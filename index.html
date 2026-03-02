@@ -353,6 +353,7 @@ body {
 </style>
 </head>
 <body>
+<script src="courses_data.js"></script>
 
 <div class="container">
   <!-- Header -->
@@ -557,17 +558,15 @@ let displayedCount = 0;
 const PAGE_SIZE = 50;
 
 /* ===== Initialization ===== */
-async function init() {
-  try {
-    const resp = await fetch('courses.json');
-    allCourses = await resp.json();
+function init() {
+  if (typeof COURSES_DATA !== 'undefined') {
+    allCourses = COURSES_DATA;
     populateFilters();
     applyFilters();
     document.getElementById('loadingMsg').remove();
-  } catch (err) {
+  } else {
     document.getElementById('loadingMsg').innerHTML =
-      '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败</span>';
-    console.error(err);
+      '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败<br><small>courses_data.js not found</small></span>';
   }
 }
 

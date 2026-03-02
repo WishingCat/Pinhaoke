@@ -238,8 +238,16 @@ def main():
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(all_courses, f, ensure_ascii=False, indent=2)
 
+    # Also generate a JS file for direct <script src> loading (avoids CORS on file://)
+    js_file = os.path.join(base_dir, 'courses_data.js')
+    with open(js_file, 'w', encoding='utf-8') as f:
+        f.write('const COURSES_DATA = ')
+        json.dump(all_courses, f, ensure_ascii=False, separators=(',', ':'))
+        f.write(';\n')
+
     print(f'\nTotal courses: {len(all_courses)}')
     print(f'Output written to: {output_file}')
+    print(f'JS data written to: {js_file}')
 
     # Print some stats
     categories = set(c['课程类别'] for c in all_courses)
