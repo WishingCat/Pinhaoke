@@ -22,8 +22,10 @@
 
 ## 如果有能力的话欢迎赞助 弥补网站的运行费用 只要自己还在学校读书 每学期都会一直更新下去的！
 
-
-
+<p align="center">
+<img src="Images/wechat_sponsor.jpg" alt="微信赞助" width="300">&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="Images/alipay_sponsor.jpg" alt="支付宝赞助" width="300">
+</p>
 
 ## 如果有反馈BUG、意见等或者希望有新的功能，欢迎联系！一定会尽快安排。
-<p align="center"><img src="Images/MyWeChat.jpg" alt="微信联系方式" width="300"></p>
+<p align="center"><img src="Images/MyWeChat.jpg" alt="微信联系方式" width="200"></p>
