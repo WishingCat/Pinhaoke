@@ -6,7 +6,7 @@
 
 
 ## 使用方法
-直接打开网页：即可使用
+直接打开网页：[www.pinhaoke.love](http://www.pinhaoke.love) 即可使用
 
 ## 功能
 
