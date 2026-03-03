@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>北大课程搜索 | PKU Course Search</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet"></noscript>
 <style>
 /* ===== Reset & Base ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -501,6 +502,32 @@ body::after {
   display: block;
 }
 
+/* ===== Loading Spinner ===== */
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--glass-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-overlay .loading-label {
+  color: var(--text-lighter);
+  font-size: 0.9rem;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
   .container { padding: 16px 12px 40px; }
@@ -516,10 +543,36 @@ body::after {
   .course-card { padding: 16px 18px; }
   .card-details { grid-template-columns: 1fr; }
 }
+
+/* ===== Mobile Performance: reduce blur effects ===== */
+@media (max-width: 768px) {
+  :root {
+    --blur: 8px;
+    --blur-strong: 12px;
+  }
+  body::before, body::after {
+    filter: blur(40px);
+  }
+  .font-dropdown {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .filter-group select,
+  .filter-group input {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.7);
+  }
+  .clear-btn {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.6);
+  }
+}
 </style>
 </head>
 <body>
-<script src="courses_data.js"></script>
+<script src="courses_data.js" defer></script>
 
 <div class="container">
   <!-- Header -->
@@ -607,9 +660,9 @@ body::after {
 
   <!-- Results -->
   <div class="results" id="resultsContainer">
-    <div class="state-msg" id="loadingMsg">
-      <span class="icon">&#x23F3;</span>
-      <span id="loadingText">正在加载课程数据...</span>
+    <div class="loading-overlay" id="loadingMsg">
+      <div class="spinner"></div>
+      <span class="loading-label" id="loadingText">正在加载课程数据...</span>
     </div>
   </div>
 
@@ -842,7 +895,17 @@ const PAGE_SIZE = 50;
 /* ===== Initialization ===== */
 function init() {
   if (typeof COURSES_DATA !== 'undefined') {
-    allCourses = COURSES_DATA;
+    // Dereference compact format: expand indexed fields to actual strings
+    allCourses = COURSES_DATA.map(c => ({
+      '课程名': c.n,
+      '教师': c.t,
+      '开课单位': _D[c.d],
+      '上课时间': c.s,
+      '教室': c.r,
+      '备注': c.m,
+      '课程类别': _C[c.c],
+      '学生类别': _G[c.g],
+    }));
     populateFilters();
     applyFilters();
     document.getElementById('loadingMsg').remove();
@@ -1016,7 +1079,7 @@ function clearAll() {
 }
 
 /* ===== Start ===== */
-init();
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

@@ -239,10 +239,38 @@ def main():
         json.dump(all_courses, f, ensure_ascii=False, indent=2)
 
     # Also generate a JS file for direct <script src> loading (avoids CORS on file://)
+    # Use compact format: short keys + lookup arrays for repeated values
+    departments = sorted(set(c['开课单位'] for c in all_courses))
+    categories = list(dict.fromkeys(c['课程类别'] for c in all_courses))  # preserve order
+    student_types = ['本科生', '研究生']
+
+    dept_idx = {d: i for i, d in enumerate(departments)}
+    cat_idx = {c: i for i, c in enumerate(categories)}
+    st_idx = {s: i for i, s in enumerate(student_types)}
+
+    compact_courses = []
+    for c in all_courses:
+        compact_courses.append({
+            'n': c['课程名'],
+            't': c['教师'],
+            'd': dept_idx[c['开课单位']],
+            's': c['上课时间'],
+            'r': c['教室'],
+            'm': c['备注'],
+            'c': cat_idx[c['课程类别']],
+            'g': st_idx[c['学生类别']],
+        })
+
     js_file = os.path.join(base_dir, 'courses_data.js')
     with open(js_file, 'w', encoding='utf-8') as f:
-        f.write('const COURSES_DATA = ')
-        json.dump(all_courses, f, ensure_ascii=False, separators=(',', ':'))
+        f.write('const _D=')
+        json.dump(departments, f, ensure_ascii=False, separators=(',', ':'))
+        f.write(';\nconst _C=')
+        json.dump(categories, f, ensure_ascii=False, separators=(',', ':'))
+        f.write(';\nconst _G=')
+        json.dump(student_types, f, ensure_ascii=False, separators=(',', ':'))
+        f.write(';\nconst COURSES_DATA=')
+        json.dump(compact_courses, f, ensure_ascii=False, separators=(',', ':'))
         f.write(';\n')
 
     print(f'\nTotal courses: {len(all_courses)}')
