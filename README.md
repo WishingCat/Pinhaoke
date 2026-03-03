@@ -20,6 +20,8 @@
 - `pku_undergraduate_course_schedule_spring_2026.xlsx` — 本科生课程表（37 个类别，2833 门课）
 - `pku_graduate_course_schedule_spring_2026.xlsx` — 研究生课程表（42 个类别，1377 门课）
 
+数据来源于2026年3月2日获取到的教务部发布的该学期课程的excl文档。
+
 ## 如果有能力的话欢迎赞助 弥补网站的运行费用 
 ## 只要有人需要 每学期都会一直更新下去的！
 
