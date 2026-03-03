@@ -5,10 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>北大课程搜索 | PKU Course Search</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet">
 <style>
 /* ===== Reset & Base ===== */
@@ -533,26 +529,6 @@ body::after {
       <span id="githubText">在Github上给这个项目点个Star<br>就是对我最大的支持，感谢您！<br>欢迎通过Github页面联系作者<br>欢迎提供任何意见，会及时修改！<br><span class="designer">Design By 祈愿的猫</span></span>
     </a>
     <div class="top-controls">
-      <div class="font-selector" id="fontSelector">
-        <button class="top-btn" onclick="toggleFontDropdown()">
-          <span class="icon">&#x1D5A0;</span>
-          <span id="fontLabel">HarmonyOS</span>
-        </button>
-        <div class="font-dropdown" id="fontDropdown">
-          <button class="font-option active" data-font="harmonyos" onclick="setFont('harmonyos')">
-            <span class="font-name">HarmonyOS Sans SC</span>
-            <span class="font-desc">现代几何，笔画清晰锐利</span>
-          </button>
-          <button class="font-option" data-font="noto" onclick="setFont('noto')">
-            <span class="font-name">Noto Sans SC</span>
-            <span class="font-desc">思源黑体，中性清晰</span>
-          </button>
-          <button class="font-option" data-font="lxgw" onclick="setFont('lxgw')">
-            <span class="font-name">LXGW WenKai</span>
-            <span class="font-desc">霞鹜文楷，温润文艺</span>
-          </button>
-        </div>
-      </div>
       <div class="font-selector" id="langSelector">
         <button class="top-btn" onclick="toggleLangDropdown()">
           <span class="icon">&#x1F310;</span>
@@ -797,35 +773,7 @@ const i18n = {
 
 let currentLang = 'zh';
 
-/* ===== Font Selector ===== */
-const FONTS = {
-  harmonyos: { family: '"HarmonyOS Sans SC"', label: 'HarmonyOS' },
-  noto:      { family: '"Noto Sans SC"',      label: 'Noto Sans' },
-  lxgw:      { family: '"LXGW WenKai"',       label: 'LXGW WenKai' },
-};
-const FALLBACK = ', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif';
-let currentFont = 'harmonyos';
-
-function setFont(key) {
-  currentFont = key;
-  document.body.style.fontFamily = FONTS[key].family + FALLBACK;
-  document.getElementById('fontLabel').textContent = FONTS[key].label;
-  document.querySelectorAll('.font-option').forEach(el => {
-    el.classList.toggle('active', el.dataset.font === key);
-  });
-  closeFontDropdown();
-}
-
-function toggleFontDropdown() {
-  document.getElementById('fontDropdown').classList.toggle('open');
-}
-
-function closeFontDropdown() {
-  document.getElementById('fontDropdown').classList.remove('open');
-}
-
 document.addEventListener('click', e => {
-  if (!document.getElementById('fontSelector').contains(e.target)) closeFontDropdown();
   if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
 });
 
