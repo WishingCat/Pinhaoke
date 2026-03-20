@@ -278,9 +278,17 @@ body::after {
   margin-bottom: 24px;
 }
 
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
 .filter-group {
   flex: 1 1 200px;
   min-width: 160px;
+  position: relative;
 }
 
 .filter-group label {
@@ -294,7 +302,6 @@ body::after {
   letter-spacing: 0.5px;
 }
 
-.filter-group select,
 .filter-group input {
   width: 100%;
   padding: 10px 14px;
@@ -308,31 +315,139 @@ body::after {
   font-size: 0.88rem;
   color: var(--text);
   font-family: inherit;
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: pointer;
   transition: all 0.25s;
 }
 
-.filter-group select option {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  color: var(--text);
-  padding: 8px 12px;
-}
-
-.filter-group select:focus,
 .filter-group input:focus {
   border-color: var(--accent-light);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-.filter-group select {
+/* ===== Custom Glass Select ===== */
+.custom-select {
+  position: relative;
+}
+
+.custom-select-trigger {
+  width: 100%;
+  padding: 10px 32px 10px 14px;
+  border: 1px solid var(--glass-border-light);
+  outline: none;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px var(--glass-shadow);
+  font-size: 0.88rem;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
-  padding-right: 32px;
+}
+
+.custom-select-trigger:hover {
+  background-color: var(--glass-bg-strong);
+}
+
+.custom-select.open .custom-select-trigger {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.custom-select-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 200;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.18);
+}
+
+.custom-select.open .custom-select-dropdown {
+  display: block;
+}
+
+.custom-select-option {
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-select-option:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.custom-select-option.active {
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.06);
+}
+
+/* ===== Like Button ===== */
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 20px;
+  border: 1px solid var(--glass-border-light);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  font-size: 0.88rem;
+  color: var(--text-light);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.25s;
+  box-shadow: 0 4px 12px var(--glass-shadow);
+}
+
+.like-btn:hover {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.like-btn.liked {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.like-btn .heart {
+  font-size: 1.1rem;
+  transition: transform 0.25s;
+}
+
+.like-btn:active .heart {
+  transform: scale(1.3);
+}
+
+.like-btn .like-count {
+  font-weight: 600;
+  font-size: 0.84rem;
+  min-width: 1ch;
 }
 
 /* ===== Results Info ===== */
@@ -491,6 +606,8 @@ body::after {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
 }
 
 .detail-btn {
@@ -787,11 +904,16 @@ body::after {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
-  .filter-group select,
+  .custom-select-trigger,
   .filter-group input {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     background: rgba(255, 255, 255, 0.65);
+  }
+  .custom-select-dropdown {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    background: rgba(255, 255, 255, 0.85);
   }
   .clear-btn {
     backdrop-filter: none;
@@ -842,46 +964,39 @@ body::after {
 
   <!-- Filters -->
   <div class="filters" id="filtersContainer">
-    <div class="filter-group">
-      <label id="labelCourseType">课程类型</label>
-      <select id="filterCourseType" onchange="applyFilters()">
-        <option value="">全部</option>
-      </select>
+    <!-- Row 1: 课程类型, 课程类别, 学分, 开课单位 -->
+    <div class="filter-row">
+      <div class="filter-group">
+        <label id="labelCourseType">课程类型</label>
+        <div class="custom-select" id="csCourseType" data-filter="filterCourseType"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelCategory">课程类别</label>
+        <div class="custom-select" id="csCategory" data-filter="filterCategory"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelCredits">学分</label>
+        <div class="custom-select" id="csCredits" data-filter="filterCredits"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelDepartment">开课单位</label>
+        <div class="custom-select" id="csDepartment" data-filter="filterDepartment"></div>
+      </div>
     </div>
-    <div class="filter-group">
-      <label id="labelCategory">课程类别</label>
-      <select id="filterCategory" onchange="applyFilters()">
-        <option value="">全部</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label id="labelCredits">学分</label>
-      <select id="filterCredits" onchange="applyFilters()">
-        <option value="">全部</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label id="labelDepartment">开课单位</label>
-      <select id="filterDepartment" onchange="applyFilters()">
-        <option value="">全部</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label id="labelWeekday">上课时间</label>
-      <select id="filterWeekday" onchange="applyFilters()">
-        <option value="">全部</option>
-        <option value="周一">周一</option>
-        <option value="周二">周二</option>
-        <option value="周三">周三</option>
-        <option value="周四">周四</option>
-        <option value="周五">周五</option>
-        <option value="周六">周六</option>
-        <option value="周日">周日</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label id="labelClassroom">教室</label>
-      <input type="text" id="filterClassroom" placeholder="输入教室名称..." oninput="debouncedSearch()">
+    <!-- Row 2: 成绩记载方式, 上课时间, 教室 -->
+    <div class="filter-row">
+      <div class="filter-group">
+        <label id="labelGrading">成绩记载方式</label>
+        <div class="custom-select" id="csGrading" data-filter="filterGrading"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelWeekday">上课时间</label>
+        <div class="custom-select" id="csWeekday" data-filter="filterWeekday"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelClassroom">教室</label>
+        <input type="text" id="filterClassroom" placeholder="输入教室名称..." oninput="debouncedSearch()">
+      </div>
     </div>
   </div>
 
@@ -929,6 +1044,7 @@ const i18n = {
     searchPlaceholder: '输入课程名、教师姓名或教室...',
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
+    labelGrading: '成绩记载方式',
     labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
@@ -958,6 +1074,7 @@ const i18n = {
     searchPlaceholder: 'Search course name, teacher or classroom...',
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
+    labelGrading: 'Grading',
     labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
@@ -987,6 +1104,7 @@ const i18n = {
     searchPlaceholder: '授業名、教員名または教室を入力...',
     labelCourseType: '科目種別', labelCategory: '科目区分',
     labelCredits: '単位', labelDepartment: '開講部局',
+    labelGrading: '成績評価方法',
     labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
@@ -1016,6 +1134,7 @@ const i18n = {
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
     labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
     labelCredits: '학점', labelDepartment: '개설 학과',
+    labelGrading: '성적 방식',
     labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
@@ -1045,6 +1164,7 @@ const i18n = {
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
     labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
+    labelGrading: 'Notation',
     labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
@@ -1074,6 +1194,7 @@ const i18n = {
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
+    labelGrading: 'Bewertung',
     labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
@@ -1103,6 +1224,7 @@ const i18n = {
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
     labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
+    labelGrading: 'Calificaci\u00f3n',
     labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
@@ -1132,6 +1254,7 @@ const i18n = {
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
+    labelGrading: 'Оценивание',
     labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
@@ -1192,34 +1315,13 @@ function applyI18n() {
   document.getElementById('labelCategory').textContent = lang.labelCategory;
   document.getElementById('labelCredits').textContent = lang.labelCredits;
   document.getElementById('labelDepartment').textContent = lang.labelDepartment;
+  document.getElementById('labelGrading').textContent = lang.labelGrading;
   document.getElementById('labelWeekday').textContent = lang.labelWeekday;
   document.getElementById('labelClassroom').textContent = lang.labelClassroom;
   document.getElementById('filterClassroom').placeholder = lang.classroomPlaceholder;
   document.getElementById('clearBtn').textContent = lang.clearBtn;
   document.getElementById('loadMoreText').textContent = lang.loadMoreText;
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
-
-  // Update course type options
-  const ctSelect = document.getElementById('filterCourseType');
-  ctSelect.options[0].textContent = lang.all;
-  for (let i = 1; i < ctSelect.options.length; i++) {
-    const val = ctSelect.options[i].value;
-    ctSelect.options[i].textContent = lang.courseTypes[val] || val;
-  }
-
-  // Update weekday options
-  const wdSelect = document.getElementById('filterWeekday');
-  const weekdaysCN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  wdSelect.options[0].textContent = lang.all;
-  for (let i = 0; i < 7; i++) {
-    wdSelect.options[i + 1].textContent = lang.weekdays[i];
-    wdSelect.options[i + 1].value = weekdaysCN[i];
-  }
-
-  // Update other filter first options
-  document.getElementById('filterCategory').options[0].textContent = lang.all;
-  document.getElementById('filterCredits').options[0].textContent = lang.all;
-  document.getElementById('filterDepartment').options[0].textContent = lang.all;
   updateResultsCount();
 }
 
@@ -1244,45 +1346,80 @@ async function init() {
   }
 }
 
+/* ===== Custom Select Component ===== */
+const csValues = {}; // track selected values: { filterId: value }
+
+function initCustomSelect(containerId, options, allText) {
+  const container = document.getElementById(containerId);
+  const filterId = container.dataset.filter;
+  csValues[filterId] = '';
+
+  let html = `<div class="custom-select-trigger">${esc(allText)}</div>`;
+  html += `<div class="custom-select-dropdown">`;
+  html += `<div class="custom-select-option active" data-value="">${esc(allText)}</div>`;
+  for (const opt of options) {
+    html += `<div class="custom-select-option" data-value="${esc(opt.value)}">${esc(opt.label)}</div>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+
+  const trigger = container.querySelector('.custom-select-trigger');
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    closeAllSelects(container);
+    container.classList.toggle('open');
+  });
+
+  container.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      csValues[filterId] = opt.dataset.value;
+      trigger.textContent = opt.textContent;
+      container.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      container.classList.remove('open');
+      applyFilters();
+    });
+  });
+}
+
+function closeAllSelects(except) {
+  document.querySelectorAll('.custom-select.open').forEach(cs => {
+    if (cs !== except) cs.classList.remove('open');
+  });
+}
+
+document.addEventListener('click', () => closeAllSelects());
+
 function populateFilters(filters) {
   const lang = i18n[currentLang];
 
-  // Course types
-  const ctSelect = document.getElementById('filterCourseType');
-  filters.course_types.forEach(ct => {
-    const opt = document.createElement('option');
-    opt.value = ct;
-    opt.textContent = lang.courseTypes[ct] || ct;
-    ctSelect.appendChild(opt);
-  });
+  initCustomSelect('csCourseType',
+    filters.course_types.map(ct => ({ value: ct, label: lang.courseTypes[ct] || ct })),
+    lang.all);
 
-  // Categories
-  const catSelect = document.getElementById('filterCategory');
-  filters.categories.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    catSelect.appendChild(opt);
-  });
+  initCustomSelect('csCategory',
+    filters.categories.map(c => ({ value: c, label: c })),
+    lang.all);
 
-  // Credits
-  const credSelect = document.getElementById('filterCredits');
-  filters.credits.forEach(cr => {
-    if (cr === 0) return;
-    const opt = document.createElement('option');
-    opt.value = cr;
-    opt.textContent = cr % 1 === 0 ? cr.toFixed(0) : cr.toFixed(1);
-    credSelect.appendChild(opt);
-  });
+  initCustomSelect('csCredits',
+    filters.credits.filter(c => c !== 0).map(c => ({
+      value: String(c),
+      label: c % 1 === 0 ? c.toFixed(0) : c.toFixed(1)
+    })),
+    lang.all);
 
-  // Departments
-  const deptSelect = document.getElementById('filterDepartment');
-  filters.departments.forEach(dept => {
-    const opt = document.createElement('option');
-    opt.value = dept;
-    opt.textContent = dept;
-    deptSelect.appendChild(opt);
-  });
+  initCustomSelect('csDepartment',
+    filters.departments.map(d => ({ value: d, label: d })),
+    lang.all);
+
+  initCustomSelect('csGrading',
+    filters.gradings.map(g => ({ value: g, label: g })),
+    lang.all);
+
+  const weekdaysCN = ['周一','周二','周三','周四','周五','周六','周日'];
+  initCustomSelect('csWeekday',
+    weekdaysCN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
+    lang.all);
 }
 
 /* ===== Search & Filter ===== */
@@ -1303,14 +1440,14 @@ async function fetchCourses() {
 
   const params = new URLSearchParams();
   const q = document.getElementById('searchInput').value.trim();
-  const type = document.getElementById('filterCourseType').value;
-  const category = document.getElementById('filterCategory').value;
-  const credits = document.getElementById('filterCredits').value;
-  const department = document.getElementById('filterDepartment').value;
-  const weekday = document.getElementById('filterWeekday').value;
   const classroom = document.getElementById('filterClassroom').value.trim();
+  const type = csValues.filterCourseType || '';
+  const category = csValues.filterCategory || '';
+  const credits = csValues.filterCredits || '';
+  const department = csValues.filterDepartment || '';
+  const weekday = csValues.filterWeekday || '';
+  const grading = csValues.filterGrading || '';
 
-  // Combine search query and classroom into one query
   const searchTerms = [q, classroom].filter(Boolean).join(' ');
   if (searchTerms) params.set('q', searchTerms);
   if (type) params.set('type', type);
@@ -1318,6 +1455,7 @@ async function fetchCourses() {
   if (credits) params.set('credits', credits);
   if (department) params.set('department', department);
   if (weekday) params.set('weekday', weekday);
+  if (grading) params.set('grading', grading);
   params.set('page', currentPage);
   params.set('page_size', PAGE_SIZE);
 
@@ -1429,11 +1567,61 @@ function createCard(course) {
 
   html += `</div>
     <div class="card-footer">
+      <button class="like-btn${isLiked(course.id) ? ' liked' : ''}" onclick="toggleLike(event, ${course.id})" data-id="${course.id}">
+        <span class="heart">${isLiked(course.id) ? '&#x2764;' : '&#x2661;'}</span>
+        <span class="like-count">${course.likes || 0}</span>
+      </button>
       <button class="detail-btn" onclick="showDetail(${course.id})">${esc(lang.detailBtn)}</button>
     </div>`;
 
   card.innerHTML = html;
   return card;
+}
+
+/* ===== Like System ===== */
+function getLikedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem('pinhaoke_likes') || '[]')); }
+  catch { return new Set(); }
+}
+
+function saveLikedSet(s) {
+  localStorage.setItem('pinhaoke_likes', JSON.stringify([...s]));
+}
+
+function isLiked(id) {
+  return getLikedSet().has(id);
+}
+
+async function toggleLike(e, courseId) {
+  e.stopPropagation();
+  const liked = getLikedSet();
+  const btn = e.currentTarget;
+  const heart = btn.querySelector('.heart');
+  const countEl = btn.querySelector('.like-count');
+  const wasLiked = liked.has(courseId);
+
+  try {
+    const resp = await fetch('/api/courses/' + courseId + (wasLiked ? '/unlike' : '/like'), { method: 'POST' });
+    const data = await resp.json();
+    countEl.textContent = data.likes;
+
+    if (wasLiked) {
+      liked.delete(courseId);
+      btn.classList.remove('liked');
+      heart.innerHTML = '&#x2661;';
+    } else {
+      liked.add(courseId);
+      btn.classList.add('liked');
+      heart.innerHTML = '&#x2764;';
+    }
+    saveLikedSet(liked);
+
+    // Update in currentCourses
+    const c = currentCourses.find(c => c.id === courseId);
+    if (c) c.likes = data.likes;
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 /* ===== Detail Modal ===== */
@@ -1568,12 +1756,18 @@ function esc(str) {
 
 function clearAll() {
   document.getElementById('searchInput').value = '';
-  document.getElementById('filterCourseType').value = '';
-  document.getElementById('filterCategory').value = '';
-  document.getElementById('filterCredits').value = '';
-  document.getElementById('filterDepartment').value = '';
-  document.getElementById('filterWeekday').value = '';
   document.getElementById('filterClassroom').value = '';
+  // Reset all custom selects
+  document.querySelectorAll('.custom-select').forEach(cs => {
+    const filterId = cs.dataset.filter;
+    csValues[filterId] = '';
+    const trigger = cs.querySelector('.custom-select-trigger');
+    const firstOpt = cs.querySelector('.custom-select-option');
+    if (trigger && firstOpt) trigger.textContent = firstOpt.textContent;
+    cs.querySelectorAll('.custom-select-option').forEach((o, i) => {
+      o.classList.toggle('active', i === 0);
+    });
+  });
   applyFilters();
 }
 

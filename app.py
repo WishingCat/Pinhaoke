@@ -37,6 +37,9 @@ def get_filters():
         credits = [r[0] for r in c.execute(
             "SELECT DISTINCT credits FROM courses ORDER BY credits"
         )]
+        gradings = [r[0] for r in c.execute(
+            "SELECT DISTINCT grading FROM course_details WHERE grading != '' ORDER BY grading"
+        )]
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
     return {
@@ -44,6 +47,7 @@ def get_filters():
         "categories": categories,
         "departments": departments,
         "credits": credits,
+        "gradings": gradings,
         "weekdays": weekdays,
     }
 
@@ -56,6 +60,7 @@ def list_courses(
     credits: str = Query("", description="Credits filter"),
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter"),
+    grading: str = Query("", description="Grading filter"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
@@ -65,47 +70,58 @@ def list_courses(
     if q:
         q_like = f"%{q}%"
         conditions.append(
-            "(course_name LIKE ? OR teacher LIKE ? OR classroom LIKE ?)"
+            "(c.course_name LIKE ? OR c.teacher LIKE ? OR c.classroom LIKE ?)"
         )
         params.extend([q_like, q_like, q_like])
 
     if type:
-        conditions.append("course_type = ?")
+        conditions.append("c.course_type = ?")
         params.append(type)
 
     if category:
-        conditions.append("category = ?")
+        conditions.append("c.category = ?")
         params.append(category)
 
     if credits:
-        conditions.append("credits = ?")
+        conditions.append("c.credits = ?")
         params.append(float(credits))
 
     if department:
-        conditions.append("department = ?")
+        conditions.append("c.department = ?")
         params.append(department)
 
     if weekday:
-        conditions.append("weekdays LIKE ?")
+        conditions.append("c.weekdays LIKE ?")
         params.append(f"%{weekday}%")
+
+    if grading:
+        conditions.append("d.grading = ?")
+        params.append(grading)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     offset = (page - 1) * page_size
 
     with get_db() as conn:
-        c = conn.cursor()
+        cur = conn.cursor()
 
-        count_row = c.execute(
-            f"SELECT COUNT(*) FROM courses{where}", params
+        count_row = cur.execute(
+            f"""SELECT COUNT(*) FROM courses c
+                LEFT JOIN course_details d ON c.id = d.course_id{where}""",
+            params,
         ).fetchone()
         total = count_row[0]
 
-        rows = c.execute(
-            f"""SELECT id, course_type, course_code, course_name, category,
-                       credits, teacher, class_no, department, schedule,
-                       classroom, enrollment, pnp, notes, major, grade
-                FROM courses{where}
-                ORDER BY id
+        rows = cur.execute(
+            f"""SELECT c.id, c.course_type, c.course_code, c.course_name,
+                       c.category, c.credits, c.teacher, c.class_no,
+                       c.department, c.schedule, c.classroom, c.enrollment,
+                       c.pnp, c.notes, c.major, c.grade,
+                       COALESCE(l.like_count, 0) as likes
+                FROM courses c
+                LEFT JOIN course_details d ON c.id = d.course_id
+                LEFT JOIN course_likes l ON c.id = l.course_id
+                {where}
+                ORDER BY c.id
                 LIMIT ? OFFSET ?""",
             params + [page_size, offset],
         ).fetchall()
@@ -129,6 +145,7 @@ def list_courses(
             "notes": r["notes"],
             "major": r["major"],
             "grade": r["grade"],
+            "likes": r["likes"],
         })
 
     return {"total": total, "page": page, "page_size": page_size, "courses": courses}
@@ -137,14 +154,16 @@ def list_courses(
 @app.get("/api/courses/{course_id}")
 def get_course_detail(course_id: int):
     with get_db() as conn:
-        c = conn.cursor()
+        cur = conn.cursor()
 
-        row = c.execute(
+        row = cur.execute(
             """SELECT c.*, d.english_name, d.prerequisites, d.intro_cn,
                       d.intro_en, d.grading, d.ge_series, d.language,
-                      d.textbook, d.reference, d.syllabus, d.evaluation
+                      d.textbook, d.reference, d.syllabus, d.evaluation,
+                      COALESCE(l.like_count, 0) as likes
                FROM courses c
                LEFT JOIN course_details d ON c.id = d.course_id
+               LEFT JOIN course_likes l ON c.id = l.course_id
                WHERE c.id = ?""",
             (course_id,),
         ).fetchone()
@@ -181,7 +200,43 @@ def get_course_detail(course_id: int):
         "reference": row["reference"],
         "syllabus": row["syllabus"],
         "evaluation": row["evaluation"],
+        "likes": row["likes"],
     }
+
+
+@app.post("/api/courses/{course_id}/like")
+def like_course(course_id: int):
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO course_likes (course_id, like_count)
+               VALUES (?, 1)
+               ON CONFLICT(course_id) DO UPDATE SET like_count = like_count + 1""",
+            (course_id,),
+        )
+        conn.commit()
+        row = cur.execute(
+            "SELECT like_count FROM course_likes WHERE course_id = ?",
+            (course_id,),
+        ).fetchone()
+    return {"likes": row[0] if row else 0}
+
+
+@app.post("/api/courses/{course_id}/unlike")
+def unlike_course(course_id: int):
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE course_likes SET like_count = MAX(like_count - 1, 0)
+               WHERE course_id = ?""",
+            (course_id,),
+        )
+        conn.commit()
+        row = cur.execute(
+            "SELECT like_count FROM course_likes WHERE course_id = ?",
+            (course_id,),
+        ).fetchone()
+    return {"likes": row[0] if row else 0}
 
 
 # Static files

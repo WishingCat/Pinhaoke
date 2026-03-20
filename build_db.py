@@ -174,6 +174,16 @@ def build_db():
                 ),
             )
 
+    # Likes table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS course_likes (
+            course_id INTEGER PRIMARY KEY REFERENCES courses(id),
+            like_count INTEGER DEFAULT 0
+        )
+    """)
+    # Initialize likes for all courses
+    c.execute("INSERT INTO course_likes (course_id, like_count) SELECT id, 0 FROM courses")
+
     # Indexes
     c.executescript("""
         CREATE INDEX idx_course_type ON courses(course_type);
