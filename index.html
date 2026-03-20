@@ -27,6 +27,8 @@
   --green: #059669;
   --green-bg: rgba(5, 150, 105, 0.1);
   --indigo-bg: rgba(99, 102, 241, 0.1);
+  --orange: #d97706;
+  --orange-bg: rgba(217, 119, 6, 0.1);
   --radius: 18px;
   --radius-sm: 12px;
   --radius-pill: 50px;
@@ -134,7 +136,7 @@ body::after {
   font-weight: 400;
 }
 
-/* ===== Top Controls (lang + font) ===== */
+/* ===== Top Controls (lang) ===== */
 .top-controls {
   position: absolute;
   top: 20px;
@@ -402,6 +404,7 @@ body::after {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .badge {
@@ -414,22 +417,34 @@ body::after {
   border: 1px solid transparent;
 }
 
-.badge-undergrad {
+.badge-elective {
   color: var(--accent);
   background: var(--indigo-bg);
   border-color: rgba(99, 102, 241, 0.2);
 }
 
-.badge-grad {
+.badge-general {
   color: var(--green);
   background: var(--green-bg);
   border-color: rgba(5, 150, 105, 0.2);
+}
+
+.badge-major {
+  color: var(--orange);
+  background: var(--orange-bg);
+  border-color: rgba(217, 119, 6, 0.2);
 }
 
 .badge-category {
   color: var(--text-light);
   background: rgba(100, 116, 139, 0.08);
   border-color: rgba(100, 116, 139, 0.15);
+}
+
+.badge-credits {
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.06);
+  border-color: rgba(99, 102, 241, 0.15);
 }
 
 .card-details {
@@ -460,6 +475,164 @@ body::after {
 .detail-value.notes {
   color: var(--text-light);
   font-size: 0.82rem;
+}
+
+/* ===== Detail Button ===== */
+.card-footer {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detail-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--glass-border-light);
+  border-radius: var(--radius-pill);
+  background: rgba(99, 102, 241, 0.06);
+  font-size: 0.78rem;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.25s;
+}
+
+.detail-btn:hover {
+  background: var(--indigo-bg);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+
+.detail-btn:active { transform: scale(0.96); }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 80px rgba(31, 38, 135, 0.2);
+  padding: 32px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.modal-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-light);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(100, 116, 139, 0.2);
+  color: var(--text);
+}
+
+.modal-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.modal-section {
+  margin-bottom: 20px;
+}
+
+.modal-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 20px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-lighter);
+  text-transform: uppercase;
+}
+
+.modal-field-value {
+  font-size: 0.88rem;
+  color: var(--text);
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.modal-field-value.long-text {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-light);
+  font-size: 0.84rem;
+}
+
+.modal-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-lighter);
 }
 
 /* ===== Load More ===== */
@@ -503,7 +676,7 @@ body::after {
 }
 
 /* ===== Loading Spinner ===== */
-.loading-overlay {
+.loading-overlay-inline {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -523,7 +696,7 @@ body::after {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.loading-overlay .loading-label {
+.loading-overlay-inline .loading-label {
   color: var(--text-lighter);
   font-size: 0.9rem;
 }
@@ -542,6 +715,7 @@ body::after {
   .filter-group { flex: 1 1 140px; min-width: 120px; }
   .course-card { padding: 16px 18px; }
   .card-details { grid-template-columns: 1fr; }
+  .modal-content { padding: 20px; max-height: 90vh; }
 }
 
 /* ===== Mobile Performance: reduce blur effects ===== */
@@ -572,7 +746,6 @@ body::after {
 </style>
 </head>
 <body>
-<script src="courses_data.js" defer></script>
 
 <div class="container">
   <!-- Header -->
@@ -607,23 +780,27 @@ body::after {
   <div class="search-section">
     <div class="search-box">
       <span class="search-icon">&#x1F50D;</span>
-      <input type="text" id="searchInput" placeholder="输入课程名或教师姓名..." oninput="debouncedSearch()">
+      <input type="text" id="searchInput" placeholder="输入课程名、教师姓名或教室..." oninput="debouncedSearch()">
     </div>
   </div>
 
   <!-- Filters -->
   <div class="filters" id="filtersContainer">
     <div class="filter-group">
-      <label id="labelStudentType">学生类别</label>
-      <select id="filterStudentType" onchange="applyFilters()">
+      <label id="labelCourseType">课程类型</label>
+      <select id="filterCourseType" onchange="applyFilters()">
         <option value="">全部</option>
-        <option value="本科生">本科生</option>
-        <option value="研究生">研究生</option>
       </select>
     </div>
     <div class="filter-group">
       <label id="labelCategory">课程类别</label>
       <select id="filterCategory" onchange="applyFilters()">
+        <option value="">全部</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label id="labelCredits">学分</label>
+      <select id="filterCredits" onchange="applyFilters()">
         <option value="">全部</option>
       </select>
     </div>
@@ -660,7 +837,7 @@ body::after {
 
   <!-- Results -->
   <div class="results" id="resultsContainer">
-    <div class="loading-overlay" id="loadingMsg">
+    <div class="loading-overlay-inline" id="loadingMsg">
       <div class="spinner"></div>
       <span class="loading-label" id="loadingText">正在加载课程数据...</span>
     </div>
@@ -672,6 +849,11 @@ body::after {
   </button>
 </div>
 
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
 <script>
 /* ===== i18n ===== */
 const i18n = {
@@ -679,148 +861,233 @@ const i18n = {
     name: '中文',
     title: '拼好课',
     subtitle: '北京大学2026春季学期课程搜索(每学期更新)',
-    searchPlaceholder: '输入课程名或教师姓名...',
-    labelStudentType: '学生类别',
-    labelCategory: '课程类别',
-    labelDepartment: '开课单位',
-    labelWeekday: '上课时间',
-    labelClassroom: '教室',
+    searchPlaceholder: '输入课程名、教师姓名或教室...',
+    labelCourseType: '课程类型', labelCategory: '课程类别',
+    labelCredits: '学分', labelDepartment: '开课单位',
+    labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
-    clearBtn: '清除筛选',
-    loadMoreText: '加载更多',
+    clearBtn: '清除筛选', loadMoreText: '加载更多',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
-    all: '全部', undergrad: '本科生', grad: '研究生',
+    all: '全部',
+    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课' },
     weekdays: ['周一','周二','周三','周四','周五','周六','周日'],
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
+    fieldCredits: '学分', fieldEnrollment: '选课人数', fieldPNP: 'PNP',
+    detailBtn: '查看详情',
+    modalLoading: '加载中...',
+    modalBasicInfo: '基本信息', modalDetailInfo: '详细信息',
+    modalEnglishName: '英文名称', modalPrerequisites: '先修课程',
+    modalIntroCn: '中文简介', modalIntroEn: '英文简介',
+    modalGrading: '成绩记载方式', modalLanguage: '授课语言',
+    modalGeSeries: '通识课系列', modalSyllabus: '教学大纲',
+    modalEvaluation: '教学评估', modalCourseCode: '课程号',
+    modalClassNo: '班号', modalMajor: '专业限制', modalGrade: '年级限制',
   },
   en: {
     name: 'English',
     title: 'Pinhaoke',
     subtitle: 'PKU Spring 2026 Course Search (Updated Every Semester)',
-    searchPlaceholder: 'Search course name or teacher...',
-    labelStudentType: 'Student Type', labelCategory: 'Category',
-    labelDepartment: 'Department', labelWeekday: 'Schedule',
-    labelClassroom: 'Classroom',
+    searchPlaceholder: 'Search course name, teacher or classroom...',
+    labelCourseType: 'Course Type', labelCategory: 'Category',
+    labelCredits: 'Credits', labelDepartment: 'Department',
+    labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
-    all: 'All', undergrad: 'Undergraduate', grad: 'Graduate',
+    all: 'All',
+    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major' },
     weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
+    fieldCredits: 'Credits', fieldEnrollment: 'Enrollment', fieldPNP: 'P/NP',
+    detailBtn: 'Details',
+    modalLoading: 'Loading...',
+    modalBasicInfo: 'Basic Info', modalDetailInfo: 'Details',
+    modalEnglishName: 'English Name', modalPrerequisites: 'Prerequisites',
+    modalIntroCn: 'Description (CN)', modalIntroEn: 'Description (EN)',
+    modalGrading: 'Grading', modalLanguage: 'Language',
+    modalGeSeries: 'GE Series', modalSyllabus: 'Syllabus',
+    modalEvaluation: 'Evaluation', modalCourseCode: 'Course Code',
+    modalClassNo: 'Class No.', modalMajor: 'Major Restriction', modalGrade: 'Grade Restriction',
   },
   ja: {
     name: '日本語',
     title: '拼好課',
     subtitle: '北京大学2026年春学期 授業検索（毎学期更新）',
-    searchPlaceholder: '授業名または教員名を入力...',
-    labelStudentType: '学生区分', labelCategory: '科目区分',
-    labelDepartment: '開講部局', labelWeekday: '曜日',
-    labelClassroom: '教室',
+    searchPlaceholder: '授業名、教員名または教室を入力...',
+    labelCourseType: '科目種別', labelCategory: '科目区分',
+    labelCredits: '単位', labelDepartment: '開講部局',
+    labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
-    all: 'すべて', undergrad: '学部', grad: '大学院',
+    all: 'すべて',
+    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課' },
     weekdays: ['月','火','水','木','金','土','日'],
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
+    fieldCredits: '単位', fieldEnrollment: '登録者数', fieldPNP: 'P/NP',
+    detailBtn: '詳細',
+    modalLoading: '読み込み中...',
+    modalBasicInfo: '基本情報', modalDetailInfo: '詳細情報',
+    modalEnglishName: '英語名', modalPrerequisites: '前提科目',
+    modalIntroCn: '説明（中国語）', modalIntroEn: '説明（英語）',
+    modalGrading: '成績評価', modalLanguage: '使用言語',
+    modalGeSeries: '一般教養系列', modalSyllabus: 'シラバス',
+    modalEvaluation: '授業評価', modalCourseCode: '科目番号',
+    modalClassNo: 'クラス', modalMajor: '専攻制限', modalGrade: '学年制限',
   },
   ko: {
     name: '한국어',
     title: '핀하오커',
     subtitle: '베이징대학교 2026 봄학기 강좌 검색 (매 학기 업데이트)',
-    searchPlaceholder: '강좌명 또는 교수명 입력...',
-    labelStudentType: '학생 유형', labelCategory: '강좌 분류',
-    labelDepartment: '개설 학과', labelWeekday: '요일',
-    labelClassroom: '강의실',
+    searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
+    labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
+    labelCredits: '학점', labelDepartment: '개설 학과',
+    labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
-    all: '전체', undergrad: '학부', grad: '대학원',
+    all: '전체',
+    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공' },
     weekdays: ['월','화','수','목','금','토','일'],
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
+    fieldCredits: '학점', fieldEnrollment: '수강 인원', fieldPNP: 'P/NP',
+    detailBtn: '상세',
+    modalLoading: '로딩 중...',
+    modalBasicInfo: '기본 정보', modalDetailInfo: '상세 정보',
+    modalEnglishName: '영문명', modalPrerequisites: '선수과목',
+    modalIntroCn: '설명(중국어)', modalIntroEn: '설명(영어)',
+    modalGrading: '성적 방식', modalLanguage: '수업 언어',
+    modalGeSeries: '교양 계열', modalSyllabus: '강의계획서',
+    modalEvaluation: '강의 평가', modalCourseCode: '과목 번호',
+    modalClassNo: '분반', modalMajor: '전공 제한', modalGrade: '학년 제한',
   },
   fr: {
-    name: 'Français',
+    name: 'Fran\u00e7ais',
     title: 'Pinhaoke',
     subtitle: 'Recherche de cours PKU - Printemps 2026 (Mise \u00e0 jour chaque semestre)',
-    searchPlaceholder: 'Nom du cours ou de l\'enseignant...',
-    labelStudentType: 'Niveau', labelCategory: 'Catégorie',
-    labelDepartment: 'Département', labelWeekday: 'Jour',
-    labelClassroom: 'Salle',
+    searchPlaceholder: 'Nom du cours, enseignant ou salle...',
+    labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
+    labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
+    labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
-    clearBtn: 'Réinitialiser', loadMoreText: 'Voir plus',
-    loadingText: 'Chargement des données...',
-    emptyText: 'Aucun cours trouvé',
-    resultsCount: (s, t) => `${s} / ${t} cours affichés`,
-    all: 'Tous', undergrad: 'Licence', grad: 'Master',
+    clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
+    loadingText: 'Chargement des donn\u00e9es...',
+    emptyText: 'Aucun cours trouv\u00e9',
+    resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
+    all: 'Tous',
+    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9' },
     weekdays: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
-    fieldTeacher: 'Enseignant', fieldDepartment: 'Dépt.',
+    fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
+    fieldCredits: 'Cr\u00e9dits', fieldEnrollment: 'Inscrits', fieldPNP: 'P/NP',
+    detailBtn: 'D\u00e9tails',
+    modalLoading: 'Chargement...',
+    modalBasicInfo: 'Info de base', modalDetailInfo: 'D\u00e9tails',
+    modalEnglishName: 'Nom anglais', modalPrerequisites: 'Pr\u00e9requis',
+    modalIntroCn: 'Description (CN)', modalIntroEn: 'Description (EN)',
+    modalGrading: 'Notation', modalLanguage: 'Langue',
+    modalGeSeries: 'S\u00e9rie', modalSyllabus: 'Programme',
+    modalEvaluation: '\u00c9valuation', modalCourseCode: 'Code',
+    modalClassNo: 'Classe', modalMajor: 'Sp\u00e9cialit\u00e9', modalGrade: 'Ann\u00e9e',
   },
   de: {
     name: 'Deutsch',
     title: 'Pinhaoke',
     subtitle: 'PKU Kurssuche - Fr\u00fchling 2026 (Jedes Semester aktualisiert)',
-    searchPlaceholder: 'Kursname oder Dozent...',
-    labelStudentType: 'Studiengang', labelCategory: 'Kategorie',
-    labelDepartment: 'Fakultät', labelWeekday: 'Wochentag',
-    labelClassroom: 'Raum',
+    searchPlaceholder: 'Kursname, Dozent oder Raum...',
+    labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
+    labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
+    labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
-    clearBtn: 'Zurücksetzen', loadMoreText: 'Mehr laden',
+    clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
-    all: 'Alle', undergrad: 'Bachelor', grad: 'Master',
+    all: 'Alle',
+    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs' },
     weekdays: ['Mo','Di','Mi','Do','Fr','Sa','So'],
-    fieldTeacher: 'Dozent', fieldDepartment: 'Fakultät',
+    fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
+    fieldCredits: 'Credits', fieldEnrollment: 'Teilnehmer', fieldPNP: 'P/NP',
+    detailBtn: 'Details',
+    modalLoading: 'Laden...',
+    modalBasicInfo: 'Grundinfo', modalDetailInfo: 'Details',
+    modalEnglishName: 'Englischer Name', modalPrerequisites: 'Voraussetzungen',
+    modalIntroCn: 'Beschreibung (CN)', modalIntroEn: 'Beschreibung (EN)',
+    modalGrading: 'Bewertung', modalLanguage: 'Sprache',
+    modalGeSeries: 'Serie', modalSyllabus: 'Lehrplan',
+    modalEvaluation: 'Bewertung', modalCourseCode: 'Kurscode',
+    modalClassNo: 'Klasse', modalMajor: 'Fachbeschr\u00e4nkung', modalGrade: 'Jahrgang',
   },
   es: {
-    name: 'Español',
+    name: 'Espa\u00f1ol',
     title: 'Pinhaoke',
     subtitle: 'B\u00fasqueda de cursos PKU - Primavera 2026 (Actualizado cada semestre)',
-    searchPlaceholder: 'Nombre del curso o profesor...',
-    labelStudentType: 'Nivel', labelCategory: 'Categoría',
-    labelDepartment: 'Departamento', labelWeekday: 'Día',
-    labelClassroom: 'Aula',
+    searchPlaceholder: 'Nombre del curso, profesor o aula...',
+    labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
+    labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
+    labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
-    clearBtn: 'Limpiar', loadMoreText: 'Cargar más',
+    clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
-    all: 'Todos', undergrad: 'Grado', grad: 'Posgrado',
-    weekdays: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],
+    all: 'Todos',
+    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad' },
+    weekdays: ['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'],
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
+    fieldCredits: 'Cr\u00e9ditos', fieldEnrollment: 'Inscritos', fieldPNP: 'P/NP',
+    detailBtn: 'Detalles',
+    modalLoading: 'Cargando...',
+    modalBasicInfo: 'Info b\u00e1sica', modalDetailInfo: 'Detalles',
+    modalEnglishName: 'Nombre en ingl\u00e9s', modalPrerequisites: 'Prerrequisitos',
+    modalIntroCn: 'Descripci\u00f3n (CN)', modalIntroEn: 'Descripci\u00f3n (EN)',
+    modalGrading: 'Calificaci\u00f3n', modalLanguage: 'Idioma',
+    modalGeSeries: 'Serie', modalSyllabus: 'Programa',
+    modalEvaluation: 'Evaluaci\u00f3n', modalCourseCode: 'C\u00f3digo',
+    modalClassNo: 'Clase', modalMajor: 'Especialidad', modalGrade: 'A\u00f1o',
   },
   ru: {
     name: 'Русский',
     title: 'Pinhaoke',
     subtitle: 'Поиск курсов ПКУ - Весна 2026 (Обновляется каждый семестр)',
-    searchPlaceholder: 'Название курса или преподаватель...',
-    labelStudentType: 'Уровень', labelCategory: 'Категория',
-    labelDepartment: 'Факультет', labelWeekday: 'День',
-    labelClassroom: 'Аудитория',
+    searchPlaceholder: 'Название курса, преподаватель или аудитория...',
+    labelCourseType: 'Тип курса', labelCategory: 'Категория',
+    labelCredits: 'Кредиты', labelDepartment: 'Факультет',
+    labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
-    all: 'Все', undergrad: 'Бакалавриат', grad: 'Магистратура',
+    all: 'Все',
+    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный' },
     weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
+    fieldCredits: 'Кредиты', fieldEnrollment: 'Записано', fieldPNP: 'P/NP',
+    detailBtn: 'Подробнее',
+    modalLoading: 'Загрузка...',
+    modalBasicInfo: 'Основная информация', modalDetailInfo: 'Подробности',
+    modalEnglishName: 'Название (англ.)', modalPrerequisites: 'Пререквизиты',
+    modalIntroCn: 'Описание (кит.)', modalIntroEn: 'Описание (англ.)',
+    modalGrading: 'Оценивание', modalLanguage: 'Язык',
+    modalGeSeries: 'Серия', modalSyllabus: 'Программа',
+    modalEvaluation: 'Оценка', modalCourseCode: 'Код курса',
+    modalClassNo: 'Группа', modalMajor: 'Специальность', modalGrade: 'Курс',
   },
 };
 
@@ -839,7 +1106,7 @@ function setLang(key) {
   });
   closeLangDropdown();
   applyI18n();
-  renderResults();
+  rerenderCards();
 }
 
 function toggleLangDropdown() {
@@ -854,10 +1121,11 @@ function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
   document.getElementById('subtitle').textContent = lang.subtitle;
-  document.getElementById('langLabel').textContent = lang.langLabel;
+  document.getElementById('langLabel').textContent = lang.name;
   document.getElementById('searchInput').placeholder = lang.searchPlaceholder;
-  document.getElementById('labelStudentType').textContent = lang.labelStudentType;
+  document.getElementById('labelCourseType').textContent = lang.labelCourseType;
   document.getElementById('labelCategory').textContent = lang.labelCategory;
+  document.getElementById('labelCredits').textContent = lang.labelCredits;
   document.getElementById('labelDepartment').textContent = lang.labelDepartment;
   document.getElementById('labelWeekday').textContent = lang.labelWeekday;
   document.getElementById('labelClassroom').textContent = lang.labelClassroom;
@@ -866,13 +1134,15 @@ function applyI18n() {
   document.getElementById('loadMoreText').textContent = lang.loadMoreText;
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
 
-  const stSelect = document.getElementById('filterStudentType');
-  stSelect.options[0].textContent = lang.all;
-  stSelect.options[1].textContent = lang.undergrad;
-  stSelect.options[2].textContent = lang.grad;
-  stSelect.options[1].value = '本科生';
-  stSelect.options[2].value = '研究生';
+  // Update course type options
+  const ctSelect = document.getElementById('filterCourseType');
+  ctSelect.options[0].textContent = lang.all;
+  for (let i = 1; i < ctSelect.options.length; i++) {
+    const val = ctSelect.options[i].value;
+    ctSelect.options[i].textContent = lang.courseTypes[val] || val;
+  }
 
+  // Update weekday options
   const wdSelect = document.getElementById('filterWeekday');
   const weekdaysCN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   wdSelect.options[0].textContent = lang.all;
@@ -881,54 +1151,68 @@ function applyI18n() {
     wdSelect.options[i + 1].value = weekdaysCN[i];
   }
 
+  // Update other filter first options
   document.getElementById('filterCategory').options[0].textContent = lang.all;
+  document.getElementById('filterCredits').options[0].textContent = lang.all;
   document.getElementById('filterDepartment').options[0].textContent = lang.all;
   updateResultsCount();
 }
 
 /* ===== Data ===== */
-let allCourses = [];
-let filteredCourses = [];
-let displayedCount = 0;
+let currentCourses = [];
+let totalCount = 0;
+let currentPage = 1;
 const PAGE_SIZE = 50;
+let fetchController = null;
 
 /* ===== Initialization ===== */
-function init() {
-  if (typeof COURSES_DATA !== 'undefined') {
-    // Dereference compact format: expand indexed fields to actual strings
-    allCourses = COURSES_DATA.map(c => ({
-      '课程名': c.n,
-      '教师': c.t,
-      '开课单位': _D[c.d],
-      '上课时间': c.s,
-      '教室': c.r,
-      '备注': c.m,
-      '课程类别': _C[c.c],
-      '学生类别': _G[c.g],
-    }));
-    populateFilters();
-    applyFilters();
+async function init() {
+  try {
+    const resp = await fetch('/api/filters');
+    const filters = await resp.json();
+    populateFilters(filters);
+    await fetchCourses();
     document.getElementById('loadingMsg').remove();
-  } else {
+  } catch (e) {
     document.getElementById('loadingMsg').innerHTML =
-      '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败<br><small>courses_data.js not found</small></span>';
+      '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败</span>';
   }
 }
 
-function populateFilters() {
-  const categories = [...new Set(allCourses.map(c => c['课程类别']))];
-  const departments = [...new Set(allCourses.map(c => c['开课单位']))].sort();
+function populateFilters(filters) {
+  const lang = i18n[currentLang];
 
+  // Course types
+  const ctSelect = document.getElementById('filterCourseType');
+  filters.course_types.forEach(ct => {
+    const opt = document.createElement('option');
+    opt.value = ct;
+    opt.textContent = lang.courseTypes[ct] || ct;
+    ctSelect.appendChild(opt);
+  });
+
+  // Categories
   const catSelect = document.getElementById('filterCategory');
-  categories.forEach(cat => {
+  filters.categories.forEach(cat => {
     const opt = document.createElement('option');
     opt.value = cat;
     opt.textContent = cat;
     catSelect.appendChild(opt);
   });
 
+  // Credits
+  const credSelect = document.getElementById('filterCredits');
+  filters.credits.forEach(cr => {
+    if (cr === 0) return;
+    const opt = document.createElement('option');
+    opt.value = cr;
+    opt.textContent = cr % 1 === 0 ? cr.toFixed(0) : cr.toFixed(1);
+    credSelect.appendChild(opt);
+  });
+
+  // Departments
   const deptSelect = document.getElementById('filterDepartment');
-  departments.forEach(dept => {
+  filters.departments.forEach(dept => {
     const opt = document.createElement('option');
     opt.value = dept;
     opt.textContent = dept;
@@ -940,71 +1224,103 @@ function populateFilters() {
 let debounceTimer = null;
 function debouncedSearch() {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(applyFilters, 250);
+  debounceTimer = setTimeout(applyFilters, 300);
 }
 
 function applyFilters() {
-  const query = document.getElementById('searchInput').value.trim().toLowerCase();
-  const studentType = document.getElementById('filterStudentType').value;
-  const category = document.getElementById('filterCategory').value;
-  const department = document.getElementById('filterDepartment').value;
-  const weekday = document.getElementById('filterWeekday').value;
-  const classroom = document.getElementById('filterClassroom').value.trim().toLowerCase();
-
-  filteredCourses = allCourses.filter(c => {
-    if (query) {
-      const inName = c['课程名'].toLowerCase().includes(query);
-      const inTeacher = c['教师'].toLowerCase().includes(query);
-      if (!inName && !inTeacher) return false;
-    }
-    if (studentType && c['学生类别'] !== studentType) return false;
-    if (category && c['课程类别'] !== category) return false;
-    if (department && c['开课单位'] !== department) return false;
-    if (weekday && !c['上课时间'].includes(weekday)) return false;
-    if (classroom) {
-      const inClassroom = c['教室'].toLowerCase().includes(classroom);
-      const inNotes = c['备注'].toLowerCase().includes(classroom);
-      if (!inClassroom && !inNotes) return false;
-    }
-    return true;
-  });
-
-  displayedCount = 0;
-  renderResults();
+  currentPage = 1;
+  fetchCourses();
 }
 
-function renderResults() {
+async function fetchCourses() {
+  if (fetchController) fetchController.abort();
+  fetchController = new AbortController();
+
+  const params = new URLSearchParams();
+  const q = document.getElementById('searchInput').value.trim();
+  const type = document.getElementById('filterCourseType').value;
+  const category = document.getElementById('filterCategory').value;
+  const credits = document.getElementById('filterCredits').value;
+  const department = document.getElementById('filterDepartment').value;
+  const weekday = document.getElementById('filterWeekday').value;
+  const classroom = document.getElementById('filterClassroom').value.trim();
+
+  // Combine search query and classroom into one query
+  const searchTerms = [q, classroom].filter(Boolean).join(' ');
+  if (searchTerms) params.set('q', searchTerms);
+  if (type) params.set('type', type);
+  if (category) params.set('category', category);
+  if (credits) params.set('credits', credits);
+  if (department) params.set('department', department);
+  if (weekday) params.set('weekday', weekday);
+  params.set('page', currentPage);
+  params.set('page_size', PAGE_SIZE);
+
+  try {
+    const resp = await fetch('/api/courses?' + params.toString(), {
+      signal: fetchController.signal
+    });
+    const data = await resp.json();
+    totalCount = data.total;
+
+    if (currentPage === 1) {
+      currentCourses = data.courses;
+    } else {
+      currentCourses = currentCourses.concat(data.courses);
+    }
+
+    renderCards();
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error(e);
+  }
+}
+
+function renderCards() {
   const container = document.getElementById('resultsContainer');
   const lang = i18n[currentLang];
 
-  if (filteredCourses.length === 0) {
+  if (currentCourses.length === 0 && currentPage === 1) {
     container.innerHTML = `<div class="state-msg"><span class="icon">&#x1F50D;</span><span>${lang.emptyText}</span></div>`;
     document.getElementById('loadMoreBtn').style.display = 'none';
     updateResultsCount();
     return;
   }
 
-  const end = Math.min(displayedCount + PAGE_SIZE, filteredCourses.length);
-  if (displayedCount === 0) container.innerHTML = '';
-
+  container.innerHTML = '';
   const fragment = document.createDocumentFragment();
-  for (let i = displayedCount; i < end; i++) {
-    fragment.appendChild(createCard(filteredCourses[i]));
+  for (const course of currentCourses) {
+    fragment.appendChild(createCard(course));
   }
   container.appendChild(fragment);
 
-  displayedCount = end;
   document.getElementById('loadMoreBtn').style.display =
-    displayedCount < filteredCourses.length ? 'block' : 'none';
+    currentCourses.length < totalCount ? 'block' : 'none';
   updateResultsCount();
 }
 
-function loadMore() { renderResults(); }
+function rerenderCards() {
+  if (currentCourses.length > 0) renderCards();
+  updateResultsCount();
+}
+
+function loadMore() {
+  currentPage++;
+  fetchCourses();
+}
 
 function updateResultsCount() {
-  const shown = Math.min(displayedCount, filteredCourses.length);
   document.getElementById('resultsCount').textContent =
-    i18n[currentLang].resultsCount(shown, filteredCourses.length);
+    i18n[currentLang].resultsCount(currentCourses.length, totalCount);
+}
+
+function getTypeBadgeClass(type) {
+  if (type === '公选课') return 'badge-elective';
+  if (type === '通识课') return 'badge-general';
+  return 'badge-major';
+}
+
+function getTypeBadgeText(type) {
+  return i18n[currentLang].courseTypes[type] || type;
 }
 
 function createCard(course) {
@@ -1012,54 +1328,185 @@ function createCard(course) {
   const card = document.createElement('div');
   card.className = 'course-card';
 
-  const isUndergrad = course['学生类别'] === '本科生';
-  const badgeClass = isUndergrad ? 'badge-undergrad' : 'badge-grad';
-  const badgeText = isUndergrad ? lang.undergrad : lang.grad;
-
   let html = `
     <div class="card-header">
-      <span class="course-name">${esc(course['课程名'])}</span>
+      <span class="course-name">${esc(course.course_name)}</span>
       <div class="card-badges">
-        <span class="badge ${badgeClass}">${esc(badgeText)}</span>
-        <span class="badge badge-category">${esc(course['课程类别'])}</span>
+        <span class="badge ${getTypeBadgeClass(course.course_type)}">${esc(getTypeBadgeText(course.course_type))}</span>
+        <span class="badge badge-category">${esc(course.category)}</span>
+        <span class="badge badge-credits">${course.credits % 1 === 0 ? course.credits.toFixed(0) : course.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
       </div>
     </div>
     <div class="card-details">
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldTeacher)}</span>
-        <span class="detail-value">${esc(course['教师'])}</span>
+        <span class="detail-value">${esc(course.teacher || '-')}</span>
       </div>
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldDepartment)}</span>
-        <span class="detail-value">${esc(course['开课单位'])}</span>
+        <span class="detail-value">${esc(course.department)}</span>
       </div>`;
 
-  if (course['上课时间']) {
+  if (course.schedule) {
     html += `
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldTime)}</span>
-        <span class="detail-value">${esc(course['上课时间'])}</span>
+        <span class="detail-value">${esc(course.schedule)}</span>
       </div>`;
   }
-  if (course['教室']) {
+  if (course.classroom) {
     html += `
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldClassroom)}</span>
-        <span class="detail-value">${esc(course['教室'])}</span>
+        <span class="detail-value">${esc(course.classroom)}</span>
       </div>`;
   }
-  if (course['备注']) {
+  if (course.enrollment) {
+    html += `
+      <div class="detail-item">
+        <span class="detail-label">${esc(lang.fieldEnrollment)}</span>
+        <span class="detail-value">${esc(course.enrollment)}</span>
+      </div>`;
+  }
+  if (course.notes) {
     html += `
       <div class="detail-item" style="grid-column: 1 / -1;">
         <span class="detail-label">${esc(lang.fieldNotes)}</span>
-        <span class="detail-value notes">${esc(course['备注'])}</span>
+        <span class="detail-value notes">${esc(course.notes)}</span>
       </div>`;
   }
 
-  html += '</div>';
+  html += `</div>
+    <div class="card-footer">
+      <button class="detail-btn" onclick="showDetail(${course.id})">${esc(lang.detailBtn)}</button>
+    </div>`;
+
   card.innerHTML = html;
   return card;
 }
+
+/* ===== Detail Modal ===== */
+async function showDetail(courseId) {
+  const lang = i18n[currentLang];
+  const overlay = document.getElementById('modalOverlay');
+  const content = document.getElementById('modalContent');
+
+  content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${lang.modalLoading}</span></div>`;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const resp = await fetch('/api/courses/' + courseId);
+    const c = await resp.json();
+
+    let html = `
+      <div class="modal-header">
+        <span class="modal-title">${esc(c.course_name)}</span>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-badges">
+        <span class="badge ${getTypeBadgeClass(c.course_type)}">${esc(getTypeBadgeText(c.course_type))}</span>
+        <span class="badge badge-category">${esc(c.category)}</span>
+        <span class="badge badge-credits">${c.credits % 1 === 0 ? c.credits.toFixed(0) : c.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
+      </div>`;
+
+    // Basic info section
+    html += `<div class="modal-section">
+      <div class="modal-section-title">${esc(lang.modalBasicInfo)}</div>
+      <div class="modal-grid">`;
+
+    const basicFields = [
+      [lang.modalCourseCode, c.course_code],
+      [lang.modalClassNo, c.class_no],
+      [lang.fieldTeacher, c.teacher],
+      [lang.fieldDepartment, c.department],
+      [lang.fieldTime, c.schedule],
+      [lang.fieldClassroom, c.classroom],
+      [lang.fieldEnrollment, c.enrollment],
+      [lang.fieldPNP, c.pnp],
+      [lang.modalGrading, c.grading],
+      [lang.modalLanguage, c.language],
+    ];
+    if (c.major) basicFields.push([lang.modalMajor, c.major]);
+    if (c.grade) basicFields.push([lang.modalGrade, c.grade]);
+
+    for (const [label, value] of basicFields) {
+      if (value) {
+        html += `<div class="modal-field">
+          <span class="modal-field-label">${esc(label)}</span>
+          <span class="modal-field-value">${esc(value)}</span>
+        </div>`;
+      }
+    }
+    html += '</div></div>';
+
+    // English name
+    if (c.english_name) {
+      html += `<div class="modal-section">
+        <div class="modal-section-title">${esc(lang.modalEnglishName)}</div>
+        <div class="modal-field-value">${esc(c.english_name)}</div>
+      </div>`;
+    }
+
+    // GE Series
+    if (c.ge_series) {
+      html += `<div class="modal-section">
+        <div class="modal-section-title">${esc(lang.modalGeSeries)}</div>
+        <div class="modal-field-value">${esc(c.ge_series)}</div>
+      </div>`;
+    }
+
+    // Prerequisites
+    if (c.prerequisites && c.prerequisites !== '无先修要求') {
+      html += `<div class="modal-section">
+        <div class="modal-section-title">${esc(lang.modalPrerequisites)}</div>
+        <div class="modal-field-value">${esc(c.prerequisites)}</div>
+      </div>`;
+    }
+
+    // Notes
+    if (c.notes) {
+      html += `<div class="modal-section">
+        <div class="modal-section-title">${esc(lang.fieldNotes)}</div>
+        <div class="modal-field-value">${esc(c.notes)}</div>
+      </div>`;
+    }
+
+    // Detail info section
+    html += `<div class="modal-section">
+      <div class="modal-section-title">${esc(lang.modalDetailInfo)}</div>`;
+
+    const longFields = [
+      [lang.modalIntroCn, c.intro_cn],
+      [lang.modalIntroEn, c.intro_en],
+      [lang.modalSyllabus, c.syllabus],
+      [lang.modalEvaluation, c.evaluation],
+    ];
+
+    for (const [label, value] of longFields) {
+      if (value) {
+        html += `<div style="margin-bottom:16px">
+          <div class="modal-field-label" style="margin-bottom:6px">${esc(label)}</div>
+          <div class="modal-field-value long-text">${esc(value)}</div>
+        </div>`;
+      }
+    }
+    html += '</div>';
+
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = '<div class="modal-loading">Failed to load details</div>';
+  }
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
 
 function esc(str) {
   if (!str) return '';
@@ -1070,8 +1517,9 @@ function esc(str) {
 
 function clearAll() {
   document.getElementById('searchInput').value = '';
-  document.getElementById('filterStudentType').value = '';
+  document.getElementById('filterCourseType').value = '';
   document.getElementById('filterCategory').value = '';
+  document.getElementById('filterCredits').value = '';
   document.getElementById('filterDepartment').value = '';
   document.getElementById('filterWeekday').value = '';
   document.getElementById('filterClassroom').value = '';
@@ -1081,6 +1529,5 @@ function clearAll() {
 /* ===== Start ===== */
 document.addEventListener('DOMContentLoaded', init);
 </script>
-<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "95af5394c09840318b2ddb3cde422cc3"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

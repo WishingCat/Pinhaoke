@@ -1,1 +1,6 @@
 *.xlsx
+courses.db
+Course data/
+__pycache__/
+venv/
+*.pyc

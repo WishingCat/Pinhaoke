@@ -1,0 +1,13 @@
+[Unit]
+Description=Pinhaoke Course Search
+After=network.target
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/pinhaoke
+ExecStart=/opt/pinhaoke/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
