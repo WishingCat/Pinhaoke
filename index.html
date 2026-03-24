@@ -560,6 +560,12 @@ body::after {
   border-color: rgba(217, 119, 6, 0.2);
 }
 
+.badge-grad {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
 .badge-category {
   color: var(--text-light);
   background: rgba(100, 116, 139, 0.08);
@@ -1067,7 +1073,7 @@ const i18n = {
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
     all: '全部',
-    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课' },
+    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课' },
     weekdays: ['周一','周二','周三','周四','周五','周六','周日'],
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
@@ -1098,7 +1104,7 @@ const i18n = {
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
     all: 'All',
-    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major' },
+    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate' },
     weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
@@ -1129,7 +1135,7 @@ const i18n = {
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
     all: 'すべて',
-    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課' },
+    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院' },
     weekdays: ['月','火','水','木','金','土','日'],
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
@@ -1160,7 +1166,7 @@ const i18n = {
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
     all: '전체',
-    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공' },
+    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원' },
     weekdays: ['월','화','수','목','금','토','일'],
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
@@ -1191,7 +1197,7 @@ const i18n = {
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
     all: 'Tous',
-    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9' },
+    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master' },
     weekdays: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
     fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
@@ -1222,7 +1228,7 @@ const i18n = {
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
     all: 'Alle',
-    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs' },
+    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master' },
     weekdays: ['Mo','Di','Mi','Do','Fr','Sa','So'],
     fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
@@ -1253,7 +1259,7 @@ const i18n = {
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
     all: 'Todos',
-    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad' },
+    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado' },
     weekdays: ['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'],
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
@@ -1284,7 +1290,7 @@ const i18n = {
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
     all: 'Все',
-    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный' },
+    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура' },
     weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
@@ -1553,6 +1559,7 @@ function updateResultsCount() {
 function getTypeBadgeClass(type) {
   if (type === '公选课') return 'badge-elective';
   if (type === '通识课') return 'badge-general';
+  if (type === '研究生课') return 'badge-grad';
   return 'badge-major';
 }
 

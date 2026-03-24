@@ -5,13 +5,13 @@ import re
 import sqlite3
 import os
 
-DATA_DIR = "Course data"
 DB_PATH = "courses.db"
 
 FILES = [
-    ("北大公选课数据_25-26第2学期.json", "公选课"),
-    ("北大通识课数据_25-26第2学期.json", "通识课"),
-    ("北大专业课数据_25-26第2学期.json", "专业课"),
+    ("Course data/北大公选课数据_25-26第2学期.json", "公选课"),
+    ("Course data/北大通识课数据_25-26第2学期.json", "通识课"),
+    ("Course data/北大专业课数据_25-26第2学期.json", "专业课"),
+    ("Graduated_Course_data/北大研究生课程数据_25-26第2学期.json", "研究生课"),
 ]
 
 WEEKDAY_ORDER = "一二三四五六日"
@@ -113,10 +113,11 @@ def build_db():
     """)
 
     course_id = 0
-    for filename, course_type in FILES:
-        filepath = os.path.join(DATA_DIR, filename)
+    for filepath, course_type in FILES:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        is_grad = course_type == "研究生课"
 
         for item in data:
             course_id += 1
@@ -156,23 +157,43 @@ def build_db():
                 ),
             )
 
-            c.execute(
-                """INSERT INTO course_details VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    course_id,
-                    di.get("英文名称", ""),
-                    di.get("先修课程", ""),
-                    di.get("中文简介", ""),
-                    di.get("英文简介", ""),
-                    di.get("成绩记载方式", ""),
-                    di.get("通识课所属系列", ""),
-                    di.get("授课语言", ""),
-                    di.get("教材", ""),
-                    di.get("参考书", ""),
-                    di.get("教学大纲", ""),
-                    di.get("教学评估", ""),
-                ),
-            )
+            if is_grad:
+                # Graduate courses have different detail fields
+                c.execute(
+                    """INSERT INTO course_details VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        course_id,
+                        di.get("英文名称", ""),
+                        "",  # prerequisites
+                        di.get("课程简介", ""),  # intro_cn
+                        "",  # intro_en
+                        "",  # grading
+                        "",  # ge_series
+                        "",  # language
+                        "",  # textbook
+                        di.get("参考书", ""),
+                        di.get("详情备注", ""),  # syllabus
+                        "",  # evaluation
+                    ),
+                )
+            else:
+                c.execute(
+                    """INSERT INTO course_details VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        course_id,
+                        di.get("英文名称", ""),
+                        di.get("先修课程", ""),
+                        di.get("中文简介", ""),
+                        di.get("英文简介", ""),
+                        di.get("成绩记载方式", ""),
+                        di.get("通识课所属系列", ""),
+                        di.get("授课语言", ""),
+                        di.get("教材", ""),
+                        di.get("参考书", ""),
+                        di.get("教学大纲", ""),
+                        di.get("教学评估", ""),
+                    ),
+                )
 
     # Likes table
     c.execute("""

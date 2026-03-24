@@ -1,6 +1,7 @@
 *.xlsx
 courses.db
 Course data/
+Graduated_Course_data/
 __pycache__/
 venv/
 *.pyc
