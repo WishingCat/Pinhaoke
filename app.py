@@ -61,7 +61,7 @@ def list_courses(
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
-    sort: str = Query("", description="Sort: pinyin, likes"),
+    sort: str = Query("", description="Sort: pinyin"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
@@ -104,7 +104,6 @@ def list_courses(
 
     sort_map = {
         "pinyin": "c.course_name COLLATE NOCASE",
-        "likes": "COALESCE(l.like_count, 0) DESC, c.id",
     }
     order_by = sort_map.get(sort, "c.id")
 
@@ -122,11 +121,9 @@ def list_courses(
             f"""SELECT c.id, c.course_type, c.course_code, c.course_name,
                        c.category, c.credits, c.teacher, c.class_no,
                        c.department, c.schedule, c.classroom, c.enrollment,
-                       c.pnp, c.notes, c.major, c.grade,
-                       COALESCE(l.like_count, 0) as likes
+                       c.pnp, c.notes, c.major, c.grade
                 FROM courses c
                 LEFT JOIN course_details d ON c.id = d.course_id
-                LEFT JOIN course_likes l ON c.id = l.course_id
                 {where}
                 ORDER BY {order_by}
                 LIMIT ? OFFSET ?""",
@@ -152,7 +149,6 @@ def list_courses(
             "notes": r["notes"],
             "major": r["major"],
             "grade": r["grade"],
-            "likes": r["likes"],
         })
 
     return {"total": total, "page": page, "page_size": page_size, "courses": courses}
@@ -166,11 +162,9 @@ def get_course_detail(course_id: int):
         row = cur.execute(
             """SELECT c.*, d.english_name, d.prerequisites, d.intro_cn,
                       d.intro_en, d.grading, d.ge_series, d.language,
-                      d.textbook, d.reference, d.syllabus, d.evaluation,
-                      COALESCE(l.like_count, 0) as likes
+                      d.textbook, d.reference, d.syllabus, d.evaluation
                FROM courses c
                LEFT JOIN course_details d ON c.id = d.course_id
-               LEFT JOIN course_likes l ON c.id = l.course_id
                WHERE c.id = ?""",
             (course_id,),
         ).fetchone()
@@ -207,43 +201,7 @@ def get_course_detail(course_id: int):
         "reference": row["reference"],
         "syllabus": row["syllabus"],
         "evaluation": row["evaluation"],
-        "likes": row["likes"],
     }
-
-
-@app.post("/api/courses/{course_id}/like")
-def like_course(course_id: int):
-    with get_db() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            """INSERT INTO course_likes (course_id, like_count)
-               VALUES (?, 1)
-               ON CONFLICT(course_id) DO UPDATE SET like_count = like_count + 1""",
-            (course_id,),
-        )
-        conn.commit()
-        row = cur.execute(
-            "SELECT like_count FROM course_likes WHERE course_id = ?",
-            (course_id,),
-        ).fetchone()
-    return {"likes": row[0] if row else 0}
-
-
-@app.post("/api/courses/{course_id}/unlike")
-def unlike_course(course_id: int):
-    with get_db() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            """UPDATE course_likes SET like_count = MAX(like_count - 1, 0)
-               WHERE course_id = ?""",
-            (course_id,),
-        )
-        conn.commit()
-        row = cur.execute(
-            "SELECT like_count FROM course_likes WHERE course_id = ?",
-            (course_id,),
-        ).fetchone()
-    return {"likes": row[0] if row else 0}
 
 
 # Static files

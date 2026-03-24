@@ -435,53 +435,6 @@ body::after {
   background: rgba(99, 102, 241, 0.06);
 }
 
-/* ===== Like Button ===== */
-.like-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 22px;
-  border: 1px solid rgba(236, 72, 153, 0.3);
-  border-radius: var(--radius-pill);
-  background: rgba(236, 72, 153, 0.08);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #ec4899;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.25s;
-  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.1);
-}
-
-.like-btn:hover {
-  background: rgba(236, 72, 153, 0.15);
-  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.2);
-  transform: translateY(-1px);
-}
-
-.like-btn.liked {
-  color: #db2777;
-  background: rgba(236, 72, 153, 0.18);
-  border-color: rgba(219, 39, 119, 0.4);
-}
-
-.like-btn .heart {
-  font-size: 1.1rem;
-  transition: transform 0.25s;
-}
-
-.like-btn:active .heart {
-  transform: scale(1.3);
-}
-
-.like-btn .like-count {
-  font-weight: 700;
-  font-size: 0.84rem;
-  min-width: 1ch;
-}
-
 /* ===== Results Info ===== */
 .results-info {
   display: flex;
@@ -1100,7 +1053,7 @@ const i18n = {
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
-    sortDefault: '默认', sortPinyin: '课程名拼音', sortLikes: '爱心数',
+    sortDefault: '默认', sortPinyin: '课程名拼音',
     labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
@@ -1131,7 +1084,7 @@ const i18n = {
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
-    sortDefault: 'Default', sortPinyin: 'Name (A-Z)', sortLikes: 'Most Liked',
+    sortDefault: 'Default', sortPinyin: 'Name (A-Z)',
     labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
@@ -1162,7 +1115,7 @@ const i18n = {
     labelCourseType: '科目種別', labelCategory: '科目区分',
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
-    sortDefault: 'デフォルト', sortPinyin: '名前順', sortLikes: '人気順',
+    sortDefault: 'デフォルト', sortPinyin: '名前順',
     labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
@@ -1193,7 +1146,7 @@ const i18n = {
     labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
-    sortDefault: '기본', sortPinyin: '이름순', sortLikes: '인기순',
+    sortDefault: '기본', sortPinyin: '이름순',
     labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
@@ -1224,7 +1177,7 @@ const i18n = {
     labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
-    sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A-Z)', sortLikes: 'Populaire',
+    sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A-Z)',
     labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
@@ -1255,7 +1208,7 @@ const i18n = {
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
-    sortDefault: 'Standard', sortPinyin: 'Name (A-Z)', sortLikes: 'Beliebt',
+    sortDefault: 'Standard', sortPinyin: 'Name (A-Z)',
     labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
@@ -1286,7 +1239,7 @@ const i18n = {
     labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
-    sortDefault: 'Por defecto', sortPinyin: 'Nombre (A-Z)', sortLikes: 'Popular',
+    sortDefault: 'Por defecto', sortPinyin: 'Nombre (A-Z)',
     labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
@@ -1317,7 +1270,7 @@ const i18n = {
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
-    sortDefault: 'По умолчанию', sortPinyin: 'По имени', sortLikes: 'Популярные',
+    sortDefault: 'По умолчанию', sortPinyin: 'По имени',
     labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
@@ -1482,8 +1435,7 @@ function populateFilters(filters) {
 
   initCustomSelect('csSort', [
     { value: 'pinyin', label: lang.sortPinyin },
-    { value: 'likes', label: lang.sortLikes },
-  ], lang.sortDefault, 'likes');
+  ], lang.sortDefault);
 
   initCustomSelect('csGrading',
     filters.gradings.map(g => ({ value: g, label: g })),
@@ -1643,61 +1595,11 @@ function createCard(course) {
 
   html += `</div>
     <div class="card-footer">
-      <button class="like-btn${isLiked(course.id) ? ' liked' : ''}" onclick="toggleLike(event, ${course.id})" data-id="${course.id}">
-        <span class="heart">${isLiked(course.id) ? '&#x2764;' : '&#x2661;'}</span>
-        <span class="like-count">${course.likes || 0}</span>
-      </button>
       <button class="detail-btn" onclick="showDetail(${course.id})">${esc(lang.detailBtn)}</button>
     </div>`;
 
   card.innerHTML = html;
   return card;
-}
-
-/* ===== Like System ===== */
-function getLikedSet() {
-  try { return new Set(JSON.parse(localStorage.getItem('pinhaoke_likes') || '[]')); }
-  catch { return new Set(); }
-}
-
-function saveLikedSet(s) {
-  localStorage.setItem('pinhaoke_likes', JSON.stringify([...s]));
-}
-
-function isLiked(id) {
-  return getLikedSet().has(id);
-}
-
-async function toggleLike(e, courseId) {
-  e.stopPropagation();
-  const liked = getLikedSet();
-  const btn = e.currentTarget;
-  const heart = btn.querySelector('.heart');
-  const countEl = btn.querySelector('.like-count');
-  const wasLiked = liked.has(courseId);
-
-  try {
-    const resp = await fetch('/api/courses/' + courseId + (wasLiked ? '/unlike' : '/like'), { method: 'POST' });
-    const data = await resp.json();
-    countEl.textContent = data.likes;
-
-    if (wasLiked) {
-      liked.delete(courseId);
-      btn.classList.remove('liked');
-      heart.innerHTML = '&#x2661;';
-    } else {
-      liked.add(courseId);
-      btn.classList.add('liked');
-      heart.innerHTML = '&#x2764;';
-    }
-    saveLikedSet(liked);
-
-    // Update in currentCourses
-    const c = currentCourses.find(c => c.id === courseId);
-    if (c) c.likes = data.likes;
-  } catch (err) {
-    console.error(err);
-  }
 }
 
 /* ===== Detail Modal ===== */
