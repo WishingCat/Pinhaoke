@@ -11,7 +11,7 @@ FILES = [
     ("Course data/北大公选课数据_25-26第2学期.json", "公选课"),
     ("Course data/北大通识课数据_25-26第2学期.json", "通识课"),
     ("Course data/北大专业课数据_25-26第2学期.json", "专业课"),
-    ("Graduated_Course_data/北大研究生课程数据_25-26第2学期.json", "研究生课"),
+    ("Graduated_Course_data/pku_graduate_courses.json", "研究生课"),
 ]
 
 WEEKDAY_ORDER = "一二三四五六日"
