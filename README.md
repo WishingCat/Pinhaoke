@@ -35,22 +35,6 @@ Nginx (反向代理) → FastAPI (Python 后端) → SQLite (数据库)
 
 数据来源于 2026 年 3 月 20 日从北京大学选课系统 `elective.pku.edu.cn` 获取的课程数据，每门课程包含基本信息与详细信息两部分。
 
-## 本地运行
-
-```bash
-# 1. 安装依赖
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-
-# 2. 构建数据库（需要 Course data/ 目录下的 JSON 文件）
-python3 build_db.py
-
-# 3. 启动服务
-venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
-```
-
-访问 http://127.0.0.1:8000 即可使用。
-
 ## 如果有能力的话欢迎赞助 弥补网站的运行费用
 ## 只要有人需要 每学期都会一直更新下去的！
 
@@ -63,6 +47,14 @@ venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ## 如果想要反馈BUG,或者希望有新的功能意见,欢迎微信联系,一定会尽快安排!
 <p align="center"><img src="Images/MyWeChat.jpg" alt="微信联系方式" width="200"></p>
 
+
+### 鸣谢赞助
+
+感谢以下朋友的慷慨赞助，你们的支持是项目持续运营的动力！
+
+| 赞助者 | 金额 |
+|--------|------|
+| 噬铁侠 | 100¥ |
 
 ### 鸣谢
 感谢西米露老师提供的课程列表
