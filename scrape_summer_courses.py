@@ -46,20 +46,37 @@ def open_context(p):
 
 
 def ensure_logged_in(page: Page, context: BrowserContext):
-    """Navigate to elective; if redirected to IAAA, poll URL until login completes."""
-    page.goto(QUERY_URL, wait_until="domcontentloaded")
-    needs_login = "iaaa.pku.edu.cn" in page.url or "login" in page.url.lower()
-    if needs_login:
-        print("\n[!] 检测到未登录。请在浏览器里完成登录（IAAA 学号密码 + 验证码）。", flush=True)
-        print("[!] 登录完成后脚本会自动检测 URL 并继续，无需操作终端。", flush=True)
-    # 最多等 5 分钟登录完成
+    """Always start from IAAA login URL; poll URL until we land back on elective."""
+    print(f"[i] 打开登录入口：{LOGIN_URL}", flush=True)
+    page.goto(LOGIN_URL, wait_until="domcontentloaded")
+    print(f"[i] 跳转后 URL: {page.url}", flush=True)
+
+    if "iaaa.pku.edu.cn" in page.url:
+        print("\n[!] 检测到未登录。请在弹出的 Chromium 窗口里完成登录（学号 + 密码 + 验证码）。", flush=True)
+        print("[!] 脚本会自动检测登录完成，无需操作终端。最多等 5 分钟。", flush=True)
+
     deadline = time.time() + 300
+    last_print = 0
     while time.time() < deadline:
-        if "elective.pku.edu.cn" in page.url and "elective2008" in page.url:
+        url = page.url
+        # 登录成功 = 离开 IAAA 域、回到 elective 域
+        if "elective.pku.edu.cn" in url and "iaaa.pku.edu.cn" not in url:
             break
+        now = time.time()
+        if now - last_print > 10:
+            print(f"[.] 等待登录中... 当前 URL: {url}", flush=True)
+            last_print = now
         page.wait_for_timeout(1000)
     else:
         raise RuntimeError(f"超时未登录，当前 URL: {page.url}")
+
+    print(f"[i] 登录后落点 URL: {page.url}", flush=True)
+    # 跳到查询页
+    page.goto(QUERY_URL, wait_until="domcontentloaded")
+    print(f"[i] 查询页 URL: {page.url}", flush=True)
+    if "iaaa.pku.edu.cn" in page.url:
+        raise RuntimeError("访问查询页又被踢回 IAAA，登录态可能未真正生效")
+
     context.storage_state(path=str(AUTH_STATE))
     print(f"[+] 已保存登录态到 {AUTH_STATE.relative_to(BASE)}", flush=True)
 
