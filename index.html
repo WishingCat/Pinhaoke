@@ -5,223 +5,233 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>北大课程搜索 | PKU Course Search</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet"></noscript>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <style>
-/* ===== Reset & Base ===== */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ============================================================
+   PINHAOKE  ·  CLEAN MODERN
+   white surface · sharp ink · color-coded type strips
+   ============================================================ */
 
+/* ===== Reset ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+button { font: inherit; cursor: pointer; }
+input { font: inherit; }
+
+/* ===== Tokens ===== */
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.45);
-  --glass-bg-strong: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-border-light: rgba(255, 255, 255, 0.35);
-  --glass-shadow: rgba(31, 38, 135, 0.1);
-  --blur: 16px;
-  --blur-strong: 22px;
-  --text: #1e293b;
-  --text-light: #475569;
-  --text-lighter: #94a3b8;
-  --accent: #6366f1;
-  --accent-light: #818cf8;
-  --green: #059669;
-  --green-bg: rgba(5, 150, 105, 0.1);
-  --indigo-bg: rgba(99, 102, 241, 0.1);
-  --orange: #d97706;
-  --orange-bg: rgba(217, 119, 6, 0.1);
-  --radius: 18px;
-  --radius-sm: 12px;
-  --radius-pill: 50px;
+  /* surfaces */
+  --bg:           #FAFAFA;
+  --surface:      #FFFFFF;
+  --surface-2:    #F5F5F5;
+
+  /* ink scale */
+  --ink:          #0A0A0A;
+  --ink-2:        #404040;
+  --ink-3:        #737373;
+  --ink-4:        #A3A3A3;
+
+  /* borders */
+  --border:       #E5E5E5;
+  --border-2:     #D4D4D4;
+  --border-soft:  #F1F1F1;
+
+  /* single bold accent */
+  --accent:       #1E40AF;
+  --accent-deep:  #1E3A8A;
+  --accent-soft:  #DBEAFE;
+  --accent-mist:  #EFF6FF;
+
+  /* course-type colors (left strip + badge) */
+  --c-elective:        #4F46E5;
+  --c-elective-soft:   #EEF2FF;
+  --c-elective-border: rgba(79, 70, 229, 0.20);
+
+  --c-general:         #059669;
+  --c-general-soft:    #ECFDF5;
+  --c-general-border:  rgba(5, 150, 105, 0.22);
+
+  --c-major:           #D97706;
+  --c-major-soft:      #FFFBEB;
+  --c-major-border:    rgba(217, 119, 6, 0.25);
+
+  --c-grad:            #E11D48;
+  --c-grad-soft:       #FFF1F2;
+  --c-grad-border:     rgba(225, 29, 72, 0.22);
+
+  /* radii / shadows */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r:    10px;
+  --r-lg: 14px;
+
+  --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow-sm: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow:    0 4px 12px rgba(10, 10, 10, 0.06), 0 2px 4px rgba(10, 10, 10, 0.04);
+  --shadow-lg: 0 12px 28px rgba(10, 10, 10, 0.10), 0 4px 8px rgba(10, 10, 10, 0.06);
+  --shadow-xl: 0 24px 48px rgba(10, 10, 10, 0.16);
+
+  /* fonts */
+  --f-sans: 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --f-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
+
+html { background: var(--bg); }
 
 body {
-  font-family: "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
-  color: var(--text);
-  line-height: 1.6;
+  font-family: var(--f-sans);
+  color: var(--ink);
+  line-height: 1.55;
   min-height: 100vh;
-  background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 25%, #e0f2fe 50%, #ede9fe 75%, #fae8ff 100%);
-  background-attachment: fixed;
+  background: var(--bg);
+  font-feature-settings: "kern" 1, "palt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Decorative background blobs */
-body::before,
-body::after {
-  content: '';
-  position: fixed;
-  border-radius: 50%;
-  z-index: -1;
-  filter: blur(80px);
-  opacity: 0.5;
-}
-body::before {
-  width: 500px; height: 500px;
-  top: -100px; right: -100px;
-  background: radial-gradient(circle, #c7d2fe, #a5b4fc, transparent 70%);
-}
-body::after {
-  width: 600px; height: 600px;
-  bottom: -150px; left: -150px;
-  background: radial-gradient(circle, #bae6fd, #93c5fd, transparent 70%);
-}
+::selection { background: var(--accent); color: #FFFFFF; }
 
-/* ===== Glass Mixin ===== */
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px var(--glass-shadow);
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border: 2px solid var(--bg); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
-/* ===== Layout ===== */
+/* ===== Container ===== */
 .container {
-  max-width: 1100px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 24px 20px 60px;
-}
-
-/* ===== Header ===== */
-.header {
-  text-align: center;
-  padding: 50px 20px 32px;
+  padding: 28px 28px 80px;
   position: relative;
 }
 
-.github-star {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  color: var(--text-light);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  white-space: nowrap;
-  transition: color 0.25s;
-}
+/* ============================================================
+   HEADER
+   ============================================================ */
 
-.github-star:hover { color: var(--text); }
-
-.github-star svg {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  fill: var(--text-light);
-  transition: fill 0.25s;
-}
-
-.github-star:hover svg { fill: var(--text); }
-
-.github-star .designer {
-  color: var(--accent-light);
+.header {
+  text-align: center;
+  padding: 64px 20px 40px;
+  position: relative;
 }
 
 .header h1 {
-  font-size: 2.6rem;
+  font-family: var(--f-sans);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.3px;
-  background: linear-gradient(135deg, #4f46e5, #6366f1, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  background: none;
+  -webkit-text-fill-color: initial;
 }
 
 .header .subtitle {
-  font-size: 0.9rem;
-  color: var(--text-light);
-  margin-top: 8px;
+  font-size: 0.95rem;
+  color: var(--ink-3);
+  margin-top: 14px;
   font-weight: 400;
+  letter-spacing: 0;
 }
 
-/* ===== Top Controls (lang + sponsor) ===== */
+/* github link upper-left */
+.github-star {
+  position: absolute;
+  top: 24px; left: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink-3);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  font-family: var(--f-sans);
+  transition: color 0.2s ease;
+}
+
+.github-star:hover { color: var(--ink); }
+
+.github-star svg {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  fill: var(--ink-3);
+  transition: fill 0.2s ease;
+}
+
+.github-star:hover svg { fill: var(--ink); }
+
+.github-star .designer { color: var(--accent); font-weight: 500; }
+
+/* upper-right controls */
 .top-controls {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 24px; right: 0;
   display: flex;
   gap: 8px;
   align-items: center;
+  z-index: 50;
 }
 
-.sponsor-link {
-  display: flex;
+.sponsor-link,
+.top-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 16px var(--glass-shadow);
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
   text-decoration: none;
-  color: var(--text-light);
-  font-size: 0.8rem;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-family: var(--f-sans);
+  font-weight: 500;
   white-space: nowrap;
-  transition: all 0.25s;
+  transition: all 0.2s ease;
   user-select: none;
 }
 
 .sponsor-link:hover {
-  background: var(--glass-bg-strong);
-  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.15);
-  color: #ec4899;
-}
-
-.sponsor-link .sponsor-icon {
-  font-size: 0.95rem;
-}
-
-.top-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 16px var(--glass-shadow);
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-light);
-  font-family: inherit;
-  transition: all 0.25s;
-  user-select: none;
+  border-color: var(--c-grad);
+  color: var(--c-grad);
+  background: var(--c-grad-soft);
 }
 
 .top-btn:hover {
-  background: var(--glass-bg-strong);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.15);
+  border-color: var(--ink-3);
+  background: var(--bg);
+  color: var(--ink);
 }
 
-.top-btn:active { transform: scale(0.96); }
+.top-btn:active { transform: scale(0.97); }
+.top-btn .icon, .sponsor-link .sponsor-icon { font-size: 0.86rem; }
 
-.top-btn .icon { font-size: 0.95rem; }
-
-/* Font selector dropdown */
-.font-selector {
-  position: relative;
-}
+/* lang dropdown */
+.font-selector { position: relative; }
 
 .font-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
-  min-width: 200px;
-  padding: 6px 0;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.18);
+  min-width: 180px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
+  animation: pop-in 0.15s ease;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .font-dropdown.open { display: block; }
@@ -229,59 +239,54 @@ body::after {
 .font-option {
   display: block;
   width: 100%;
-  padding: 9px 16px;
+  padding: 8px 12px;
   border: none;
   background: none;
   text-align: left;
-  font-size: 0.84rem;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  font-family: var(--f-sans);
+  border-radius: var(--r-sm);
+  transition: all 0.15s ease;
 }
 
-.font-option:hover { background: rgba(99, 102, 241, 0.08); }
+.font-option:hover { background: var(--bg); color: var(--ink); }
 
 .font-option.active {
   color: var(--accent);
+  background: var(--accent-mist);
   font-weight: 600;
 }
 
 .font-option .font-name { display: block; }
+.font-option .font-desc { font-size: 0.72rem; color: var(--ink-4); margin-top: 1px; }
 
-.font-option .font-desc {
-  font-size: 0.72rem;
-  color: var(--text-lighter);
-  margin-top: 1px;
-}
+/* ============================================================
+   SEARCH
+   ============================================================ */
 
-/* ===== Search Bar ===== */
-.search-section {
-  margin: 20px 0 24px;
-}
+.search-section { margin: 28px 0 20px; }
 
 .search-box {
   display: flex;
   align-items: center;
-  padding: 14px 22px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(var(--blur-strong));
-  -webkit-backdrop-filter: blur(var(--blur-strong));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px var(--glass-shadow);
   gap: 12px;
-  transition: all 0.3s;
+  padding: 14px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-box:focus-within {
-  border-color: var(--accent-light);
-  box-shadow: 0 8px 32px var(--glass-shadow), 0 0 0 3px rgba(99, 102, 241, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-mist), var(--shadow);
 }
 
 .search-box .search-icon {
-  color: var(--text-lighter);
-  font-size: 1.1rem;
+  color: var(--ink-4);
+  font-size: 1rem;
   flex-shrink: 0;
 }
 
@@ -291,220 +296,255 @@ body::after {
   outline: none;
   background: transparent;
   font-size: 1rem;
-  color: var(--text);
-  font-family: inherit;
+  color: var(--ink);
+  font-family: var(--f-sans);
 }
 
-.search-box input::placeholder {
-  color: var(--text-lighter);
-}
+.search-box input::placeholder { color: var(--ink-4); }
 
-/* ===== Filters ===== */
+/* ============================================================
+   FILTERS
+   ============================================================ */
+
 .filters {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 28px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
 }
 
 .filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   width: 100%;
 }
 
-.filter-group {
-  flex: 1 1 200px;
-  min-width: 160px;
-  position: relative;
-}
+@media (max-width: 860px) { .filter-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .filter-row { grid-template-columns: 1fr; } }
+
+.filter-group { position: relative; }
 
 .filter-group label {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--text-light);
+  color: var(--ink-2);
   margin-bottom: 6px;
-  padding-left: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding-left: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--f-sans);
 }
 
-.filter-group input {
+.filter-group input,
+.custom-select-trigger {
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--glass-border-light);
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   outline: none;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 16px var(--glass-shadow);
-  font-size: 0.88rem;
-  color: var(--text);
-  font-family: inherit;
-  transition: all 0.25s;
+  background: var(--bg);
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-family: var(--f-sans);
+  transition: all 0.2s ease;
+}
+
+.filter-group input:hover,
+.custom-select-trigger:hover {
+  background-color: var(--surface);
+  border-color: var(--border-2);
 }
 
 .filter-group input:focus {
-  border-color: var(--accent-light);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: var(--accent);
+  background-color: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-mist);
 }
 
-/* ===== Custom Glass Select ===== */
-.custom-select {
-  position: relative;
-}
+.filter-group input::placeholder { color: var(--ink-4); }
+
+/* custom select */
+.custom-select { position: relative; }
 
 .custom-select-trigger {
-  width: 100%;
-  padding: 10px 32px 10px 14px;
-  border: 1px solid var(--glass-border-light);
-  outline: none;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 16px var(--glass-shadow);
-  font-size: 0.88rem;
-  color: var(--text);
-  font-family: inherit;
   cursor: pointer;
-  transition: all 0.25s;
   user-select: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
 
-.custom-select-trigger:hover {
-  background-color: var(--glass-bg-strong);
-}
-
 .custom-select.open .custom-select-trigger {
-  border-color: var(--accent-light);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: var(--accent);
+  background-color: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-mist);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231E40AF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 .custom-select-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  max-height: 260px;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  max-height: 280px;
   overflow-y: auto;
   z-index: 200;
-  padding: 6px 0;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.18);
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  animation: pop-in 0.15s ease;
 }
 
-.custom-select.open .custom-select-dropdown {
-  display: block;
-}
+.custom-select.open .custom-select-dropdown { display: block; }
 
 .custom-select-option {
-  padding: 9px 16px;
-  font-size: 0.85rem;
-  color: var(--text);
+  padding: 8px 12px;
+  font-size: 0.86rem;
+  color: var(--ink-2);
+  font-family: var(--f-sans);
   cursor: pointer;
-  transition: background 0.15s;
+  border-radius: var(--r-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: all 0.15s ease;
 }
 
-.custom-select-option:hover {
-  background: rgba(99, 102, 241, 0.08);
-}
+.custom-select-option:hover { background: var(--bg); color: var(--ink); }
 
 .custom-select-option.active {
+  background: var(--accent-mist);
   color: var(--accent);
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.06);
 }
 
-/* ===== Results Info ===== */
+/* ============================================================
+   RESULTS META
+   ============================================================ */
+
 .results-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  padding: 0 4px;
+  padding: 0 2px;
+  gap: 16px;
 }
 
 .results-count {
-  font-size: 0.88rem;
-  color: var(--text-light);
+  font-size: 0.9rem;
+  color: var(--ink-3);
 }
 
 .clear-btn {
-  padding: 7px 18px;
-  border: 1px solid var(--glass-border-light);
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: 0.8rem;
-  color: var(--text-light);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.25s;
+  color: var(--ink-2);
+  font-family: var(--f-sans);
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .clear-btn:hover {
-  background: var(--glass-bg-strong);
-  color: var(--text);
+  border-color: var(--ink-3);
+  color: var(--ink);
+  background: var(--bg);
 }
 
-.clear-btn:active { transform: scale(0.96); }
+.clear-btn:active { transform: scale(0.97); }
 
-/* ===== Course Cards ===== */
+/* ============================================================
+   COURSE CARDS  ·  Type-coded left strip
+   ============================================================ */
+
 .results {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .course-card {
-  padding: 20px 24px;
-  border-radius: var(--radius);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px var(--glass-shadow);
-  transition: all 0.3s;
+  position: relative;
+  padding: 20px 24px 20px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  animation: card-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
+/* left color strip — neutral default */
+.course-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--ink-4);
+  transition: background 0.2s ease;
+}
+
+/* type-specific strip via :has() (modern browsers; falls back to neutral gray) */
+.course-card:has(.badge-elective)::before { background: var(--c-elective); }
+.course-card:has(.badge-general)::before  { background: var(--c-general); }
+.course-card:has(.badge-major)::before    { background: var(--c-major); }
+.course-card:has(.badge-grad)::before     { background: var(--c-grad); }
+
 .course-card:hover {
-  background: var(--glass-bg-strong);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.15);
+  border-color: var(--border-2);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+/* staggered entrance */
+.course-card:nth-child(1) { animation-delay: 0.02s; }
+.course-card:nth-child(2) { animation-delay: 0.05s; }
+.course-card:nth-child(3) { animation-delay: 0.08s; }
+.course-card:nth-child(4) { animation-delay: 0.11s; }
+.course-card:nth-child(5) { animation-delay: 0.14s; }
+.course-card:nth-child(6) { animation-delay: 0.17s; }
+.course-card:nth-child(7) { animation-delay: 0.20s; }
+.course-card:nth-child(8) { animation-delay: 0.23s; }
+.course-card:nth-child(n+9) { animation-delay: 0.26s; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 12px;
 }
 
 .course-name {
-  font-size: 1.05rem;
+  font-family: var(--f-sans);
+  font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
   line-height: 1.4;
+  letter-spacing: -0.005em;
+  flex: 1;
 }
 
 .card-badges {
@@ -512,87 +552,105 @@ body::after {
   gap: 6px;
   flex-shrink: 0;
   flex-wrap: wrap;
+  align-items: center;
 }
 
+/* Solid colored badges — clear, scannable */
 .badge {
-  display: inline-block;
-  padding: 3px 11px;
-  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 600;
+  font-family: var(--f-sans);
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  border: 1px solid transparent;
+  line-height: 1.45;
 }
 
 .badge-elective {
-  color: var(--accent);
-  background: var(--indigo-bg);
-  border-color: rgba(99, 102, 241, 0.2);
+  color: var(--c-elective);
+  background: var(--c-elective-soft);
+  border-color: var(--c-elective-border);
 }
 
 .badge-general {
-  color: var(--green);
-  background: var(--green-bg);
-  border-color: rgba(5, 150, 105, 0.2);
+  color: var(--c-general);
+  background: var(--c-general-soft);
+  border-color: var(--c-general-border);
 }
 
 .badge-major {
-  color: var(--orange);
-  background: var(--orange-bg);
-  border-color: rgba(217, 119, 6, 0.2);
+  color: var(--c-major);
+  background: var(--c-major-soft);
+  border-color: var(--c-major-border);
 }
 
 .badge-grad {
-  color: #7c3aed;
-  background: rgba(124, 58, 237, 0.1);
-  border-color: rgba(124, 58, 237, 0.2);
+  color: var(--c-grad);
+  background: var(--c-grad-soft);
+  border-color: var(--c-grad-border);
 }
 
 .badge-category {
-  color: var(--text-light);
-  background: rgba(100, 116, 139, 0.08);
-  border-color: rgba(100, 116, 139, 0.15);
+  color: var(--ink-2);
+  background: var(--bg);
+  border-color: var(--border);
+  font-weight: 500;
 }
 
 .badge-credits {
-  color: var(--accent);
-  background: rgba(99, 102, 241, 0.06);
-  border-color: rgba(99, 102, 241, 0.15);
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--border);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
 }
 
+/* details */
 .card-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px 20px;
+  gap: 6px 24px;
+  margin-top: 2px;
 }
 
 .detail-item {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  font-size: 0.86rem;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-family: var(--f-sans);
+  color: var(--ink-2);
+  line-height: 1.6;
 }
 
 .detail-label {
-  color: var(--text-lighter);
+  color: var(--ink-3);
   white-space: nowrap;
   flex-shrink: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  min-width: 3.5em;
 }
 
 .detail-value {
-  color: var(--text);
+  color: var(--ink);
   white-space: pre-line;
 }
 
 .detail-value.notes {
-  color: var(--text-light);
-  font-size: 0.82rem;
+  color: var(--ink-3);
+  font-size: 0.84rem;
 }
 
-/* ===== Detail Button ===== */
+/* card footer — solid primary button */
 .card-footer {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -600,123 +658,155 @@ body::after {
 }
 
 .detail-btn {
-  padding: 10px 28px;
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: var(--radius-pill);
-  background: var(--indigo-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #FFFFFF;
   cursor: pointer;
-  font-family: inherit;
-  transition: all 0.25s;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+  box-shadow: var(--shadow-xs);
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
+}
+
+.detail-btn::after {
+  content: '→';
+  display: inline-block;
+  font-weight: 500;
+  transition: transform 0.2s ease;
 }
 
 .detail-btn:hover {
-  background: rgba(99, 102, 241, 0.18);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.2);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.30);
   transform: translateY(-1px);
 }
 
-.detail-btn:active { transform: scale(0.97); }
+.detail-btn:hover::after { transform: translateX(3px); }
+.detail-btn:active { transform: translateY(0); box-shadow: var(--shadow-xs); }
 
-/* ===== Modal ===== */
+/* ============================================================
+   MODAL
+   ============================================================ */
+
 .modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(10, 10, 10, 0.55);
   z-index: 1000;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 24px;
+  animation: overlay-fade 0.2s ease;
 }
 
-.modal-overlay.open {
-  display: flex;
-}
+@keyframes overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-overlay.open { display: flex; }
 
 .modal-content {
   width: 100%;
-  max-width: 720px;
-  max-height: 85vh;
+  max-width: 760px;
+  max-height: 86vh;
   overflow-y: auto;
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 24px 80px rgba(31, 38, 135, 0.2);
-  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 32px 36px;
+  position: relative;
+  animation: modal-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes modal-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   gap: 16px;
 }
 
 .modal-title {
-  font-size: 1.3rem;
+  font-family: var(--f-sans);
+  font-size: 1.4rem;
   font-weight: 700;
-  color: var(--text);
-  line-height: 1.3;
+  color: var(--ink);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .modal-close {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(100, 116, 139, 0.1);
-  color: var(--text-light);
-  font-size: 1.1rem;
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: 1.15rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .modal-close:hover {
-  background: rgba(100, 116, 139, 0.2);
-  color: var(--text);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--bg);
 }
 
 .modal-badges {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.modal-section {
-  margin-bottom: 20px;
-}
+.modal-section { margin-bottom: 24px; }
 
 .modal-section-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--accent);
+  font-family: var(--f-sans);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink-3);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-section-title::before {
+  content: '';
+  width: 14px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
 }
 
 .modal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px 20px;
+  gap: 12px 28px;
 }
 
 .modal-field {
@@ -726,88 +816,104 @@ body::after {
 }
 
 .modal-field-label {
-  font-size: 0.72rem;
+  font-family: var(--f-sans);
+  font-size: 0.74rem;
   font-weight: 600;
-  color: var(--text-lighter);
-  text-transform: uppercase;
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .modal-field-value {
-  font-size: 0.88rem;
-  color: var(--text);
+  font-family: var(--f-sans);
+  font-size: 0.94rem;
+  color: var(--ink);
   white-space: pre-line;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .modal-field-value.long-text {
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-light);
-  font-size: 0.84rem;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font-family: var(--f-sans);
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: var(--ink-2);
+  margin-top: 4px;
+  letter-spacing: 0;
 }
 
 .modal-loading {
   text-align: center;
-  padding: 40px;
-  color: var(--text-lighter);
+  padding: 60px 20px;
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  font-size: 0.92rem;
 }
 
-/* ===== Load More ===== */
+/* ============================================================
+   LOAD MORE
+   ============================================================ */
+
 .load-more {
   display: block;
-  margin: 28px auto 0;
-  padding: 12px 44px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  box-shadow: 0 4px 16px var(--glass-shadow);
-  font-size: 0.9rem;
-  color: var(--text-light);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.25s;
+  margin: 32px auto 0;
+  padding: 11px 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--f-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: all 0.2s ease;
 }
 
 .load-more:hover {
-  background: var(--glass-bg-strong);
-  color: var(--accent);
-  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.12);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--bg);
+  box-shadow: var(--shadow);
 }
 
-.load-more:active { transform: scale(0.97); }
+.load-more:active { transform: scale(0.98); }
 
-/* ===== Empty / Loading States ===== */
+/* ============================================================
+   STATES
+   ============================================================ */
+
 .state-msg {
   text-align: center;
-  padding: 60px 20px;
-  color: var(--text-lighter);
+  padding: 80px 20px;
+  color: var(--ink-3);
+  font-family: var(--f-sans);
   font-size: 0.95rem;
+  letter-spacing: 0;
 }
 
 .state-msg .icon {
-  font-size: 2.5rem;
+  font-size: 2rem;
   margin-bottom: 12px;
   display: block;
+  opacity: 0.5;
 }
 
-/* ===== Loading Spinner ===== */
 .loading-overlay-inline {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--glass-border);
+  width: 32px; height: 32px;
+  border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -817,20 +923,24 @@ body::after {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .loading-overlay-inline .loading-label {
-  color: var(--text-lighter);
+  color: var(--ink-3);
   font-size: 0.9rem;
+  font-family: var(--f-sans);
+  font-style: normal;
+  letter-spacing: 0;
 }
 
-/* ===== Footer ===== */
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
 .site-footer {
-  margin-top: 60px;
-  padding: 32px 24px;
-  border-radius: var(--radius);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px var(--glass-shadow);
+  margin-top: 64px;
+  padding: 32px 0 8px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  box-shadow: none;
   text-align: center;
 }
 
@@ -838,77 +948,65 @@ body::after {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 24px;
-  margin-bottom: 16px;
+  gap: 32px;
+  margin-bottom: 14px;
 }
 
 .footer-item {
   font-size: 0.85rem;
-  color: var(--text-light);
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  letter-spacing: 0;
 }
 
 .footer-item strong {
-  color: var(--accent);
-  font-weight: 600;
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .footer-names {
-  color: var(--text);
+  color: var(--ink);
   font-weight: 500;
+  font-family: var(--f-sans);
 }
 
 .footer-msg {
   font-size: 0.84rem;
-  color: var(--text-lighter);
+  color: var(--ink-4);
   line-height: 1.8;
+  font-family: var(--f-sans);
+  font-style: normal;
+  letter-spacing: 0;
 }
 
-/* ===== Responsive ===== */
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
 @media (max-width: 640px) {
-  .container { padding: 16px 12px 40px; }
-  .header { padding: 110px 12px 20px; }
-  .github-star { top: 10px; left: 12px; font-size: 0.65rem; }
-  .github-star svg { width: 22px; height: 22px; }
-  .header h1 { font-size: 2rem; }
-  .top-controls { top: 10px; right: 12px; gap: 6px; }
-  .top-btn { padding: 5px 10px; font-size: 0.74rem; }
+  .container { padding: 20px 16px 60px; }
+  .header { padding: 100px 14px 32px; }
+  .header h1 { font-size: 2.2rem; }
+  .header .subtitle { font-size: 0.86rem; margin-top: 10px; }
+  .github-star { top: 14px; left: 0; font-size: 0.68rem; }
+  .github-star svg { width: 20px; height: 20px; }
+  .top-controls { top: 14px; right: 0; gap: 6px; }
+  .top-btn, .sponsor-link { padding: 6px 10px; font-size: 0.72rem; }
   .search-box { padding: 12px 16px; }
-  .filters { gap: 10px; }
-  .filter-group { flex: 1 1 140px; min-width: 120px; }
-  .course-card { padding: 16px 18px; }
-  .card-details { grid-template-columns: 1fr; }
-  .modal-content { padding: 20px; max-height: 90vh; }
-}
-
-/* ===== Mobile Performance: reduce blur effects ===== */
-@media (max-width: 768px) {
-  :root {
-    --blur: 8px;
-    --blur-strong: 12px;
-  }
-  body::before, body::after {
-    filter: blur(40px);
-  }
-  .font-dropdown {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-  .custom-select-trigger,
-  .filter-group input {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    background: rgba(255, 255, 255, 0.65);
-  }
-  .custom-select-dropdown {
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    background: rgba(255, 255, 255, 0.85);
-  }
-  .clear-btn {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgba(255, 255, 255, 0.6);
-  }
+  .filters { padding: 16px 14px; gap: 14px; }
+  .course-card { padding: 16px 16px 16px 22px; }
+  .card-header { flex-direction: column; gap: 10px; }
+  .card-badges { gap: 6px; }
+  .card-details { grid-template-columns: 1fr; gap: 4px 0; }
+  .modal-content { padding: 24px 20px; }
+  .modal-title { font-size: 1.2rem; }
+  .modal-grid { grid-template-columns: 1fr; gap: 12px; }
+  .detail-btn { padding: 9px 18px; }
 }
 </style>
 <script>
@@ -1029,7 +1127,6 @@ var _hmt = _hmt || [];
   <div class="site-footer">
     <div class="footer-info">
       <div class="footer-item"><strong>项目维护</strong> <span class="footer-names">祈愿的猫</span></div>
-      <div class="footer-item"><strong>鸣谢</strong> <span class="footer-names">学生爱心社: 西米露老师 奥利奥老师</span></div>
     </div>
     <div class="footer-msg">欢迎大家把网站分享给其他好朋友们！会一直更新下去为大家服务的~</div>
   </div>
@@ -1073,6 +1170,9 @@ const i18n = {
     modalGeSeries: '通识课系列', modalSyllabus: '教学大纲',
     modalEvaluation: '教学评估', modalCourseCode: '课程号',
     modalClassNo: '班号', modalMajor: '专业限制', modalGrade: '年级限制',
+    modalTerm: '开课学期', modalAudience: '修读对象',
+    modalWeeklyHours: '周学时', modalTotalHours: '总学时',
+    modalExtraNotes: '详情备注',
   },
   en: {
     name: 'English',
@@ -1104,6 +1204,9 @@ const i18n = {
     modalGeSeries: 'GE Series', modalSyllabus: 'Syllabus',
     modalEvaluation: 'Evaluation', modalCourseCode: 'Course Code',
     modalClassNo: 'Class No.', modalMajor: 'Major Restriction', modalGrade: 'Grade Restriction',
+    modalTerm: 'Term', modalAudience: 'Audience',
+    modalWeeklyHours: 'Hours / Week', modalTotalHours: 'Total Hours',
+    modalExtraNotes: 'Additional Notes',
   },
   ja: {
     name: '日本語',
@@ -1135,6 +1238,9 @@ const i18n = {
     modalGeSeries: '一般教養系列', modalSyllabus: 'シラバス',
     modalEvaluation: '授業評価', modalCourseCode: '科目番号',
     modalClassNo: 'クラス', modalMajor: '専攻制限', modalGrade: '学年制限',
+    modalTerm: '開講学期', modalAudience: '対象',
+    modalWeeklyHours: '週時間', modalTotalHours: '総時間',
+    modalExtraNotes: '備考',
   },
   ko: {
     name: '한국어',
@@ -1166,6 +1272,9 @@ const i18n = {
     modalGeSeries: '교양 계열', modalSyllabus: '강의계획서',
     modalEvaluation: '강의 평가', modalCourseCode: '과목 번호',
     modalClassNo: '분반', modalMajor: '전공 제한', modalGrade: '학년 제한',
+    modalTerm: '개강 학기', modalAudience: '수강 대상',
+    modalWeeklyHours: '주당 시수', modalTotalHours: '총 시수',
+    modalExtraNotes: '추가 비고',
   },
   fr: {
     name: 'Fran\u00e7ais',
@@ -1197,6 +1306,9 @@ const i18n = {
     modalGeSeries: 'S\u00e9rie', modalSyllabus: 'Programme',
     modalEvaluation: '\u00c9valuation', modalCourseCode: 'Code',
     modalClassNo: 'Classe', modalMajor: 'Sp\u00e9cialit\u00e9', modalGrade: 'Ann\u00e9e',
+    modalTerm: 'Semestre', modalAudience: 'Public',
+    modalWeeklyHours: 'h/sem', modalTotalHours: 'Heures totales',
+    modalExtraNotes: 'Notes',
   },
   de: {
     name: 'Deutsch',
@@ -1228,6 +1340,9 @@ const i18n = {
     modalGeSeries: 'Serie', modalSyllabus: 'Lehrplan',
     modalEvaluation: 'Bewertung', modalCourseCode: 'Kurscode',
     modalClassNo: 'Klasse', modalMajor: 'Fachbeschr\u00e4nkung', modalGrade: 'Jahrgang',
+    modalTerm: 'Semester', modalAudience: 'Zielgruppe',
+    modalWeeklyHours: 'SWS', modalTotalHours: 'Gesamtstunden',
+    modalExtraNotes: 'Zusatz',
   },
   es: {
     name: 'Espa\u00f1ol',
@@ -1259,6 +1374,9 @@ const i18n = {
     modalGeSeries: 'Serie', modalSyllabus: 'Programa',
     modalEvaluation: 'Evaluaci\u00f3n', modalCourseCode: 'C\u00f3digo',
     modalClassNo: 'Clase', modalMajor: 'Especialidad', modalGrade: 'A\u00f1o',
+    modalTerm: 'Semestre', modalAudience: 'Destinatarios',
+    modalWeeklyHours: 'h/sem', modalTotalHours: 'Horas totales',
+    modalExtraNotes: 'Notas adicionales',
   },
   ru: {
     name: 'Русский',
@@ -1290,8 +1408,212 @@ const i18n = {
     modalGeSeries: 'Серия', modalSyllabus: 'Программа',
     modalEvaluation: 'Оценка', modalCourseCode: 'Код курса',
     modalClassNo: 'Группа', modalMajor: 'Специальность', modalGrade: 'Курс',
+    modalTerm: 'Семестр', modalAudience: 'Целевая аудитория',
+    modalWeeklyHours: 'Часов/нед', modalTotalHours: 'Всего часов',
+    modalExtraNotes: 'Доп. примечания',
   },
 };
+
+/* ============================================================
+   DATA i18n — translations for course data fields
+   index order: [en, ja, ko, fr, de, es, ru]
+   ============================================================ */
+const TR_IDX = { en: 0, ja: 1, ko: 2, fr: 3, de: 4, es: 5, ru: 6 };
+
+const dataI18n = {
+  departments: {
+    '外国语学院': ['School of Foreign Languages','外国語学院','외국어대학','École des langues étrangères','Fakultät für Fremdsprachen','Escuela de Lenguas Extranjeras','Школа иностранных языков'],
+    '物理学院': ['School of Physics','物理学院','물리학대학','École de Physique','Fakultät für Physik','Escuela de Física','Школа физики'],
+    '数学科学学院': ['School of Mathematical Sciences','数学科学学院','수리과학대학','École des Sciences Mathématiques','Fakultät für Mathematische Wissenschaften','Escuela de Ciencias Matemáticas','Школа математических наук'],
+    '哲学系': ['Department of Philosophy','哲学科','철학과','Département de Philosophie','Institut für Philosophie','Departamento de Filosofía','Кафедра философии'],
+    '信息科学技术学院': ['School of Electronics Engineering and Computer Science','情報科学技術学院','정보과학기술대학','École des Sciences et Technologies de l’Information','Fakultät für Informationswissenschaft und Technik','Escuela de Tecnologías de la Información','Школа информационных наук и технологий'],
+    '经济学院': ['School of Economics','経済学院','경제대학','École d’Économie','Fakultät für Wirtschaftswissenschaften','Escuela de Economía','Школа экономики'],
+    '中国语言文学系': ['Department of Chinese Language and Literature','中国言語文学科','중국언어문학과','Département de Langue et Littérature Chinoises','Institut für chinesische Sprache und Literatur','Departamento de Lengua y Literatura Chinas','Кафедра китайского языка и литературы'],
+    '地球与空间科学学院': ['School of Earth and Space Sciences','地球・宇宙科学学院','지구우주과학대학','École des Sciences de la Terre et de l’Espace','Fakultät für Erd- und Raumwissenschaften','Escuela de Ciencias de la Tierra y del Espacio','Школа наук о Земле и космосе'],
+    '生命科学学院': ['School of Life Sciences','生命科学学院','생명과학대학','École des Sciences de la Vie','Fakultät für Biowissenschaften','Escuela de Ciencias de la Vida','Школа наук о жизни'],
+    '光华管理学院': ['Guanghua School of Management','光華管理学院','광화경영대학','École de Management Guanghua','Guanghua School of Management','Escuela de Administración Guanghua','Школа менеджмента Гуанхуа'],
+    '化学与分子工程学院': ['College of Chemistry and Molecular Engineering','化学・分子工学学院','화학분자공학대학','Faculté de Chimie et Génie Moléculaire','Fakultät für Chemie und Molekulartechnik','Facultad de Química e Ingeniería Molecular','Колледж химии и молекулярной инженерии'],
+    '城市与环境学院': ['College of Urban and Environmental Sciences','都市・環境学院','도시환경대학','Faculté d’Études Urbaines et Environnementales','Fakultät für Stadt- und Umweltwissenschaften','Facultad de Estudios Urbanos y Ambientales','Колледж городской и экологической науки'],
+    '工学院': ['College of Engineering','工学院','공과대학','Faculté d’Ingénierie','Fakultät für Ingenieurwissenschaften','Facultad de Ingeniería','Инженерный колледж'],
+    '教务部': ['Office of Educational Administration','教務部','교무처','Bureau de l’Administration Académique','Akademisches Verwaltungsamt','Oficina de Administración Académica','Отдел учебной части'],
+    '心理与认知科学学院': ['School of Psychological and Cognitive Sciences','心理・認知科学学院','심리인지과학대학','École des Sciences Psychologiques et Cognitives','Fakultät für Psychologie und Kognitionswissenschaft','Escuela de Ciencias Psicológicas y Cognitivas','Школа психологических и когнитивных наук'],
+    '历史学系': ['Department of History','歴史学科','역사학과','Département d’Histoire','Institut für Geschichte','Departamento de Historia','Кафедра истории'],
+    '国际关系学院': ['School of International Studies','国際関係学院','국제관계대학','École des Études Internationales','Fakultät für Internationale Studien','Escuela de Estudios Internacionales','Школа международных исследований'],
+    '国家发展研究院': ['National School of Development','国家発展研究院','국가발전연구원','École Nationale de Développement','Nationale Schule für Entwicklung','Escuela Nacional de Desarrollo','Национальная школа развития'],
+    '社会学系': ['Department of Sociology','社会学科','사회학과','Département de Sociologie','Institut für Soziologie','Departamento de Sociología','Кафедра социологии'],
+    '政府管理学院': ['School of Government','政府管理学院','정부관리대학','École de Gouvernement','Fakultät für Regierungsverwaltung','Escuela de Gobierno','Школа государственного управления'],
+    '考古文博学院': ['School of Archaeology and Museology','考古文博学院','고고문박대학','École d’Archéologie et de Muséologie','Fakultät für Archäologie und Museologie','Escuela de Arqueología y Museología','Школа археологии и музееведения'],
+    '艺术学院': ['School of Arts','芸術学院','예술대학','École des Arts','Kunsthochschule','Escuela de Artes','Школа искусств'],
+    '深圳研究生院': ['Shenzhen Graduate School','深圳大学院','선전대학원','École Supérieure de Shenzhen','Graduiertenschule Shenzhen','Escuela de Posgrado de Shenzhen','Шэньчжэньская аспирантура'],
+    '马克思主义学院': ['School of Marxism','マルクス主義学院','마르크스주의대학','École de Marxisme','Schule des Marxismus','Escuela del Marxismo','Школа марксизма'],
+    '信息管理系': ['Department of Information Management','情報管理学科','정보관리학과','Département de Gestion de l’Information','Institut für Informationsmanagement','Departamento de Gestión de la Información','Кафедра информационного менеджмента'],
+    '教育学院': ['Graduate School of Education','教育学院','교육대학','École Supérieure d’Éducation','Graduiertenschule für Erziehungswissenschaft','Escuela de Posgrado en Educación','Высшая школа образования'],
+    '环境科学与工程学院': ['College of Environmental Sciences and Engineering','環境科学・工学学院','환경과학공학대학','Faculté des Sciences et Ingénierie Environnementales','Fakultät für Umweltwissenschaften und -technik','Facultad de Ciencias e Ingeniería Ambiental','Колледж экологических наук и инженерии'],
+    '新闻与传播学院': ['School of Journalism and Communication','ジャーナリズム・コミュニケーション学院','언론정보대학','École de Journalisme et Communication','Fakultät für Journalismus und Kommunikation','Escuela de Periodismo y Comunicación','Школа журналистики и коммуникаций'],
+    '法学院': ['Peking University Law School','法学院','법과대학','Faculté de Droit','Juristische Fakultät','Facultad de Derecho','Юридический факультет'],
+    '前沿交叉学科研究院': ['Academy for Advanced Interdisciplinary Studies','学際先端研究院','첨단융합학문연구원','Académie d’Études Interdisciplinaires Avancées','Akademie für Fortgeschrittene Interdisziplinäre Studien','Academia de Estudios Interdisciplinarios Avanzados','Академия передовых междисциплинарных исследований'],
+    '元培学院': ['Yuanpei College','元培学院','위안페이대학','Collège Yuanpei','Yuanpei-Kolleg','Colegio Yuanpei','Колледж Юаньпэй'],
+    '体育教研部': ['Department of Physical Education','体育教学研究部','체육교학연구부','Département d’Éducation Physique','Institut für Sportwissenschaft','Departamento de Educación Física','Кафедра физического воспитания'],
+    '材料科学与工程学院': ['School of Materials Science and Engineering','材料科学・工学学院','재료과학공학대학','École des Sciences et Génie des Matériaux','Fakultät für Materialwissenschaft und -technik','Escuela de Ciencia e Ingeniería de Materiales','Школа материаловедения и инженерии'],
+    '计算机学院': ['School of Computer Science','コンピュータ学院','컴퓨터과학대학','École d’Informatique','Fakultät für Informatik','Escuela de Informática','Школа компьютерных наук'],
+    '医学部教学办': ['Health Science Center Teaching Office','医学部教学事務局','의학부 교학사무처','Bureau d’Enseignement du Centre des Sciences de la Santé','Lehrbüro des Health Science Center','Oficina de Enseñanza del Centro de Ciencias de la Salud','Учебный отдел Центра медицинских наук'],
+    '力学与工程科学学院': ['School of Mechanics and Engineering Science','力学・工学科学学院','역학공학과학대학','École de Mécanique et Sciences de l’Ingénieur','Fakultät für Mechanik und Ingenieurwissenschaften','Escuela de Mecánica y Ciencias de la Ingeniería','Школа механики и инженерных наук'],
+    '先进制造与机器人学院': ['School of Advanced Manufacturing and Robotics','先進製造・ロボット学院','첨단제조로봇대학','École de Fabrication Avancée et Robotique','Fakultät für Fortgeschrittene Fertigung und Robotik','Escuela de Fabricación Avanzada y Robótica','Школа передового производства и робототехники'],
+    '对外汉语教育学院': ['School of Chinese as a Second Language','対外漢語教育学院','대외한어교육대학','École de Chinois Langue Étrangère','Schule für Chinesisch als Fremdsprache','Escuela de Chino como Lengua Extranjera','Школа преподавания китайского как иностранного'],
+    '人口研究所': ['Institute of Population Research','人口研究所','인구연구소','Institut de Recherche sur la Population','Institut für Bevölkerungsforschung','Instituto de Investigación Demográfica','Институт демографических исследований'],
+    '研究生院': ['Graduate School','大学院','대학원','École Doctorale','Graduiertenschule','Escuela de Posgrado','Аспирантура'],
+    '智能学院': ['School of Intelligence Science and Technology','知能科学技術学院','지능과학기술대학','École de Sciences et Technologies de l’Intelligence','Schule für Intelligenzwissenschaft und -technik','Escuela de Ciencia y Tecnología de la Inteligencia','Школа науки и технологий интеллекта'],
+    '现代农学院': ['Institute of Advanced Agricultural Sciences','現代農学院','현대농학대학','Institut des Sciences Agricoles Avancées','Institut für Moderne Agrarwissenschaften','Instituto de Ciencias Agrícolas Avanzadas','Институт современных аграрных наук'],
+    '集成电路学院': ['School of Integrated Circuits','集積回路学院','집적회로대학','École des Circuits Intégrés','Fakultät für Integrierte Schaltungen','Escuela de Circuitos Integrados','Школа интегральных схем'],
+    '新媒体研究院': ['School of New Media','新メディア研究院','뉴미디어연구원','Institut des Nouveaux Médias','Institut für Neue Medien','Instituto de Nuevos Medios','Институт новых медиа'],
+    '软件与微电子学院': ['School of Software and Microelectronics','ソフトウェア・マイクロエレクトロニクス学院','소프트웨어 및 마이크로전자대학','École de Logiciel et Microélectronique','Fakultät für Software und Mikroelektronik','Escuela de Software y Microelectrónica','Школа программного обеспечения и микроэлектроники'],
+    '未来技术学院': ['School of Future Technology','未来技術学院','미래기술대학','École des Technologies du Futur','Schule für Zukunftstechnologie','Escuela de Tecnologías del Futuro','Школа технологий будущего'],
+    '电子学院': ['School of Electronics','エレクトロニクス学院','전자대학','École d’Électronique','Fakultät für Elektronik','Escuela de Electrónica','Школа электроники'],
+    '汇丰商学院': ['HSBC Business School','HSBCビジネス学院','HSBC비즈니스대학','École de Commerce HSBC','HSBC Business School','Escuela de Negocios HSBC','Школа бизнеса HSBC'],
+    '习近平新时代中国特色社会主义思想研究院': ['Institute of Xi Jinping Thought on Socialism with Chinese Characteristics for a New Era','習近平新時代中国特色社会主義思想研究院','시진핑신시대중국특색사회주의사상연구원','Institut de la Pensée de Xi Jinping','Institut für Xi Jinpings Gedanken für eine neue Ära','Instituto del Pensamiento de Xi Jinping','Институт мысли Си Цзиньпина для новой эпохи'],
+    '创新创业学院': ['School of Innovation and Entrepreneurship','イノベーション・起業学院','혁신창업대학','École d’Innovation et d’Entrepreneuriat','Schule für Innovation und Unternehmertum','Escuela de Innovación y Emprendimiento','Школа инноваций и предпринимательства'],
+    '建筑与景观设计学院': ['School of Architecture and Landscape','建築・景観設計学院','건축조경설계대학','École d’Architecture et Paysage','Schule für Architektur und Landschaftsgestaltung','Escuela de Arquitectura y Paisaje','Школа архитектуры и ландшафта'],
+    '人工智能研究院': ['Institute for Artificial Intelligence','人工知能研究院','인공지능연구원','Institut d’Intelligence Artificielle','Institut für Künstliche Intelligenz','Instituto de Inteligencia Artificial','Институт искусственного интеллекта'],
+    '学生工作部人民武装部': ['Student Affairs Office','学生支援部','학생사업부','Bureau des Affaires Étudiantes','Studentenbüro','Oficina de Asuntos Estudiantiles','Отдел студенческих дел'],
+  },
+
+  categories: {
+    '任选': ['Elective','選択','선택','Au choix','Wahlfach','Optativa','По выбору'],
+    '选修': ['Elective Course','選択科目','선택과목','Cours optionnel','Wahlpflichtkurs','Curso optativo','Факультативный курс'],
+    '必修': ['Required','必修','필수','Obligatoire','Pflichtfach','Obligatorio','Обязательный'],
+    '全校任选': ['University-wide Elective','全学選択','전교선택','Au choix universitaire','Universitätsweites Wahlfach','Optativa Universitaria','Общеуниверситетский по выбору'],
+    '限选': ['Restricted Elective','制限選択','제한선택','Choix restreint','Eingeschränktes Wahlfach','Optativa Restringida','Ограниченный по выбору'],
+    '通识课(通识核心课IV)': ['General Ed (Core IV)','一般教養(コアIV)','교양(핵심IV)','Formation Générale (Noyau IV)','Allgemeinbildung (Kernkurs IV)','Educación General (Núcleo IV)','Общеобразовательный (Базовый IV)'],
+    '通识课(通选课II)': ['General Ed (Elective II)','一般教養(選択II)','교양(선택II)','Formation Générale (Optionnel II)','Allgemeinbildung (Wahl II)','Educación General (Electivo II)','Общеобразовательный (Выборный II)'],
+    '任选、劳动教育课': ['Elective / Labor Education','選択・労働教育','선택/노동교육','Au choix / Éducation au Travail','Wahl / Arbeitserziehung','Optativa / Educación Laboral','По выбору / Трудовое воспитание'],
+    '通识课(通识核心课II)': ['General Ed (Core II)','一般教養(コアII)','교양(핵심II)','Formation Générale (Noyau II)','Allgemeinbildung (Kernkurs II)','Educación General (Núcleo II)','Общеобразовательный (Базовый II)'],
+    '通识课(通选课IV)': ['General Ed (Elective IV)','一般教養(選択IV)','교양(선택IV)','Formation Générale (Optionnel IV)','Allgemeinbildung (Wahl IV)','Educación General (Electivo IV)','Общеобразовательный (Выборный IV)'],
+    '通识课(通选课III)': ['General Ed (Elective III)','一般教養(選択III)','교양(선택III)','Formation Générale (Optionnel III)','Allgemeinbildung (Wahl III)','Educación General (Electivo III)','Общеобразовательный (Выборный III)'],
+    '专业必修': ['Major Required','専攻必修','전공필수','Spécialité Obligatoire','Pflichtfach im Hauptfach','Especialidad Obligatoria','Обязательный по специальности'],
+    '通识课(通识核心课I)': ['General Ed (Core I)','一般教養(コアI)','교양(핵심I)','Formation Générale (Noyau I)','Allgemeinbildung (Kernkurs I)','Educación General (Núcleo I)','Общеобразовательный (Базовый I)'],
+    '通识课(通选课I)': ['General Ed (Elective I)','一般教養(選択I)','교양(선택I)','Formation Générale (Optionnel I)','Allgemeinbildung (Wahl I)','Educación General (Electivo I)','Общеобразовательный (Выборный I)'],
+    '通识课(通识核心课III)': ['General Ed (Core III)','一般教養(コアIII)','교양(핵심III)','Formation Générale (Noyau III)','Allgemeinbildung (Kernkurs III)','Educación General (Núcleo III)','Общеобразовательный (Базовый III)'],
+    '任选、思政选择性必修': ['Elective / Civic Selective Required','選択・思政選択必修','선택/사상정치선택필수','Au choix / Civique','Wahl / Politische Bildung','Optativa / Cívica','По выбору / Идеологический'],
+    '全校任选、思政选择性必修': ['University Elective / Civic Required','全学選択・思政選択必修','전교선택/사상정치선택필수','Au choix universitaire / Civique','Universitätsweite Wahl / Politische Bildung','Optativa Universitaria / Cívica','Общеуниверситетский / Идеологический'],
+    '全校任选、劳动教育课': ['University Elective / Labor Education','全学選択・労働教育','전교선택/노동교육','Au choix universitaire / Éducation au Travail','Universitätsweite Wahl / Arbeitserziehung','Optativa Universitaria / Educación Laboral','Общеуниверситетский / Трудовое воспитание'],
+    '通识课(通选课II)、思政选择性必修': ['General Ed (II) / Civic Required','一般教養(選択II)・思政選択必修','교양(II)/사상정치필수','Formation Générale (II) / Civique','Allgemeinbildung (II) / Politische Bildung','Educación General (II) / Cívica','Общеобразовательный (II) / Идеологический'],
+    '通识课(通选课III)、思政选择性必修': ['General Ed (III) / Civic Required','一般教養(選択III)・思政選択必修','교양(III)/사상정치필수','Formation Générale (III) / Civique','Allgemeinbildung (III) / Politische Bildung','Educación General (III) / Cívica','Общеобразовательный (III) / Идеологический'],
+    '通识课(通选课II)、劳动教育课': ['General Ed (II) / Labor Education','一般教養(選択II)・労働教育','교양(II)/노동교육','Formation Générale (II) / Éducation au Travail','Allgemeinbildung (II) / Arbeitserziehung','Educación General (II) / Educación Laboral','Общеобразовательный (II) / Трудовое воспитание'],
+  },
+
+  gradings: {
+    '百分制': ['Percentage','100点法','백분율','Pourcentage','Prozentnote','Porcentaje','Процентная'],
+    '等级制': ['Letter Grade','等級制','등급제','Note littérale','Notenstufen','Calificación por Letras','Буквенная'],
+    '无需录成绩': ['No Grade Recorded','成績記録なし','성적기록불필요','Pas de note','Keine Note','Sin calificación','Без оценки'],
+    '合格制': ['Pass/Fail','合格/不合格','합격/불합격','Validé/Non validé','Bestanden/Nicht bestanden','Aprobado/Reprobado','Зачёт/Незачёт'],
+  },
+
+  languages: {
+    '中文': ['Chinese','中国語','중국어','Chinois','Chinesisch','Chino','Китайский'],
+    '英文': ['English','英語','영어','Anglais','Englisch','Inglés','Английский'],
+    '中英双语': ['Chinese/English Bilingual','中英バイリンガル','중영이중언어','Bilingue Chinois-Anglais','Chinesisch/Englisch zweisprachig','Bilingüe Chino-Inglés','Двуязычный (китайско-английский)'],
+    '其它语言': ['Other Language','その他の言語','기타언어','Autre langue','Andere Sprache','Otro idioma','Другой язык'],
+  },
+
+  audiences: {
+    '硕博': ['Master & PhD','修士・博士','석박사','Master & Doctorat','Master & Promotion','Maestría y Doctorado','Магистратура и аспирантура'],
+    '博士生': ['PhD Students','博士課程','박사과정','Étudiants en Doctorat','Promovierende','Estudiantes de Doctorado','Аспиранты'],
+    '硕士生': ['Master Students','修士課程','석사과정','Étudiants en Master','Master-Studierende','Estudiantes de Maestría','Магистранты'],
+    '研究生': ['Graduate Students','大学院生','대학원생','Étudiants Diplômés','Graduiertenstudierende','Estudiantes de Posgrado','Аспиранты'],
+    '专业学位': ['Professional Degree','専門職学位','전문학위','Diplôme Professionnel','Berufsabschluss','Título Profesional','Профессиональная степень'],
+    '硕、博': ['Master & PhD','修士・博士','석박사','Master & Doctorat','Master & Promotion','Maestría y Doctorado','Магистратура и аспирантура'],
+    '硕士、博士': ['Master & PhD','修士・博士','석박사','Master & Doctorat','Master & Promotion','Maestría y Doctorado','Магистратура и аспирантура'],
+    '硕士': ['Master','修士','석사','Master','Master','Maestría','Магистратура'],
+    '博士': ['PhD','博士','박사','Doctorat','Promotion','Doctorado','Аспирантура'],
+    '博士、硕士': ['PhD & Master','博士・修士','박사석사','Doctorat & Master','Promotion & Master','Doctorado y Maestría','Аспирантура и магистратура'],
+  },
+
+  notes: {
+    '本研合上': ['Joint Undergrad/Grad','学部・院共修','학부대학원공동수강','Cours Mixte Licence/Master','Bachelor/Master gemeinsam','Conjunto Licenciatura/Posgrado','Совместный бакалавр/магистр'],
+    '本硕合': ['Joint Undergrad/Master','学部・修士共修','학부석사공동수강','Cours Mixte Licence/Master','Bachelor/Master gemeinsam','Conjunto Licenciatura/Maestría','Совместный бакалавр/магистр'],
+    '硕博合上': ['Joint Master/PhD','修士・博士共修','석박사공동수강','Cours Mixte Master/Doctorat','Master/Promotion gemeinsam','Conjunto Maestría/Doctorado','Совместный магистр/аспирант'],
+    '与本科生合上': ['Joint with Undergraduates','学部生と合同','학부생과 합동','Avec étudiants de Licence','Mit Bachelor-Studierenden','Con estudiantes de licenciatura','Совместно со студентами бакалавриата'],
+    '博士': ['PhD','博士','박사','Doctorat','Promotion','Doctorado','Аспирантура'],
+    '研讨教室': ['Seminar Room','ゼミ教室','세미나실','Salle de Séminaire','Seminarraum','Sala de Seminario','Семинарская аудитория'],
+    '在深圳校区开课': ['Taught at Shenzhen Campus','深圳キャンパスで開講','선전캠퍼스 개설','Enseigné au Campus de Shenzhen','An der Shenzhen-Niederlassung','Impartido en Campus Shenzhen','Преподаётся в кампусе Шэньчжэнь'],
+    '--补录': ['Make-up Registration','補欠登録','보결등록','Inscription Complémentaire','Nachregistrierung','Registro Suplementario','Дозапись'],
+    'Taught in English': ['Taught in English','英語講義','영어강의','Enseigné en Anglais','Auf Englisch unterrichtet','Impartido en Inglés','Преподаётся на английском'],
+  },
+
+  titles: {
+    '教授': ['Prof.','教授','교수','Prof.','Prof.','Prof.','Проф.'],
+    '副教授': ['Assoc. Prof.','准教授','부교수','Prof. Assoc.','Assoz. Prof.','Prof. Asoc.','Доц.'],
+    '长聘副教授': ['Tenured Assoc. Prof.','テニュア准教授','정년부교수','Prof. Assoc. Titulaire','Tenured Assoz. Prof.','Prof. Asoc. Titular','Штатный доцент'],
+    '预聘副教授': ['Tenure-track Assoc. Prof.','テニュアトラック准教授','테뉴어트랙부교수','Prof. Assoc. (titularisation)','Tenure-Track Assoz. Prof.','Prof. Asoc. (vía permanencia)','Доцент (tenure-track)'],
+    '助理教授': ['Asst. Prof.','助教授','조교수','Prof. Adj.','Asst. Prof.','Prof. Adj.','Асс. проф.'],
+    '长聘助理教授': ['Tenured Asst. Prof.','テニュア助教','정년조교수','Prof. Adj. Titulaire','Tenured Asst. Prof.','Prof. Adj. Titular','Штатный асс. проф.'],
+    '预聘助理教授': ['Tenure-track Asst. Prof.','テニュアトラック助教','테뉴어트랙조교수','Prof. Adj. (titularisation)','Tenure-Track Asst. Prof.','Prof. Adj. (vía permanencia)','Асс. проф. (tenure-track)'],
+    '讲师': ['Lecturer','講師','강사','Maître de Conférences','Dozent','Profesor titular','Преподаватель'],
+    '研究员': ['Researcher','研究員','연구원','Chercheur','Forscher','Investigador','Научный сотрудник'],
+    '副研究员': ['Associate Researcher','准研究員','부연구원','Chercheur Associé','Wiss. Mitarbeiter','Investigador Asociado','Старший научный сотрудник'],
+    '助理研究员': ['Assistant Researcher','助研究員','조연구원','Chercheur Adjoint','Wiss. Mitarbeiter (Junior)','Investigador Asistente','Младший научный сотрудник'],
+  },
+
+  weekdayShort: {
+    '一': ['Mon','月','월','Lun','Mo','Lun','Пн'],
+    '二': ['Tue','火','화','Mar','Di','Mar','Вт'],
+    '三': ['Wed','水','수','Mer','Mi','Mié','Ср'],
+    '四': ['Thu','木','목','Jeu','Do','Jue','Чт'],
+    '五': ['Fri','金','금','Ven','Fr','Vie','Пт'],
+    '六': ['Sat','土','토','Sam','Sa','Sáb','Сб'],
+    '日': ['Sun','日','일','Dim','So','Dom','Вс'],
+  },
+
+  scheduleTerms: {
+    weeks:  ['Weeks','週','주','Sem.','Wochen','Sem.','Нед.'],
+    every:  ['every','毎週','매주','chaque','jede','cada','каждый'],
+    odd:    ['odd weeks','奇数週','홀수주','sem. impaires','ungerade Wochen','sem. impares','нечётные'],
+    even:   ['even weeks','偶数週','짝수주','sem. paires','gerade Wochen','sem. pares','чётные'],
+    period: ['P','時限','교시','P.','Std.','P.','п.'],
+  },
+};
+
+function tr(cat, key) {
+  if (!key) return key || '';
+  if (currentLang === 'zh') return key;
+  const i = TR_IDX[currentLang];
+  if (i === undefined) return key;
+  const entry = dataI18n[cat] && dataI18n[cat][key];
+  return (entry && entry[i]) || key;
+}
+
+// Translate parenthetical titles inside "教师姓名(职称),..."
+function trTeacher(s) {
+  if (!s || currentLang === 'zh') return s;
+  return s.replace(/[（(]([^)）]+)[)）]/g, (m, t) => {
+    const trans = tr('titles', t.trim());
+    return ' (' + trans + ')';
+  });
+}
+
+// Localize schedule: "1~15周 每周周二3~5节"
+function trSchedule(s) {
+  if (!s || currentLang === 'zh') return s;
+  const t = dataI18n.scheduleTerms;
+  const wd = dataI18n.weekdayShort;
+  const i = TR_IDX[currentLang];
+  if (i === undefined) return s;
+  return s
+    .replace(/(\d+)~(\d+)周/g, (_, a, b) => t.weeks[i] + ' ' + a + '-' + b)
+    .replace(/每周/g, t.every[i] + ' ')
+    .replace(/单周/g, t.odd[i] + ' ')
+    .replace(/双周/g, t.even[i] + ' ')
+    .replace(/周([一二三四五六日])/g, (_, d) => wd[d] ? wd[d][i] : '周' + d)
+    .replace(/(\d+)~(\d+)节/g, (_, a, b) => t.period[i] + ' ' + a + '-' + b)
+    .replace(/(\d+)节/g, (_, a) => t.period[i] + ' ' + a);
+}
+
+// Course name: prefer english_name for EN
+function trCourseName(course) {
+  if (!course) return '';
+  if (currentLang === 'en' && course.english_name) return course.english_name;
+  return course.course_name || '';
+}
 
 let currentLang = 'zh';
 
@@ -1308,7 +1630,10 @@ function setLang(key) {
   });
   closeLangDropdown();
   applyI18n();
+  if (cachedFilters) populateFilters(cachedFilters);
   rerenderCards();
+  // Re-fetch modal if open so intro/extra_notes update in new lang
+  if (currentModalCourseId) showDetail(currentModalCourseId);
 }
 
 function toggleLangDropdown() {
@@ -1348,11 +1673,12 @@ const PAGE_SIZE = 50;
 let fetchController = null;
 
 /* ===== Initialization ===== */
+let cachedFilters = null;
 async function init() {
   try {
     const resp = await fetch('/api/filters');
-    const filters = await resp.json();
-    populateFilters(filters);
+    cachedFilters = await resp.json();
+    populateFilters(cachedFilters);
     await fetchCourses();
     document.getElementById('loadingMsg').remove();
   } catch (e) {
@@ -1414,35 +1740,35 @@ function populateFilters(filters) {
 
   initCustomSelect('csCourseType',
     filters.course_types.map(ct => ({ value: ct, label: lang.courseTypes[ct] || ct })),
-    lang.all);
+    lang.all, csValues.filterCourseType);
 
   initCustomSelect('csCategory',
-    filters.categories.map(c => ({ value: c, label: c })),
-    lang.all);
+    filters.categories.map(c => ({ value: c, label: tr('categories', c) })),
+    lang.all, csValues.filterCategory);
 
   initCustomSelect('csCredits',
     filters.credits.filter(c => c !== 0).map(c => ({
       value: String(c),
       label: c % 1 === 0 ? c.toFixed(0) : c.toFixed(1)
     })),
-    lang.all);
+    lang.all, csValues.filterCredits);
 
   initCustomSelect('csDepartment',
-    filters.departments.map(d => ({ value: d, label: d })),
-    lang.all);
+    filters.departments.map(d => ({ value: d, label: tr('departments', d) })),
+    lang.all, csValues.filterDepartment);
 
   initCustomSelect('csSort', [
     { value: 'pinyin', label: lang.sortPinyin },
-  ], lang.sortDefault);
+  ], lang.sortDefault, csValues.filterSort);
 
   initCustomSelect('csGrading',
-    filters.gradings.map(g => ({ value: g, label: g })),
-    lang.all);
+    filters.gradings.map(g => ({ value: g, label: tr('gradings', g) })),
+    lang.all, csValues.filterGrading);
 
   const weekdaysCN = ['周一','周二','周三','周四','周五','周六','周日'];
   initCustomSelect('csWeekday',
     weekdaysCN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
-    lang.all);
+    lang.all, csValues.filterWeekday);
 }
 
 /* ===== Search & Filter ===== */
@@ -1559,28 +1885,28 @@ function createCard(course) {
 
   let html = `
     <div class="card-header">
-      <span class="course-name">${esc(course.course_name)}</span>
+      <span class="course-name">${esc(trCourseName(course))}</span>
       <div class="card-badges">
         <span class="badge ${getTypeBadgeClass(course.course_type)}">${esc(getTypeBadgeText(course.course_type))}</span>
-        <span class="badge badge-category">${esc(course.category)}</span>
+        <span class="badge badge-category">${esc(tr('categories', course.category))}</span>
         <span class="badge badge-credits">${course.credits % 1 === 0 ? course.credits.toFixed(0) : course.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
       </div>
     </div>
     <div class="card-details">
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldTeacher)}</span>
-        <span class="detail-value">${esc(course.teacher || '-')}</span>
+        <span class="detail-value">${esc(trTeacher(course.teacher) || '-')}</span>
       </div>
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldDepartment)}</span>
-        <span class="detail-value">${esc(course.department)}</span>
+        <span class="detail-value">${esc(tr('departments', course.department))}</span>
       </div>`;
 
   if (course.schedule) {
     html += `
       <div class="detail-item">
         <span class="detail-label">${esc(lang.fieldTime)}</span>
-        <span class="detail-value">${esc(course.schedule)}</span>
+        <span class="detail-value">${esc(trSchedule(course.schedule))}</span>
       </div>`;
   }
   if (course.classroom) {
@@ -1593,7 +1919,7 @@ function createCard(course) {
 
   html += `</div>
     <div class="card-footer">
-      <button class="detail-btn" onclick="showDetail(${course.id})">${esc(lang.detailBtn)}</button>
+      <button class="detail-btn" onclick="showDetail('${course.id}')">${esc(lang.detailBtn)}</button>
     </div>`;
 
   card.innerHTML = html;
@@ -1601,27 +1927,32 @@ function createCard(course) {
 }
 
 /* ===== Detail Modal ===== */
+let currentModalCourseId = null;
+
 async function showDetail(courseId) {
   const lang = i18n[currentLang];
   const overlay = document.getElementById('modalOverlay');
   const content = document.getElementById('modalContent');
 
+  currentModalCourseId = courseId;
   content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${lang.modalLoading}</span></div>`;
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
 
   try {
-    const resp = await fetch('/api/courses/' + courseId);
+    const resp = await fetch('/api/courses/' + courseId + '?lang=' + encodeURIComponent(currentLang));
     const c = await resp.json();
+    // Drop result if modal closed or switched to another course in the meantime.
+    if (currentModalCourseId !== courseId || !overlay.classList.contains('open')) return;
 
     let html = `
       <div class="modal-header">
-        <span class="modal-title">${esc(c.course_name)}</span>
+        <span class="modal-title">${esc(trCourseName(c))}</span>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-badges">
         <span class="badge ${getTypeBadgeClass(c.course_type)}">${esc(getTypeBadgeText(c.course_type))}</span>
-        <span class="badge badge-category">${esc(c.category)}</span>
+        <span class="badge badge-category">${esc(tr('categories', c.category))}</span>
         <span class="badge badge-credits">${c.credits % 1 === 0 ? c.credits.toFixed(0) : c.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
       </div>`;
 
@@ -1633,17 +1964,21 @@ async function showDetail(courseId) {
     const basicFields = [
       [lang.modalCourseCode, c.course_code],
       [lang.modalClassNo, c.class_no],
-      [lang.fieldTeacher, c.teacher],
-      [lang.fieldDepartment, c.department],
-      [lang.fieldTime, c.schedule],
+      [lang.fieldTeacher, trTeacher(c.teacher)],
+      [lang.fieldDepartment, tr('departments', c.department)],
+      [lang.fieldTime, trSchedule(c.schedule)],
       [lang.fieldClassroom, c.classroom],
       [lang.fieldEnrollment, c.enrollment],
       [lang.fieldPNP, c.pnp],
-      [lang.modalGrading, c.grading],
-      [lang.modalLanguage, c.language],
+      [lang.modalGrading, tr('gradings', c.grading)],
+      [lang.modalLanguage, tr('languages', c.language)],
     ];
     if (c.major) basicFields.push([lang.modalMajor, c.major]);
     if (c.grade) basicFields.push([lang.modalGrade, c.grade]);
+    if (c.term) basicFields.push([lang.modalTerm, c.term]);
+    if (c.audience) basicFields.push([lang.modalAudience, tr('audiences', c.audience)]);
+    if (c.weekly_hours) basicFields.push([lang.modalWeeklyHours, c.weekly_hours]);
+    if (c.total_hours) basicFields.push([lang.modalTotalHours, c.total_hours]);
 
     for (const [label, value] of basicFields) {
       if (value) {
@@ -1655,8 +1990,8 @@ async function showDetail(courseId) {
     }
     html += '</div></div>';
 
-    // English name
-    if (c.english_name) {
+    // English name (show when not zh OR when there is one and zh viewer wants both)
+    if (c.english_name && currentLang !== 'en') {
       html += `<div class="modal-section">
         <div class="modal-section-title">${esc(lang.modalEnglishName)}</div>
         <div class="modal-field-value">${esc(c.english_name)}</div>
@@ -1672,7 +2007,7 @@ async function showDetail(courseId) {
     }
 
     // Prerequisites
-    if (c.prerequisites && c.prerequisites !== '无先修要求') {
+    if (c.prerequisites && c.prerequisites !== '无先修要求' && c.prerequisites !== '无') {
       html += `<div class="modal-section">
         <div class="modal-section-title">${esc(lang.modalPrerequisites)}</div>
         <div class="modal-field-value">${esc(c.prerequisites)}</div>
@@ -1683,19 +2018,23 @@ async function showDetail(courseId) {
     if (c.notes) {
       html += `<div class="modal-section">
         <div class="modal-section-title">${esc(lang.fieldNotes)}</div>
-        <div class="modal-field-value">${esc(c.notes)}</div>
+        <div class="modal-field-value">${esc(tr('notes', c.notes))}</div>
       </div>`;
     }
 
-    // Detail info section
+    // Detail info section — show intro_en first when lang=en, else intro_cn first
     html += `<div class="modal-section">
       <div class="modal-section-title">${esc(lang.modalDetailInfo)}</div>`;
 
+    const introOrder = currentLang === 'en'
+      ? [[lang.modalIntroEn, c.intro_en], [lang.modalIntroCn, c.intro_cn]]
+      : [[lang.modalIntroCn, c.intro_cn], [lang.modalIntroEn, c.intro_en]];
+
     const longFields = [
-      [lang.modalIntroCn, c.intro_cn],
-      [lang.modalIntroEn, c.intro_en],
+      ...introOrder,
       [lang.modalSyllabus, c.syllabus],
       [lang.modalEvaluation, c.evaluation],
+      [lang.modalExtraNotes, c.extra_notes],
     ];
 
     for (const [label, value] of longFields) {
@@ -1717,6 +2056,7 @@ async function showDetail(courseId) {
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
   document.body.style.overflow = '';
+  currentModalCourseId = null;
 }
 
 document.addEventListener('keydown', e => {

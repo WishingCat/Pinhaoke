@@ -21,22 +21,36 @@
 ## 技术架构
 
 ```
-Nginx (反向代理) → FastAPI (Python 后端) → SQLite (数据库)
+Nginx (反向代理) → FastAPI (Python 后端) → SQLite × 2（本科 + 研究生）
 ```
 
-- **后端**：Python FastAPI + Uvicorn
-- **数据库**：SQLite，支持课程列表/筛选/搜索/详情查询
+- **后端**：Python FastAPI + Uvicorn；`app.py` 用 SQLite `ATTACH` 同时连接两库
+- **数据库**：两个独立 SQLite 文件
+  - `2026春季学期本科生课程.db`（2465 门 = 公选 256 + 通识 143 + 专业 2066）
+  - `2026春季学期研究生课程.db`（1379 门）
+  - 各自三表：`basic_info` + `detail_info`(1:1) + 视图 `courses_view`
 - **前端**：单页 HTML，通过 API 动态加载数据
 - **部署**：阿里云服务器（Ubuntu 24.04），Nginx + systemd
 
 ## 数据来源
 
-- `北大公选课数据_25-26第2学期.json` — 公选课（256 门）
-- `北大通识课数据_25-26第2学期.json` — 通识课（143 门）
-- `北大专业课数据_25-26第2学期.json` — 专业课（2066 门）
-- `北大研究生课程数据_25-26第2学期.json` — 研究生课（1179 门）
+源 JSON 仍保留在 `Course data/` 与 `Graduated_Course_data/`（不入 git）：
 
-数据来源于 2026 年 3 月 20 日从北京大学选课系统 `elective.pku.edu.cn` 获取的课程数据，每门课程包含基本信息与详细信息两部分。
+- `Course data/北大公选课数据_25-26第2学期.json` — 256 门
+- `Course data/北大通识课数据_25-26第2学期.json` — 143 门
+- `Course data/北大专业课数据_25-26第2学期.json` — 2066 门
+- `Graduated_Course_data/pku_graduate_courses.json` — 1379 门
+
+数据来源于 2026 年 3 月 20 日从北京大学选课系统 `elective.pku.edu.cn` 获取。
+
+## 重建数据库
+
+```bash
+python3 build_undergrad_db.py   # → 2026春季学期本科生课程.db
+python3 build_graduate_db.py    # → 2026春季学期研究生课程.db
+```
+
+`build_common.py` 提供共用的课表解析函数。旧的派生数据与构建脚本归档在 `archive/`。
 
 ## 如果有能力的话欢迎赞助 支持网站的运行
 ## 只要有人需要 每学期都会一直更新下去的！
@@ -59,6 +73,3 @@ Nginx (反向代理) → FastAPI (Python 后端) → SQLite (数据库)
 | 赞助者 | 金额 |
 |--------|------|
 | 噬铁侠 | 100¥ |
-
-### 鸣谢
-感谢北京大学学生爱心社 西米露老师和奥利奥老师提供的课程咨询支持
