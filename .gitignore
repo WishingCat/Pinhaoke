@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .auth/
 tmp_summer/
+
+# 夏季学期是独立项目，本仓库只追踪春季学期
+pku_inpage_summer_scraper.js
+receive_pku_summer_payload.py
+2026暑期学期课程.db

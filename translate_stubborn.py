@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Translate remaining stubborn (long) rows one language at a time."""
 import json
+import os
 import sqlite3
 import ssl
+import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 import certifi
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-API_KEY = "REDACTED_DEEPSEEK_KEY"
+API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
+    "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
+)
 API_URL = "https://api.qnaigc.com/v1/chat/completions"
 MODEL = "deepseek/deepseek-v4-flash"
 

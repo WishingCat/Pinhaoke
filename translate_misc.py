@@ -37,7 +37,9 @@ from concurrent.futures import ThreadPoolExecutor
 import certifi
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-API_KEY = "REDACTED_DEEPSEEK_KEY"
+API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
+    "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
+)
 API_URL = "https://api.qnaigc.com/v1/chat/completions"
 MODEL = "deepseek/deepseek-v4-flash"
 
