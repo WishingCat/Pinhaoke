@@ -1,1 +1,6 @@
 .DS_Store
+venv/
+__pycache__/
+*.pyc
+.auth/
+tmp_summer/

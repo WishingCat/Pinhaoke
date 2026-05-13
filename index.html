@@ -1807,6 +1807,7 @@ async function fetchCourses() {
   if (weekday) params.set('weekday', weekday);
   if (grading) params.set('grading', grading);
   if (sort) params.set('sort', sort);
+  params.set('lang', currentLang);
   params.set('page', currentPage);
   params.set('page_size', PAGE_SIZE);
 

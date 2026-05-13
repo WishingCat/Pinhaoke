@@ -200,6 +200,7 @@ def list_courses(
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
     sort: str = Query("", description="Sort: pinyin"),
+    lang: str = Query("zh", description="Display language"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
@@ -224,30 +225,59 @@ def list_courses(
         total = cur.execute(count_sql, params).fetchone()[0]
         rows = cur.execute(list_sql, params + [page_size, offset]).fetchall()
 
-    courses = [
-        {
-            "id": r["id"],
-            "course_type": r["course_type"],
-            "course_code": r["course_code"],
-            "course_name": r["course_name"],
-            "english_name": r["english_name"],
-            "category": r["category"],
-            "credits": r["credits"],
-            "teacher": r["teacher"],
-            "class_no": r["class_no"],
-            "department": r["department"],
-            "schedule": r["schedule"],
-            "classroom": r["classroom"],
-            "enrollment": r["enrollment"],
-            "pnp": r["pnp"],
-            "notes": r["notes"],
-            "major": r["major"],
-            "grade": r["grade"],
-            "language": r["language"],
-            "audience": r["audience"],
-        }
-        for r in rows
-    ]
+        # Bulk-fetch translations for visible card fields when lang != zh.
+        ug_trans: dict = {}
+        gr_trans: dict = {}
+        if lang != "zh" and rows:
+            ug_ids = [int(r["id"][1:]) for r in rows if r["id"].startswith("u")]
+            gr_ids = [int(r["id"][1:]) for r in rows if r["id"].startswith("g")]
+            CARD_FIELDS = ("course_name", "classroom", "notes")
+            for ids, ns, store in (
+                (ug_ids, "main", ug_trans),
+                (gr_ids, "gr", gr_trans),
+            ):
+                if not ids:
+                    continue
+                placeholders = ",".join("?" * len(ids))
+                fld_placeholders = ",".join("?" * len(CARD_FIELDS))
+                tr_rows = cur.execute(
+                    f"SELECT course_id, field, text FROM {ns}.translations "
+                    f"WHERE lang=? AND course_id IN ({placeholders}) "
+                    f"AND field IN ({fld_placeholders})",
+                    [lang, *ids, *CARD_FIELDS],
+                ).fetchall()
+                for cid, field, text in tr_rows:
+                    if text:
+                        store.setdefault(cid, {})[field] = text
+
+    courses = []
+    for r in rows:
+        rid = r["id"]
+        local_id = int(rid[1:])
+        trans = ug_trans.get(local_id, {}) if rid.startswith("u") else gr_trans.get(local_id, {})
+        courses.append(
+            {
+                "id": rid,
+                "course_type": r["course_type"],
+                "course_code": r["course_code"],
+                "course_name": trans.get("course_name") or r["course_name"],
+                "english_name": r["english_name"],
+                "category": r["category"],
+                "credits": r["credits"],
+                "teacher": r["teacher"],
+                "class_no": r["class_no"],
+                "department": r["department"],
+                "schedule": r["schedule"],
+                "classroom": trans.get("classroom") or r["classroom"],
+                "enrollment": r["enrollment"],
+                "pnp": r["pnp"],
+                "notes": trans.get("notes") or r["notes"],
+                "major": r["major"],
+                "grade": r["grade"],
+                "language": r["language"],
+                "audience": r["audience"],
+            }
+        )
 
     return {"total": total, "page": page, "page_size": page_size, "courses": courses}
 
@@ -262,6 +292,29 @@ def _parse_id(course_id: str):
         return course_id[0], int(course_id[1:])
     except ValueError:
         return None, None
+
+
+# Fields the translations table can override per (course_id, field, lang).
+TRANSLATABLE_FIELDS = (
+    "course_name", "notes", "pnp", "classroom", "major",
+    "prerequisites", "ge_series", "textbook", "audience", "term",
+    "reference_book", "syllabus", "evaluation",
+    "intro_cn", "extra_notes",
+)
+
+
+def _apply_translations(cur, ns: str, local_id: int, lang: str, out: dict):
+    """Replace translatable fields in `out` with values from translations table."""
+    if lang == "zh":
+        return
+    rows = cur.execute(
+        f"SELECT field, text FROM {ns}.translations "
+        f"WHERE course_id=? AND lang=?",
+        (local_id, lang),
+    ).fetchall()
+    for field, text in rows:
+        if field in TRANSLATABLE_FIELDS and text:
+            out[field] = text
 
 
 @app.get("/api/courses/{course_id}")
@@ -309,23 +362,9 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
         keys = row.keys()
         out = {k: row[k] for k in keys}
 
-        # Replace intro_cn / extra_notes with translated text when available.
-        if lang != "zh":
-            ns = "main" if level == "u" else "gr"
-            tr_intro = cur.execute(
-                f"SELECT text FROM {ns}.translations "
-                f"WHERE course_id=? AND field='intro_cn' AND lang=?",
-                (local_id, lang),
-            ).fetchone()
-            if tr_intro:
-                out["intro_cn"] = tr_intro[0]
-            tr_extra = cur.execute(
-                f"SELECT text FROM {ns}.translations "
-                f"WHERE course_id=? AND field='extra_notes' AND lang=?",
-                (local_id, lang),
-            ).fetchone()
-            if tr_extra:
-                out["extra_notes"] = tr_extra[0]
+        # Replace every translatable field with its translation when present.
+        ns = "main" if level == "u" else "gr"
+        _apply_translations(cur, ns, local_id, lang, out)
 
     # Ensure all keys exist for both levels so frontend gating is consistent.
     for k in (
