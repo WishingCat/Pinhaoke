@@ -46,21 +46,22 @@ def open_context(p):
 
 
 def ensure_logged_in(page: Page, context: BrowserContext):
-    """Navigate to elective; if redirected to IAAA, wait for user to log in manually."""
+    """Navigate to elective; if redirected to IAAA, poll URL until login completes."""
     page.goto(QUERY_URL, wait_until="domcontentloaded")
-    if "iaaa.pku.edu.cn" in page.url or "login" in page.url.lower():
-        print("\n[!] 检测到未登录。请在浏览器里完成登录（IAAA 学号密码 + 验证码）。")
-        print("[!] 登录完成、看到选课系统的课程查询页面后，回到这里按回车继续...")
-        input()
-    # 等真正进入查询页
-    for _ in range(60):
-        if "elective.pku.edu.cn" in page.url and "courseQuery" in page.url:
+    needs_login = "iaaa.pku.edu.cn" in page.url or "login" in page.url.lower()
+    if needs_login:
+        print("\n[!] 检测到未登录。请在浏览器里完成登录（IAAA 学号密码 + 验证码）。", flush=True)
+        print("[!] 登录完成后脚本会自动检测 URL 并继续，无需操作终端。", flush=True)
+    # 最多等 5 分钟登录完成
+    deadline = time.time() + 300
+    while time.time() < deadline:
+        if "elective.pku.edu.cn" in page.url and "elective2008" in page.url:
             break
         page.wait_for_timeout(1000)
     else:
-        raise RuntimeError(f"未能跳转到课程查询页，当前 URL: {page.url}")
+        raise RuntimeError(f"超时未登录，当前 URL: {page.url}")
     context.storage_state(path=str(AUTH_STATE))
-    print(f"[+] 已保存登录态到 {AUTH_STATE.relative_to(BASE)}")
+    print(f"[+] 已保存登录态到 {AUTH_STATE.relative_to(BASE)}", flush=True)
 
 
 def scrape_type(page: Page, type_name: str) -> list[dict]:
