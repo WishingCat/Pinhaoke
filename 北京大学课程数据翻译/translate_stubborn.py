@@ -124,14 +124,12 @@ def process(db_path, src_field, store_field, label):
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    _UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
+    _GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
     print("== sequential per-lang retranslate ==")
-    o1, f1 = process(
-        "2026春季学期研究生课程.db", "intro", "intro_cn", "GR intro"
-    )
-    o2, f2 = process(
-        "2026春季学期研究生课程.db", "extra_notes", "extra_notes", "GR extra"
-    )
-    o3, f3 = process(
-        "2026春季学期本科生课程.db", "intro_cn", "intro_cn", "UG intro"
-    )
+    o1, f1 = process(_GR_DB, "intro", "intro_cn", "GR intro")
+    o2, f2 = process(_GR_DB, "extra_notes", "extra_notes", "GR extra")
+    o3, f3 = process(_UG_DB, "intro_cn", "intro_cn", "UG intro")
     print(f"\nTOTAL: OK={o1+o2+o3} FAIL={f1+f2+f3}")

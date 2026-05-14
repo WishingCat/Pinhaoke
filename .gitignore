@@ -3,9 +3,12 @@ venv/
 __pycache__/
 *.pyc
 .auth/
+.playwright-mcp/
 tmp_summer/
 
-# 夏季学期是独立项目，本仓库只追踪春季学期
-pku_inpage_summer_scraper.js
-receive_pku_summer_payload.py
-2026暑期学期课程.db
+# 翻译用的 API 凭据/密钥文件，永远不要提交
+.env
+.env.*
+*.api.key
+*.api_key
+secrets/

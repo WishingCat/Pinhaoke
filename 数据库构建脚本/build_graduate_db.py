@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build 2026春季学期研究生课程.db from pku_graduate_courses.json.
+"""Build 2026春季学期研究生课程.db from 北大研究生课程_25-26第2学期.json.
 
 Schema:
     basic_info   one row per (course_code, class_no)
@@ -7,13 +7,14 @@ Schema:
     courses_view convenience view joining both
 """
 import json
-import os
 import sqlite3
+from pathlib import Path
 
 from build_common import parse_schedule, to_float
 
-DB_PATH = "2026春季学期研究生课程.db"
-SOURCE = "Graduated_Course_data/pku_graduate_courses.json"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db"
+SOURCE = PROJECT_ROOT / "课程数据" / "北大研究生课程_25-26第2学期.json"
 
 SCHEMA = """
 CREATE TABLE basic_info (
@@ -68,8 +69,9 @@ LEFT JOIN detail_info d ON d.course_id = b.id;
 
 
 def build():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if DB_PATH.exists():
+        DB_PATH.unlink()
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     c = conn.cursor()

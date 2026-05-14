@@ -18,8 +18,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path(__file__).resolve().parent
-UG_DB = BASE_DIR / "2026春季学期本科生课程.db"
-GR_DB = BASE_DIR / "2026春季学期研究生课程.db"
+DB_DIR = BASE_DIR / "数据库"
+UG_DB = DB_DIR / "2026春季学期本科生课程.db"
+GR_DB = DB_DIR / "2026春季学期研究生课程.db"
 
 app = FastAPI(title="Pinhaoke")
 

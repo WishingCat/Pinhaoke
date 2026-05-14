@@ -33,6 +33,7 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import certifi
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
@@ -43,8 +44,9 @@ API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
 API_URL = "https://api.qnaigc.com/v1/chat/completions"
 MODEL = "deepseek/deepseek-v4-flash"
 
-UG_DB = "2026春季学期本科生课程.db"
-GR_DB = "2026春季学期研究生课程.db"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
+GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {

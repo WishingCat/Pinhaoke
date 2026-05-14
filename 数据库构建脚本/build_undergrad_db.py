@@ -7,17 +7,18 @@ Schema:
     courses_view convenience view joining both
 """
 import json
-import os
 import sqlite3
+from pathlib import Path
 
 from build_common import parse_schedule, to_float
 
-DB_PATH = "2026春季学期本科生课程.db"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db"
 
 SOURCES = [
-    ("Course data/北大公选课数据_25-26第2学期.json", "公选课"),
-    ("Course data/北大通识课数据_25-26第2学期.json", "通识课"),
-    ("Course data/北大专业课数据_25-26第2学期.json", "专业课"),
+    (PROJECT_ROOT / "课程数据" / "北大本科公选课_25-26第2学期.json", "公选课"),
+    (PROJECT_ROOT / "课程数据" / "北大本科通识课_25-26第2学期.json", "通识课"),
+    (PROJECT_ROOT / "课程数据" / "北大本科专业课_25-26第2学期.json", "专业课"),
 ]
 
 SCHEMA = """
@@ -79,8 +80,9 @@ LEFT JOIN detail_info d ON d.course_id = b.id;
 
 
 def build():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if DB_PATH.exists():
+        DB_PATH.unlink()
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     c = conn.cursor()

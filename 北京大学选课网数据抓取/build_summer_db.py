@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Build 2026暑期本科生课程.db from the scraped PKU summer JSON."""
 import json
-import os
 import sqlite3
+import sys
+from pathlib import Path
 
-from build_common import parse_schedule, to_float
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT / "数据库构建脚本"))
+from build_common import parse_schedule, to_float  # noqa: E402
 
-DB_PATH = "2026暑期本科生课程.db"
-SOURCE = "Course data/北大暑期课程数据_25-26第3学期.json"
+DB_PATH = PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db"
+SOURCE = PROJECT_ROOT / "课程数据" / "北大暑期课程_25-26第3学期.json"
 
 SCHEMA = """
 CREATE TABLE basic_info (
@@ -47,12 +51,21 @@ CREATE TABLE detail_info (
     evaluation      TEXT
 );
 
+CREATE TABLE translations (
+    course_id INTEGER NOT NULL,
+    field     TEXT NOT NULL,
+    lang      TEXT NOT NULL,
+    text      TEXT NOT NULL,
+    PRIMARY KEY (course_id, field, lang)
+);
+
 CREATE INDEX idx_basic_course_type  ON basic_info(course_type);
 CREATE INDEX idx_basic_course_code  ON basic_info(course_code);
 CREATE INDEX idx_basic_course_name  ON basic_info(course_name);
 CREATE INDEX idx_basic_department   ON basic_info(department);
 CREATE INDEX idx_basic_category     ON basic_info(category);
 CREATE INDEX idx_basic_credits      ON basic_info(credits);
+CREATE INDEX idx_trans_cid_field    ON translations(course_id, field);
 
 CREATE VIEW courses_view AS
 SELECT
@@ -68,9 +81,10 @@ LEFT JOIN detail_info d ON d.course_id = b.id;
 
 
 def build():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    with open(SOURCE, encoding="utf-8") as f:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if DB_PATH.exists():
+        DB_PATH.unlink()
+    with SOURCE.open(encoding="utf-8") as f:
         data = json.load(f)
 
     conn = sqlite3.connect(DB_PATH)
