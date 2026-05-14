@@ -20,7 +20,7 @@ The README is for users; this file is for what isn't obvious from reading indivi
 ├── 数据库/                          # SQLite files
 │   ├── 2026春季学期本科生课程.db    # ← attached by app.py as `main`
 │   ├── 2026春季学期研究生课程.db    # ← attached by app.py as `gr`
-│   └── 2026暑期本科生课程.db        # built but NOT yet wired into the API
+│   └── 2026暑期本科生课程.db        # ← read by app.py as `main` when ?term=summer
 ├── 课程数据/                        # source JSONs (also where 数据说明.md lives)
 ├── 数据库构建脚本/                  # JSON → SQLite (build_common.py is shared)
 ├── 北京大学课程数据翻译/            # DeepSeek 7-lang translation pipeline — see its README
@@ -48,9 +48,9 @@ Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the pag
 
 | Endpoint | Notes |
 |---|---|
-| `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. |
-| `GET /api/courses` | Cards list. Query params: `q` (LIKEs `course_name / teacher / classroom`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort=pinyin`, `lang`, `page` (≥1), `page_size` (1–200, default 50). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456`. |
-| `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string. Accepts `?lang=`. |
+| `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. Accepts `?term=spring\|summer` (default `spring`). |
+| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort=pinyin`, `lang`, `page` (≥1), `page_size` (1–200, default 50). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. |
+| `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string — the prefix alone determines which DB to read, so **no `?term=` needed**. Accepts `?lang=`. |
 
 `lang` accepts `zh` (default — no translation lookup) or one of `en, ja, ko, fr, de, es, ru` (swaps fields from the relevant DB's `translations` table — see i18n section below).
 
@@ -95,13 +95,26 @@ If `index.html` deployment looks reverted to the old glassmorphism design, it's 
 
 ## Architecture you need to know before editing
 
-### Two DBs, one connection (ATTACH)
+### Term switch (spring / summer) and DB attach
+
+`get_db(term)` attaches a different DB set per term, governed by `TERM_DBS`:
+- `term="spring"` opens `2026春季学期本科生课程.db` as `main` and `ATTACH`es `2026春季学期研究生课程.db` as `gr`.
+- `term="summer"` opens `2026暑期本科生课程.db` as `main` only (no `gr`).
+
+`/api/filters` and `/api/courses` accept `?term=`. `/api/courses/{id}` does NOT — the id's single-char prefix (`u`/`g`/`s`) is enough to pick the right DB. Adding a new term means: build its `.db` under `数据库/`, add a `LIST_SELECT_*` with a new prefix, register it in `TERM_DBS` + `TERM_UNION_SQL`, and wire the prefix into `_parse_id`.
+
+### Two DBs, one connection (ATTACH) — spring layout
 
 `get_db()` in `app.py` opens `数据库/2026春季学期本科生课程.db` and `ATTACH`es the graduate DB as `gr`. All cross-DB queries use `UNION ALL` of `LIST_SELECT_UG` + `LIST_SELECT_GR` from one cursor. **Both SELECTs must produce the same column shape** for UNION — if you add a field to UG only, alias `''` (or `0`) on the GR side (or vice-versa).
 
 ### Course IDs are strings, not ints
 
-After the DB split the two `basic_info.id` namespaces overlap, so IDs are prefixed at the API boundary: `u123` (undergrad) / `g456` (graduate). `_parse_id()` splits the prefix; `_apply_translations` uses `ns = "main" if level == "u" else "gr"` to pick which attached DB's `translations` table to read.
+DB ids are namespaced by single-char prefix so the three DBs can coexist in URL space:
+- `u<id>` — spring undergrad (DB attached as `main` when `term=spring`)
+- `g<id>` — spring graduate (DB attached as `gr` when `term=spring`)
+- `s<id>` — summer undergrad (DB attached as `main` when `term=summer`)
+
+`_parse_id` splits the prefix into `(term, level, local_id)`. `_apply_translations` uses `ns = "gr" if level == "g" else "main"` to pick which attached DB's `translations` table to read.
 
 **Gotcha**: in `createCard()`, the detail-button onclick must quote `course.id`:
 ```js
