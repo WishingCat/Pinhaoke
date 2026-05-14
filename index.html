@@ -138,6 +138,39 @@ body {
   letter-spacing: 0;
 }
 
+/* Term toggle (春季 / 暑期) — segmented control under subtitle */
+.term-toggle {
+  display: inline-flex;
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px;
+  gap: 2px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.term-toggle button {
+  border: none;
+  background: transparent;
+  padding: 7px 18px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  color: var(--ink-3);
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.term-toggle button:hover { color: var(--ink); }
+.term-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(30,64,175,0.25);
+}
+@media (max-width: 640px) {
+  .term-toggle { margin-top: 14px; }
+  .term-toggle button { padding: 6px 14px; font-size: 0.82rem; }
+}
+
 /* github link upper-left */
 .github-star {
   position: absolute;
@@ -1052,6 +1085,10 @@ var _hmt = _hmt || [];
     </div>
     <h1 id="title">拼好课</h1>
     <p class="subtitle" id="subtitle">北京大学2026春季学期课程搜索(每学期更新)</p>
+    <div class="term-toggle" role="tablist" aria-label="学期切换">
+      <button type="button" id="termSpringBtn" class="active" data-term="spring" role="tab" aria-selected="true" onclick="setTerm('spring')">2026春季学期</button>
+      <button type="button" id="termSummerBtn" data-term="summer" role="tab" aria-selected="false" onclick="setTerm('summer')">2026暑期学期</button>
+    </div>
   </div>
 
   <!-- Search -->
@@ -1143,7 +1180,9 @@ const i18n = {
   zh: {
     name: '中文',
     title: '拼好课',
-    subtitle: '北京大学2026春季学期课程搜索(每学期更新)',
+    subtitleSpring: '北京大学2026春季学期课程搜索(每学期更新)',
+    subtitleSummer: '北京大学2026暑期学期课程搜索(每学期更新)',
+    termSpring: '2026春季学期', termSummer: '2026暑期学期',
     searchPlaceholder: '输入课程名、教师姓名或教室...',
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
@@ -1156,7 +1195,7 @@ const i18n = {
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
     all: '全部',
-    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课' },
+    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课', '英语课': '英语课', '体育课': '体育课', '劳动教育课': '劳动教育课', '政治课': '政治课', '计算机基础课': '计算机基础课' },
     weekdays: ['周一','周二','周三','周四','周五','周六','周日'],
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
@@ -1177,7 +1216,9 @@ const i18n = {
   en: {
     name: 'English',
     title: 'Pinhaoke',
-    subtitle: 'PKU Spring 2026 Course Search (Updated Every Semester)',
+    subtitleSpring: 'PKU Spring 2026 Course Search (Updated Every Semester)',
+    subtitleSummer: 'PKU Summer 2026 Course Search (Updated Every Semester)',
+    termSpring: '2026 Spring', termSummer: '2026 Summer',
     searchPlaceholder: 'Search course name, teacher or classroom...',
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
@@ -1190,7 +1231,7 @@ const i18n = {
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
     all: 'All',
-    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate' },
+    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate', '英语课': 'English', '体育课': 'PE', '劳动教育课': 'Labor Ed', '政治课': 'Politics', '计算机基础课': 'CS Basics' },
     weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
@@ -1211,7 +1252,9 @@ const i18n = {
   ja: {
     name: '日本語',
     title: '拼好課',
-    subtitle: '北京大学2026年春学期 授業検索（毎学期更新）',
+    subtitleSpring: '北京大学2026年春学期 授業検索（毎学期更新）',
+    subtitleSummer: '北京大学2026年夏学期 授業検索（毎学期更新）',
+    termSpring: '2026 春学期', termSummer: '2026 夏学期',
     searchPlaceholder: '授業名、教員名または教室を入力...',
     labelCourseType: '科目種別', labelCategory: '科目区分',
     labelCredits: '単位', labelDepartment: '開講部局',
@@ -1224,7 +1267,7 @@ const i18n = {
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
     all: 'すべて',
-    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院' },
+    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院', '英语课': '英語', '体育课': '体育', '劳动教育课': '勤労教育', '政治课': '政治', '计算机基础课': '情報基礎' },
     weekdays: ['月','火','水','木','金','土','日'],
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
@@ -1245,7 +1288,9 @@ const i18n = {
   ko: {
     name: '한국어',
     title: '핀하오커',
-    subtitle: '베이징대학교 2026 봄학기 강좌 검색 (매 학기 업데이트)',
+    subtitleSpring: '베이징대학교 2026 봄학기 강좌 검색 (매 학기 업데이트)',
+    subtitleSummer: '베이징대학교 2026 여름학기 강좌 검색 (매 학기 업데이트)',
+    termSpring: '2026 봄학기', termSummer: '2026 여름학기',
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
     labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
     labelCredits: '학점', labelDepartment: '개설 학과',
@@ -1258,7 +1303,7 @@ const i18n = {
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
     all: '전체',
-    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원' },
+    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원', '英语课': '영어', '体育课': '체육', '劳动教育课': '노동교육', '政治课': '정치', '计算机基础课': '컴퓨터기초' },
     weekdays: ['월','화','수','목','금','토','일'],
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
@@ -1279,7 +1324,9 @@ const i18n = {
   fr: {
     name: 'Fran\u00e7ais',
     title: 'Pinhaoke',
-    subtitle: 'Recherche de cours PKU - Printemps 2026 (Mise \u00e0 jour chaque semestre)',
+    subtitleSpring: 'Recherche de cours PKU - Printemps 2026 (Mise \u00e0 jour chaque semestre)',
+    subtitleSummer: 'Recherche de cours PKU - \u00c9t\u00e9 2026 (Mise \u00e0 jour chaque semestre)',
+    termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026',
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
     labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
@@ -1292,7 +1339,7 @@ const i18n = {
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
     all: 'Tous',
-    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master' },
+    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master', '英语课': 'Anglais', '体育课': 'Sport', '劳动教育课': '\u00c9d. du travail', '政治课': 'Politique', '计算机基础课': 'Info. base' },
     weekdays: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
     fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
@@ -1313,7 +1360,9 @@ const i18n = {
   de: {
     name: 'Deutsch',
     title: 'Pinhaoke',
-    subtitle: 'PKU Kurssuche - Fr\u00fchling 2026 (Jedes Semester aktualisiert)',
+    subtitleSpring: 'PKU Kurssuche - Fr\u00fchling 2026 (Jedes Semester aktualisiert)',
+    subtitleSummer: 'PKU Kurssuche - Sommer 2026 (Jedes Semester aktualisiert)',
+    termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026',
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
@@ -1326,7 +1375,7 @@ const i18n = {
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
     all: 'Alle',
-    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master' },
+    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master', '英语课': 'Englisch', '体育课': 'Sport', '劳动教育课': 'Arbeitserzieh.', '政治课': 'Politik', '计算机基础课': 'Info. Grdl.' },
     weekdays: ['Mo','Di','Mi','Do','Fr','Sa','So'],
     fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
@@ -1347,7 +1396,9 @@ const i18n = {
   es: {
     name: 'Espa\u00f1ol',
     title: 'Pinhaoke',
-    subtitle: 'B\u00fasqueda de cursos PKU - Primavera 2026 (Actualizado cada semestre)',
+    subtitleSpring: 'B\u00fasqueda de cursos PKU - Primavera 2026 (Actualizado cada semestre)',
+    subtitleSummer: 'B\u00fasqueda de cursos PKU - Verano 2026 (Actualizado cada semestre)',
+    termSpring: 'Primavera 2026', termSummer: 'Verano 2026',
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
     labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
@@ -1360,7 +1411,7 @@ const i18n = {
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
     all: 'Todos',
-    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado' },
+    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado', '英语课': 'Ingl\u00e9s', '体育课': 'EF', '劳动教育课': 'Ed. laboral', '政治课': 'Pol\u00edtica', '计算机基础课': 'Info. b\u00e1sica' },
     weekdays: ['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'],
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
@@ -1381,7 +1432,9 @@ const i18n = {
   ru: {
     name: 'Русский',
     title: 'Pinhaoke',
-    subtitle: 'Поиск курсов ПКУ - Весна 2026 (Обновляется каждый семестр)',
+    subtitleSpring: 'Поиск курсов ПКУ - Весна 2026 (Обновляется каждый семестр)',
+    subtitleSummer: 'Поиск курсов ПКУ - Лето 2026 (Обновляется каждый семестр)',
+    termSpring: 'Весна 2026', termSummer: 'Лето 2026',
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
@@ -1394,7 +1447,7 @@ const i18n = {
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
     all: 'Все',
-    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура' },
+    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура', '英语课': 'Английский', '体育课': 'Физкультура', '劳动教育课': 'Труд. восп.', '政治课': 'Политика', '计算机基础课': 'Информатика' },
     weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
@@ -1616,6 +1669,10 @@ function trCourseName(course) {
 }
 
 let currentLang = 'zh';
+let currentTerm = (function () {
+  try { return localStorage.getItem('pinhaoke_term') === 'summer' ? 'summer' : 'spring'; }
+  catch (e) { return 'spring'; }
+})();
 
 document.addEventListener('click', e => {
   if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
@@ -1647,7 +1704,10 @@ function closeLangDropdown() {
 function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
-  document.getElementById('subtitle').textContent = lang.subtitle;
+  document.getElementById('subtitle').textContent =
+    currentTerm === 'summer' ? lang.subtitleSummer : lang.subtitleSpring;
+  document.getElementById('termSpringBtn').textContent = lang.termSpring;
+  document.getElementById('termSummerBtn').textContent = lang.termSummer;
   document.getElementById('langLabel').textContent = lang.name;
   document.getElementById('searchInput').placeholder = lang.searchPlaceholder;
   document.getElementById('labelCourseType').textContent = lang.labelCourseType;
@@ -1675,15 +1735,53 @@ let fetchController = null;
 /* ===== Initialization ===== */
 let cachedFilters = null;
 async function init() {
+  // Sync the toggle UI to whatever currentTerm was restored from localStorage.
+  refreshTermToggleUI();
   try {
-    const resp = await fetch('/api/filters');
+    const resp = await fetch('/api/filters?term=' + encodeURIComponent(currentTerm));
     cachedFilters = await resp.json();
     populateFilters(cachedFilters);
+    applyI18n();
     await fetchCourses();
     document.getElementById('loadingMsg').remove();
   } catch (e) {
     document.getElementById('loadingMsg').innerHTML =
       '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败</span>';
+  }
+}
+
+function refreshTermToggleUI() {
+  document.querySelectorAll('.term-toggle button').forEach(btn => {
+    const active = btn.dataset.term === currentTerm;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
+async function setTerm(term) {
+  if (term !== 'spring' && term !== 'summer') return;
+  if (term === currentTerm) return;
+  currentTerm = term;
+  try { localStorage.setItem('pinhaoke_term', term); } catch (e) {}
+  refreshTermToggleUI();
+
+  // Filter universes differ between terms — wipe selected filter values and
+  // the search box, then reload filters + cards for the new term.
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterClassroom').value = '';
+  Object.keys(csValues).forEach(k => { csValues[k] = ''; });
+  currentPage = 1;
+  // Close any open modal — its id may belong to the other term.
+  if (currentModalCourseId) closeModal();
+
+  try {
+    const resp = await fetch('/api/filters?term=' + encodeURIComponent(currentTerm));
+    cachedFilters = await resp.json();
+    populateFilters(cachedFilters);
+    applyI18n();
+    await fetchCourses();
+  } catch (e) {
+    console.error(e);
   }
 }
 
@@ -1808,6 +1906,7 @@ async function fetchCourses() {
   if (grading) params.set('grading', grading);
   if (sort) params.set('sort', sort);
   params.set('lang', currentLang);
+  params.set('term', currentTerm);
   params.set('page', currentPage);
   params.set('page_size', PAGE_SIZE);
 

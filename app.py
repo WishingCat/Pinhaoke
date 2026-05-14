@@ -1,13 +1,20 @@
 """Pinhaoke Course Search API.
 
-Reads two standalone SQLite databases:
-  - 2026春季学期本科生课程.db  (undergraduate, AS main)
-  - 2026春季学期研究生课程.db   (graduate,       AS gr)
+Reads three standalone SQLite databases (term-switched at request time):
+  spring →
+    - 2026春季学期本科生课程.db  (undergraduate, AS main)
+    - 2026春季学期研究生课程.db  (graduate,      AS gr)
+  summer →
+    - 2026暑期本科生课程.db      (undergraduate, AS main)
 
-The two share basic columns but have different detail schemas. Cross-DB queries
-use ATTACH + UNION ALL. Each row gets a prefixed string id:
-    "u<basic_info.id>"  for undergraduate
-    "g<basic_info.id>"  for graduate
+The DBs share the basic_info columns but have different detail schemas. Cross-DB
+queries use ATTACH + UNION ALL. Each row carries a prefixed string id:
+    "u<basic_info.id>"  spring undergrad
+    "g<basic_info.id>"  spring graduate
+    "s<basic_info.id>"  summer undergrad
+
+The prefix alone determines which DB the detail endpoint opens, so callers do
+NOT need to pass ?term= when fetching a specific course.
 """
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,15 +28,32 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_DIR = BASE_DIR / "数据库"
 UG_DB = DB_DIR / "2026春季学期本科生课程.db"
 GR_DB = DB_DIR / "2026春季学期研究生课程.db"
+SUMMER_DB = DB_DIR / "2026暑期本科生课程.db"
+
+# (alias, path, id_prefix, list_select_var_name)
+TERM_DBS = {
+    "spring": [
+        ("main", UG_DB, "u"),
+        ("gr",   GR_DB, "g"),
+    ],
+    "summer": [
+        ("main", SUMMER_DB, "s"),
+    ],
+}
 
 app = FastAPI(title="Pinhaoke")
 
 
 @contextmanager
-def get_db():
-    conn = sqlite3.connect(str(UG_DB))
+def get_db(term: str = "spring"):
+    config = TERM_DBS.get(term)
+    if config is None:
+        raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
+    main_path = config[0][1]
+    conn = sqlite3.connect(str(main_path))
     conn.row_factory = sqlite3.Row
-    conn.execute(f"ATTACH DATABASE '{GR_DB}' AS gr")
+    for alias, path, _ in config[1:]:
+        conn.execute(f"ATTACH DATABASE '{path}' AS {alias}")
     try:
         yield conn
     finally:
@@ -96,48 +120,101 @@ LIST_SELECT_GR = """
     LEFT JOIN gr.detail_info d ON d.course_id = b.id
 """
 
+# Summer undergrad: same schema as spring UG, but lives alone in `main` when
+# term=summer is active. Prefix 's' to keep ids unique across terms.
+LIST_SELECT_SUMMER = """
+    SELECT
+        's' || b.id            AS id,
+        b.course_type          AS course_type,
+        b.course_code          AS course_code,
+        b.class_no             AS class_no,
+        b.course_name          AS course_name,
+        b.category             AS category,
+        b.credits              AS credits,
+        b.teacher              AS teacher,
+        b.department           AS department,
+        b.major                AS major,
+        b.grade                AS grade,
+        b.schedule             AS schedule,
+        b.classroom            AS classroom,
+        b.weekdays             AS weekdays,
+        b.enrollment           AS enrollment,
+        b.pnp                  AS pnp,
+        b.notes                AS notes,
+        d.english_name         AS english_name,
+        d.grading              AS grading,
+        d.language             AS language,
+        ''                     AS audience,
+        's'                    AS _level
+    FROM basic_info b
+    LEFT JOIN detail_info d ON d.course_id = b.id
+"""
+
+# Pre-built UNION expressions for each term.
+TERM_UNION_SQL = {
+    "spring": f"({LIST_SELECT_UG} UNION ALL {LIST_SELECT_GR})",
+    "summer": f"({LIST_SELECT_SUMMER})",
+}
+
 
 # ---- filters ------------------------------------------------------------------
 
 
 @app.get("/api/filters")
-def get_filters():
-    with get_db() as conn:
+def get_filters(term: str = Query("spring", description="spring | summer")):
+    with get_db(term) as conn:
         c = conn.cursor()
 
-        course_types = [r[0] for r in c.execute(
-            """SELECT DISTINCT course_type FROM basic_info
-               WHERE course_type != ''
-               UNION
-               SELECT '研究生课'
-               ORDER BY 1"""
-        )]
-
-        categories = [r[0] for r in c.execute(
-            """SELECT DISTINCT category FROM basic_info WHERE category != ''
-               UNION
-               SELECT DISTINCT category FROM gr.basic_info WHERE category != ''
-               ORDER BY 1"""
-        )]
-
-        departments = [r[0] for r in c.execute(
-            """SELECT DISTINCT department FROM basic_info WHERE department != ''
-               UNION
-               SELECT DISTINCT department FROM gr.basic_info WHERE department != ''
-               ORDER BY 1"""
-        )]
-
-        credits = [r[0] for r in c.execute(
-            """SELECT DISTINCT credits FROM basic_info
-               UNION
-               SELECT DISTINCT credits FROM gr.basic_info
-               ORDER BY 1"""
-        )]
-
-        gradings = [r[0] for r in c.execute(
-            """SELECT DISTINCT grading FROM detail_info
-               WHERE grading != '' ORDER BY grading"""
-        )]
+        if term == "spring":
+            course_types = [r[0] for r in c.execute(
+                """SELECT DISTINCT course_type FROM basic_info
+                   WHERE course_type != ''
+                   UNION
+                   SELECT '研究生课'
+                   ORDER BY 1"""
+            )]
+            categories = [r[0] for r in c.execute(
+                """SELECT DISTINCT category FROM basic_info WHERE category != ''
+                   UNION
+                   SELECT DISTINCT category FROM gr.basic_info WHERE category != ''
+                   ORDER BY 1"""
+            )]
+            departments = [r[0] for r in c.execute(
+                """SELECT DISTINCT department FROM basic_info WHERE department != ''
+                   UNION
+                   SELECT DISTINCT department FROM gr.basic_info WHERE department != ''
+                   ORDER BY 1"""
+            )]
+            credits = [r[0] for r in c.execute(
+                """SELECT DISTINCT credits FROM basic_info
+                   UNION
+                   SELECT DISTINCT credits FROM gr.basic_info
+                   ORDER BY 1"""
+            )]
+            gradings = [r[0] for r in c.execute(
+                """SELECT DISTINCT grading FROM detail_info
+                   WHERE grading != '' ORDER BY grading"""
+            )]
+        else:  # summer — single DB
+            course_types = [r[0] for r in c.execute(
+                """SELECT DISTINCT course_type FROM basic_info
+                   WHERE course_type != '' ORDER BY 1"""
+            )]
+            categories = [r[0] for r in c.execute(
+                """SELECT DISTINCT category FROM basic_info
+                   WHERE category != '' ORDER BY 1"""
+            )]
+            departments = [r[0] for r in c.execute(
+                """SELECT DISTINCT department FROM basic_info
+                   WHERE department != '' ORDER BY 1"""
+            )]
+            credits = [r[0] for r in c.execute(
+                "SELECT DISTINCT credits FROM basic_info ORDER BY 1"
+            )]
+            gradings = [r[0] for r in c.execute(
+                """SELECT DISTINCT grading FROM detail_info
+                   WHERE grading != '' ORDER BY grading"""
+            )]
 
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -202,9 +279,13 @@ def list_courses(
     grading: str = Query("", description="Grading filter"),
     sort: str = Query("", description="Sort: pinyin"),
     lang: str = Query("zh", description="Display language"),
+    term: str = Query("spring", description="spring | summer"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
+    if term not in TERM_UNION_SQL:
+        raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
+
     where, params = _build_where(q, type, category, credits, department, weekday, grading)
 
     sort_map = {
@@ -213,7 +294,7 @@ def list_courses(
     order_by = sort_map.get(sort, "t._level, t.id")
     offset = (page - 1) * page_size
 
-    union_sql = f"({LIST_SELECT_UG} UNION ALL {LIST_SELECT_GR})"
+    union_sql = TERM_UNION_SQL[term]
 
     count_sql = f"SELECT COUNT(*) FROM {union_sql} AS t {where}"
     list_sql = (
@@ -221,22 +302,20 @@ def list_courses(
         f"ORDER BY {order_by} LIMIT ? OFFSET ?"
     )
 
-    with get_db() as conn:
+    # Maps id prefix → attached DB alias for translation lookup.
+    PREFIX_TO_NS = {prefix: alias for (alias, _, prefix) in TERM_DBS[term]}
+
+    with get_db(term) as conn:
         cur = conn.cursor()
         total = cur.execute(count_sql, params).fetchone()[0]
         rows = cur.execute(list_sql, params + [page_size, offset]).fetchall()
 
         # Bulk-fetch translations for visible card fields when lang != zh.
-        ug_trans: dict = {}
-        gr_trans: dict = {}
+        trans_by_prefix: dict = {p: {} for p in PREFIX_TO_NS}
         if lang != "zh" and rows:
-            ug_ids = [int(r["id"][1:]) for r in rows if r["id"].startswith("u")]
-            gr_ids = [int(r["id"][1:]) for r in rows if r["id"].startswith("g")]
             CARD_FIELDS = ("course_name", "classroom", "notes")
-            for ids, ns, store in (
-                (ug_ids, "main", ug_trans),
-                (gr_ids, "gr", gr_trans),
-            ):
+            for prefix, ns in PREFIX_TO_NS.items():
+                ids = [int(r["id"][1:]) for r in rows if r["id"].startswith(prefix)]
                 if not ids:
                     continue
                 placeholders = ",".join("?" * len(ids))
@@ -247,6 +326,7 @@ def list_courses(
                     f"AND field IN ({fld_placeholders})",
                     [lang, *ids, *CARD_FIELDS],
                 ).fetchall()
+                store = trans_by_prefix[prefix]
                 for cid, field, text in tr_rows:
                     if text:
                         store.setdefault(cid, {})[field] = text
@@ -254,8 +334,9 @@ def list_courses(
     courses = []
     for r in rows:
         rid = r["id"]
+        prefix = rid[0]
         local_id = int(rid[1:])
-        trans = ug_trans.get(local_id, {}) if rid.startswith("u") else gr_trans.get(local_id, {})
+        trans = trans_by_prefix.get(prefix, {}).get(local_id, {})
         courses.append(
             {
                 "id": rid,
@@ -287,12 +368,25 @@ def list_courses(
 
 
 def _parse_id(course_id: str):
-    if not course_id or course_id[0] not in ("u", "g"):
-        return None, None
+    """Return (term, level, local_id) or (None, None, None) on parse failure.
+
+    level is the single-char id prefix ('u' / 'g' / 's'); term tells get_db()
+    which DBs to open.
+    """
+    if not course_id:
+        return None, None, None
+    prefix = course_id[0]
     try:
-        return course_id[0], int(course_id[1:])
+        local_id = int(course_id[1:])
     except ValueError:
-        return None, None
+        return None, None, None
+    if prefix == "u":
+        return "spring", "u", local_id
+    if prefix == "g":
+        return "spring", "g", local_id
+    if prefix == "s":
+        return "summer", "s", local_id
+    return None, None, None
 
 
 # Fields the translations table can override per (course_id, field, lang).
@@ -318,44 +412,51 @@ def _apply_translations(cur, ns: str, local_id: int, lang: str, out: dict):
             out[field] = text
 
 
+# Shared SELECT for "UG-shape" detail rows (spring undergrad + summer undergrad).
+_UG_DETAIL_SELECT = """
+    SELECT '{prefix}' || b.id AS id, b.course_type, b.course_code, b.class_no,
+           b.course_name, b.category, b.credits, b.teacher,
+           b.department, b.major, b.grade,
+           b.schedule, b.classroom, b.schedule_raw, b.weekdays,
+           b.enrollment, b.pnp, b.notes,
+           d.english_name, d.prerequisites, d.intro_cn, d.intro_en,
+           d.grading, d.ge_series, d.language, d.textbook,
+           d.reference_book, d.syllabus, d.evaluation
+    FROM basic_info b
+    LEFT JOIN detail_info d ON d.course_id = b.id
+    WHERE b.id = ?
+"""
+
+_GR_DETAIL_SELECT = """
+    SELECT 'g' || b.id AS id, '研究生课' AS course_type,
+           b.course_code, b.class_no, b.course_name, b.category,
+           b.credits, b.teacher, b.department, b.major, b.grade,
+           b.schedule, b.classroom, b.schedule_raw, b.weekdays,
+           b.enrollment, '' AS pnp, b.notes,
+           d.english_name,
+           d.weekly_hours, d.total_hours, d.term, d.audience,
+           d.reference_book, d.intro AS intro_cn, d.extra_notes
+    FROM gr.basic_info b
+    LEFT JOIN gr.detail_info d ON d.course_id = b.id
+    WHERE b.id = ?
+"""
+
+
 @app.get("/api/courses/{course_id}")
 def get_course_detail(course_id: str, lang: str = Query("zh")):
-    level, local_id = _parse_id(course_id)
+    term, level, local_id = _parse_id(course_id)
     if level is None:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    with get_db() as conn:
+    with get_db(term) as conn:
         cur = conn.cursor()
         if level == "u":
-            row = cur.execute(
-                """SELECT 'u' || b.id AS id, b.course_type, b.course_code, b.class_no,
-                          b.course_name, b.category, b.credits, b.teacher,
-                          b.department, b.major, b.grade,
-                          b.schedule, b.classroom, b.schedule_raw, b.weekdays,
-                          b.enrollment, b.pnp, b.notes,
-                          d.english_name, d.prerequisites, d.intro_cn, d.intro_en,
-                          d.grading, d.ge_series, d.language, d.textbook,
-                          d.reference_book, d.syllabus, d.evaluation
-                   FROM basic_info b
-                   LEFT JOIN detail_info d ON d.course_id = b.id
-                   WHERE b.id = ?""",
-                (local_id,),
-            ).fetchone()
+            sql = _UG_DETAIL_SELECT.format(prefix="u")
+        elif level == "s":
+            sql = _UG_DETAIL_SELECT.format(prefix="s")
         else:
-            row = cur.execute(
-                """SELECT 'g' || b.id AS id, '研究生课' AS course_type,
-                          b.course_code, b.class_no, b.course_name, b.category,
-                          b.credits, b.teacher, b.department, b.major, b.grade,
-                          b.schedule, b.classroom, b.schedule_raw, b.weekdays,
-                          b.enrollment, '' AS pnp, b.notes,
-                          d.english_name,
-                          d.weekly_hours, d.total_hours, d.term, d.audience,
-                          d.reference_book, d.intro AS intro_cn, d.extra_notes
-                   FROM gr.basic_info b
-                   LEFT JOIN gr.detail_info d ON d.course_id = b.id
-                   WHERE b.id = ?""",
-                (local_id,),
-            ).fetchone()
+            sql = _GR_DETAIL_SELECT
+        row = cur.execute(sql, (local_id,)).fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Course not found")
@@ -364,7 +465,7 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
         out = {k: row[k] for k in keys}
 
         # Replace every translatable field with its translation when present.
-        ns = "main" if level == "u" else "gr"
+        ns = "gr" if level == "g" else "main"
         _apply_translations(cur, ns, local_id, lang, out)
 
     # Ensure all keys exist for both levels so frontend gating is consistent.
