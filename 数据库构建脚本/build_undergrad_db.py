@@ -10,7 +10,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from build_common import parse_schedule, to_float
+from build_common import parse_schedule, parse_first_period, to_float
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db"
@@ -38,6 +38,7 @@ CREATE TABLE basic_info (
     classroom       TEXT,                 -- 解析后的教室
     schedule_raw    TEXT,                 -- 上课时间及教室（原始）
     weekdays        TEXT,                 -- 周X,周Y
+    first_period    INTEGER,              -- 最早开始节次（用于按时间排序）
     enrollment      TEXT,                 -- 限数/已选
     pnp             TEXT,                 -- 自选PNP
     notes           TEXT,                 -- 备注
@@ -65,6 +66,7 @@ CREATE INDEX idx_basic_course_name  ON basic_info(course_name);
 CREATE INDEX idx_basic_department   ON basic_info(department);
 CREATE INDEX idx_basic_category     ON basic_info(category);
 CREATE INDEX idx_basic_credits      ON basic_info(credits);
+CREATE INDEX idx_basic_first_period ON basic_info(first_period);
 
 CREATE VIEW courses_view AS
 SELECT
@@ -110,13 +112,14 @@ def build():
 
             raw_sched = bi.get("上课时间及教室", "")
             schedule, classroom, weekdays = parse_schedule(raw_sched)
+            first_period = parse_first_period(raw_sched)
 
             c.execute(
                 """INSERT INTO basic_info
                    (course_type, course_code, class_no, course_name, category, credits, teacher,
                     department, major, grade, schedule, classroom, schedule_raw,
-                    weekdays, enrollment, pnp, notes)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    weekdays, first_period, enrollment, pnp, notes)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     course_type, course_code, class_no,
                     bi.get("课程名", ""),
@@ -127,6 +130,7 @@ def build():
                     bi.get("专业", ""),
                     bi.get("年级", ""),
                     schedule, classroom, raw_sched, weekdays,
+                    first_period,
                     bi.get("限数已选", ""),
                     bi.get("自选PNP", ""),
                     bi.get("备注", ""),

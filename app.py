@@ -80,6 +80,7 @@ LIST_SELECT_UG = """
         b.schedule             AS schedule,
         b.classroom            AS classroom,
         b.weekdays             AS weekdays,
+        b.first_period         AS first_period,
         b.enrollment           AS enrollment,
         b.pnp                  AS pnp,
         b.notes                AS notes,
@@ -108,6 +109,7 @@ LIST_SELECT_GR = """
         b.schedule             AS schedule,
         b.classroom            AS classroom,
         b.weekdays             AS weekdays,
+        b.first_period         AS first_period,
         b.enrollment           AS enrollment,
         ''                     AS pnp,
         b.notes                AS notes,
@@ -138,6 +140,7 @@ LIST_SELECT_SUMMER = """
         b.schedule             AS schedule,
         b.classroom            AS classroom,
         b.weekdays             AS weekdays,
+        b.first_period         AS first_period,
         b.enrollment           AS enrollment,
         b.pnp                  AS pnp,
         b.notes                AS notes,
@@ -277,7 +280,7 @@ def list_courses(
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
-    sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | random"),
+    sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
     random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
     lang: str = Query("zh", description="Display language"),
     term: str = Query("spring", description="spring | summer"),
@@ -309,6 +312,8 @@ def list_courses(
             "pinyin_desc":  "t.course_name COLLATE NOCASE DESC",
             "credits_asc":  "t.credits ASC, t.course_name COLLATE NOCASE",
             "credits_desc": "t.credits DESC, t.course_name COLLATE NOCASE",
+            # Earliest class period first; rows with no schedule sort last.
+            "time_asc":     "(t.first_period IS NULL), t.first_period, t.course_name COLLATE NOCASE",
         }
         order_by = sort_map.get(sort, "t._level, t.id")
     offset = (page - 1) * page_size

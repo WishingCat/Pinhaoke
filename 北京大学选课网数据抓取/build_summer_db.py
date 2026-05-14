@@ -8,7 +8,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT / "数据库构建脚本"))
-from build_common import parse_schedule, to_float  # noqa: E402
+from build_common import parse_schedule, parse_first_period, to_float  # noqa: E402
 
 DB_PATH = PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db"
 SOURCE = PROJECT_ROOT / "课程数据" / "北大暑期课程_25-26第3学期.json"
@@ -30,6 +30,7 @@ CREATE TABLE basic_info (
     classroom       TEXT,
     schedule_raw    TEXT,
     weekdays        TEXT,
+    first_period    INTEGER,
     enrollment      TEXT,
     pnp             TEXT,
     notes           TEXT,
@@ -65,6 +66,7 @@ CREATE INDEX idx_basic_course_name  ON basic_info(course_name);
 CREATE INDEX idx_basic_department   ON basic_info(department);
 CREATE INDEX idx_basic_category     ON basic_info(category);
 CREATE INDEX idx_basic_credits      ON basic_info(credits);
+CREATE INDEX idx_basic_first_period ON basic_info(first_period);
 CREATE INDEX idx_trans_cid_field    ON translations(course_id, field);
 
 CREATE VIEW courses_view AS
@@ -109,13 +111,14 @@ def build():
 
         raw_sched = bi.get("上课时间及教室", "")
         schedule, classroom, weekdays = parse_schedule(raw_sched)
+        first_period = parse_first_period(raw_sched)
 
         c.execute(
             """INSERT INTO basic_info
                (course_type, course_code, class_no, course_name, category, credits, teacher,
                 department, major, grade, schedule, classroom, schedule_raw,
-                weekdays, enrollment, pnp, notes)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                weekdays, first_period, enrollment, pnp, notes)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 course_type, course_code, class_no,
                 bi.get("课程名", ""),
@@ -126,6 +129,7 @@ def build():
                 bi.get("专业", ""),
                 bi.get("年级", ""),
                 schedule, classroom, raw_sched, weekdays,
+                first_period,
                 bi.get("限数已选", ""),
                 bi.get("自选PNP", ""),
                 bi.get("备注", ""),

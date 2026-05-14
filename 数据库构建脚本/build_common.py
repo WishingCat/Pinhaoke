@@ -38,6 +38,20 @@ def parse_schedule(raw: str):
     return schedule, classroom, weekday_str
 
 
+def parse_first_period(raw: str):
+    """Return the smallest start-period number across all schedule slots, or None.
+
+    Period numbers run 1–13 in PKU's elective system (1 ≈ 08:00 morning,
+    13 ≈ 21:00 evening). Used by the 'time_asc' sort so courses earlier in
+    the day surface first.
+    """
+    if not raw:
+        return None
+    nums = re.findall(r"(\d{1,2})~\d{1,2}节", raw)
+    parsed = [int(n) for n in nums if 1 <= int(n) <= 14]
+    return min(parsed) if parsed else None
+
+
 def to_float(s, default=0.0):
     try:
         return float(s)
