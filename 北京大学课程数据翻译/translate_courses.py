@@ -40,6 +40,7 @@ MODEL = "deepseek/deepseek-v4-flash"
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
+SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -72,9 +73,13 @@ def setup_db(db_path: str):
     conn.close()
 
 
-def fetch_pending_undergrad():
-    """Returns list[(course_id, source_text, missing_langs)]."""
-    conn = sqlite3.connect(UG_DB)
+def fetch_pending_undergrad(db_path: str = UG_DB):
+    """Returns list[(course_id, source_text, missing_langs)] for a UG-shape DB.
+
+    UG-shape = detail_info has columns intro_cn + intro_en (spring undergrad
+    AND summer undergrad both qualify).
+    """
+    conn = sqlite3.connect(db_path)
     rows = conn.execute(
         "SELECT course_id, intro_cn, intro_en FROM detail_info "
         "WHERE intro_cn IS NOT NULL AND intro_cn != ''"
@@ -206,21 +211,25 @@ def main():
                     help="Translate at most N rows total (for testing).")
     ap.add_argument("--workers", type=int, default=10,
                     help="Parallel API workers.")
-    ap.add_argument("--only", choices=["ug_intro", "gr_intro", "gr_extra"],
+    ap.add_argument("--only",
+                    choices=["ug_intro", "gr_intro", "gr_extra", "summer_intro"],
                     help="Restrict to one job for testing.")
     args = ap.parse_args()
 
     print("== Setup ==")
     setup_db(UG_DB)
     setup_db(GR_DB)
+    setup_db(SUMMER_DB)
 
     print("== Pending lists ==")
-    ug = fetch_pending_undergrad()
+    ug = fetch_pending_undergrad(UG_DB)
     gr_intro = fetch_pending_grad("intro", "intro_cn")
     gr_extra = fetch_pending_grad("extra_notes", "extra_notes")
+    summer = fetch_pending_undergrad(SUMMER_DB)
     print(f"  undergrad intro_cn : {len(ug):4d} rows")
     print(f"  graduate  intro    : {len(gr_intro):4d} rows")
     print(f"  graduate  extra    : {len(gr_extra):4d} rows")
+    print(f"  summer    intro_cn : {len(summer):4d} rows")
 
     jobs = []
     if args.only in (None, "ug_intro"):
@@ -229,6 +238,8 @@ def main():
         jobs.append((GR_DB, "intro_cn", gr_intro))
     if args.only in (None, "gr_extra"):
         jobs.append((GR_DB, "extra_notes", gr_extra))
+    if args.only in (None, "summer_intro"):
+        jobs.append((SUMMER_DB, "intro_cn", summer))
 
     all_items = []
     for db, field, items in jobs:

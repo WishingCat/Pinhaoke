@@ -117,7 +117,7 @@ def process(db_path, src_field, store_field, label):
                 fail += 1
                 print(f"  [{label}] cid={cid} {lang}: FAIL {type(e).__name__}: {str(e)[:120]}")
 
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    with ThreadPoolExecutor(max_workers=20) as ex:
         list(ex.map(work, missing))
 
     return ok, fail
@@ -128,8 +128,12 @@ if __name__ == "__main__":
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent
     _UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
     _GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
+    _SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
     print("== sequential per-lang retranslate ==")
     o1, f1 = process(_GR_DB, "intro", "intro_cn", "GR intro")
     o2, f2 = process(_GR_DB, "extra_notes", "extra_notes", "GR extra")
     o3, f3 = process(_UG_DB, "intro_cn", "intro_cn", "UG intro")
-    print(f"\nTOTAL: OK={o1+o2+o3} FAIL={f1+f2+f3}")
+    o4, f4 = process(_SUMMER_DB, "intro_cn", "intro_cn", "Summer intro")
+    o5, f5 = process(_SUMMER_DB, "syllabus", "syllabus", "Summer syllabus")
+    o6, f6 = process(_SUMMER_DB, "evaluation", "evaluation", "Summer evaluation")
+    print(f"\nTOTAL: OK={o1+o2+o3+o4+o5+o6} FAIL={f1+f2+f3+f4+f5+f6}")

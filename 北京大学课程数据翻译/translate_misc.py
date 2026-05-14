@@ -47,6 +47,7 @@ MODEL = "deepseek/deepseek-v4-flash"
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
+SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -86,6 +87,24 @@ SHORT_JOBS = [
      "Target audience (e.g. 硕博 = Master & PhD)", False),
     (GR_DB, "term",          "detail_info", "term",
      "Academic term / semester", False),
+
+    # Summer undergrad (same schema as spring UG)
+    (SUMMER_DB, "course_name",   "basic_info",  "course_name",
+     "Chinese university course title", False),
+    (SUMMER_DB, "notes",         "basic_info",  "notes",
+     "Short course-registration note (may contain abbreviations, room numbers)", False),
+    (SUMMER_DB, "pnp",           "basic_info",  "pnp",
+     "Whether P/NP grading can be elected", False),
+    (SUMMER_DB, "classroom",     "basic_info",  "classroom",
+     "Classroom or building+room (e.g. 二教403 = Building 2 Room 403)", False),
+    (SUMMER_DB, "major",         "basic_info",  "major",
+     "Major / specialization restriction", False),
+    (SUMMER_DB, "prerequisites", "detail_info", "prerequisites",
+     "Course prerequisites (often a list of other course names)", False),
+    (SUMMER_DB, "ge_series",     "detail_info", "ge_series",
+     "General Education core/elective series name", False),
+    (SUMMER_DB, "textbook",      "detail_info", "textbook",
+     "Textbook citation(s)", False),
 ]
 LONG_JOBS = [
     (UG_DB, "syllabus",     "detail_info", "syllabus",
@@ -96,6 +115,14 @@ LONG_JOBS = [
      "Reference book list", True),
     (GR_DB, "reference_book","detail_info","reference_book",
      "Reference book list (citations, may be long)", True),
+
+    # Summer undergrad
+    (SUMMER_DB, "syllabus",     "detail_info", "syllabus",
+     "Long-form syllabus / weekly schedule (preserve newlines and structure)", True),
+    (SUMMER_DB, "evaluation",   "detail_info", "evaluation",
+     "Long-form teacher/student course evaluations (preserve structure)", True),
+    (SUMMER_DB, "reference_book","detail_info","reference_book",
+     "Reference book list", True),
 ]
 
 
@@ -206,7 +233,7 @@ def fetch_jobs(jobs):
 
 def reuse_english_for_course_names():
     """Copy english_name into translations as (course_id, 'course_name', 'en')."""
-    for db_path in (UG_DB, GR_DB):
+    for db_path in (UG_DB, GR_DB, SUMMER_DB):
         conn = sqlite3.connect(db_path)
         rows = conn.execute(
             "SELECT course_id, english_name FROM detail_info "
@@ -243,17 +270,28 @@ def main():
     ap.add_argument("--phase", choices=["short", "long", "all"], default="short")
     ap.add_argument("--workers", type=int, default=15)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--db", choices=["ug", "gr", "summer", "all"], default="all",
+                    help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad). Default: all.")
     args = ap.parse_args()
 
     setup_db(UG_DB)
     setup_db(GR_DB)
+    setup_db(SUMMER_DB)
     reuse_english_for_course_names()
+
+    DB_FILTER = {
+        "ug":     {UG_DB},
+        "gr":     {GR_DB},
+        "summer": {SUMMER_DB},
+        "all":    {UG_DB, GR_DB, SUMMER_DB},
+    }[args.db]
 
     jobs = []
     if args.phase in ("short", "all"):
         jobs.extend(SHORT_JOBS)
     if args.phase in ("long", "all"):
         jobs.extend(LONG_JOBS)
+    jobs = [j for j in jobs if j[0] in DB_FILTER]
 
     pending = fetch_jobs(jobs)
     if args.limit:
