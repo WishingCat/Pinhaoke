@@ -277,7 +277,8 @@ def list_courses(
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
-    sort: str = Query("", description="Sort: pinyin"),
+    sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | random"),
+    random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
     lang: str = Query("zh", description="Display language"),
     term: str = Query("spring", description="spring | summer"),
     page: int = Query(1, ge=1),
@@ -288,10 +289,28 @@ def list_courses(
 
     where, params = _build_where(q, type, category, credits, department, weekday, grading)
 
-    sort_map = {
-        "pinyin": "t.course_name COLLATE NOCASE",
-    }
-    order_by = sort_map.get(sort, "t._level, t.id")
+    if sort == "random":
+        # Deterministic shuffle: same seed → stable order across pagination.
+        # int param is already validated by FastAPI, safe to interpolate.
+        # Two large primes mix the seed so even tiny seeds produce well-spread
+        # mul/add values, giving genuinely different orderings per seed.
+        # The CASE per _level breaks 'u123' / 'g123' / 's123' hash collisions.
+        seed = max(1, int(random_seed))
+        mul = ((seed * 1664525) % 999983) or 7
+        add = (seed * 1013904223) % 999983
+        order_by = (
+            f"((CAST(SUBSTR(t.id, 2) AS INTEGER) * {mul} "
+            f"+ CASE t._level WHEN 'g' THEN 333331 WHEN 's' THEN 666661 ELSE 0 END "
+            f"+ {add}) % 999983)"
+        )
+    else:
+        sort_map = {
+            "pinyin":       "t.course_name COLLATE NOCASE",
+            "pinyin_desc":  "t.course_name COLLATE NOCASE DESC",
+            "credits_asc":  "t.credits ASC, t.course_name COLLATE NOCASE",
+            "credits_desc": "t.credits DESC, t.course_name COLLATE NOCASE",
+        }
+        order_by = sort_map.get(sort, "t._level, t.id")
     offset = (page - 1) * page_size
 
     union_sql = TERM_UNION_SQL[term]

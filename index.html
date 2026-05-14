@@ -865,6 +865,15 @@ body {
   line-height: 1.65;
 }
 
+.modal-field-caveat {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-top: 2px;
+  font-style: italic;
+}
+
 .modal-field-value.long-text {
   max-height: 320px;
   overflow-y: auto;
@@ -1059,7 +1068,7 @@ var _hmt = _hmt || [];
   <div class="header">
     <a class="github-star" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener">
       <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      <span id="githubText">在Github上给这个项目点个Star<br>就是对我最大的支持，感谢您！<br>欢迎通过Github页面联系作者<br>欢迎提供任何意见，会及时修改！<br><span class="designer">Design By 祈愿的猫</span></span>
+      <span id="githubText">给项目点个 Star<br>欢迎反馈意见<br><span class="designer">Design By 祈愿的猫</span></span>
     </a>
     <div class="top-controls">
       <a class="sponsor-link" href="https://github.com/WishingCat/Pinhaoke#%E5%A6%82%E6%9E%9C%E6%9C%89%E8%83%BD%E5%8A%9B%E7%9A%84%E8%AF%9D%E6%AC%A2%E8%BF%8E%E8%B5%9E%E5%8A%A9-%E5%BC%A5%E8%A1%A5%E7%BD%91%E7%AB%99%E7%9A%84%E8%BF%90%E8%A1%8C%E8%B4%B9%E7%94%A8" target="_blank" rel="noopener">
@@ -1187,7 +1196,7 @@ const i18n = {
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
-    sortDefault: '默认', sortPinyin: '课程名拼音',
+    sortDefault: '默认', sortPinyin: '课程名 A→Z', sortPinyinDesc: '课程名 Z→A', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortRandom: '随机',
     labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
@@ -1200,6 +1209,7 @@ const i18n = {
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
     fieldCredits: '学分', fieldEnrollment: '选课人数', fieldPNP: 'PNP',
+    enrollmentCaveat: '取自抓取数据时的静态值，无法实时更新，仅供参考',
     detailBtn: '查看详情',
     modalLoading: '加载中...',
     modalBasicInfo: '基本信息', modalDetailInfo: '详细信息',
@@ -1223,7 +1233,7 @@ const i18n = {
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
-    sortDefault: 'Default', sortPinyin: 'Name (A-Z)',
+    sortDefault: 'Default', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortRandom: 'Random',
     labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
@@ -1236,6 +1246,7 @@ const i18n = {
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
     fieldCredits: 'Credits', fieldEnrollment: 'Enrollment', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'Snapshot at scrape time — not live, for reference only',
     detailBtn: 'Details',
     modalLoading: 'Loading...',
     modalBasicInfo: 'Basic Info', modalDetailInfo: 'Details',
@@ -1259,7 +1270,7 @@ const i18n = {
     labelCourseType: '科目種別', labelCategory: '科目区分',
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
-    sortDefault: 'デフォルト', sortPinyin: '名前順',
+    sortDefault: 'デフォルト', sortPinyin: '名前 A→Z', sortPinyinDesc: '名前 Z→A', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortRandom: 'ランダム',
     labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
@@ -1272,6 +1283,7 @@ const i18n = {
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
     fieldCredits: '単位', fieldEnrollment: '登録者数', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'スクレイピング時点の値、リアルタイム更新なし、参考用',
     detailBtn: '詳細',
     modalLoading: '読み込み中...',
     modalBasicInfo: '基本情報', modalDetailInfo: '詳細情報',
@@ -1295,7 +1307,7 @@ const i18n = {
     labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
-    sortDefault: '기본', sortPinyin: '이름순',
+    sortDefault: '기본', sortPinyin: '이름 A→Z', sortPinyinDesc: '이름 Z→A', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortRandom: '무작위',
     labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
@@ -1308,6 +1320,7 @@ const i18n = {
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
     fieldCredits: '학점', fieldEnrollment: '수강 인원', fieldPNP: 'P/NP',
+    enrollmentCaveat: '수집 시점의 스냅샷, 실시간 업데이트 없음, 참고용',
     detailBtn: '상세',
     modalLoading: '로딩 중...',
     modalBasicInfo: '기본 정보', modalDetailInfo: '상세 정보',
@@ -1331,7 +1344,7 @@ const i18n = {
     labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
-    sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A-Z)',
+    sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A→Z)', sortPinyinDesc: 'Nom (Z→A)', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortRandom: 'Al\u00e9atoire',
     labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
@@ -1344,6 +1357,7 @@ const i18n = {
     fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
     fieldCredits: 'Cr\u00e9dits', fieldEnrollment: 'Inscrits', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'Instantan\u00e9 au moment du scraping \u2014 non actualis\u00e9, \u00e0 titre indicatif',
     detailBtn: 'D\u00e9tails',
     modalLoading: 'Chargement...',
     modalBasicInfo: 'Info de base', modalDetailInfo: 'D\u00e9tails',
@@ -1367,7 +1381,7 @@ const i18n = {
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
-    sortDefault: 'Standard', sortPinyin: 'Name (A-Z)',
+    sortDefault: 'Standard', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortRandom: 'Zuf\u00e4llig',
     labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
@@ -1380,6 +1394,7 @@ const i18n = {
     fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
     fieldCredits: 'Credits', fieldEnrollment: 'Teilnehmer', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'Snapshot zum Erfassungszeitpunkt \u2014 keine Live-Daten, nur Referenz',
     detailBtn: 'Details',
     modalLoading: 'Laden...',
     modalBasicInfo: 'Grundinfo', modalDetailInfo: 'Details',
@@ -1403,7 +1418,7 @@ const i18n = {
     labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
-    sortDefault: 'Por defecto', sortPinyin: 'Nombre (A-Z)',
+    sortDefault: 'Por defecto', sortPinyin: 'Nombre (A→Z)', sortPinyinDesc: 'Nombre (Z→A)', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortRandom: 'Aleatorio',
     labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
@@ -1416,6 +1431,7 @@ const i18n = {
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
     fieldCredits: 'Cr\u00e9ditos', fieldEnrollment: 'Inscritos', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'Instant\u00e1nea al momento del scraping \u2014 no actualizada, solo referencia',
     detailBtn: 'Detalles',
     modalLoading: 'Cargando...',
     modalBasicInfo: 'Info b\u00e1sica', modalDetailInfo: 'Detalles',
@@ -1439,7 +1455,7 @@ const i18n = {
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
-    sortDefault: 'По умолчанию', sortPinyin: 'По имени',
+    sortDefault: 'По умолчанию', sortPinyin: 'Имя А→Я', sortPinyinDesc: 'Имя Я→А', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortRandom: 'Случайно',
     labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
@@ -1452,6 +1468,7 @@ const i18n = {
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
     fieldCredits: 'Кредиты', fieldEnrollment: 'Записано', fieldPNP: 'P/NP',
+    enrollmentCaveat: 'Снимок на момент сбора \u2014 не обновляется, только для справки',
     detailBtn: 'Подробнее',
     modalLoading: 'Загрузка...',
     modalBasicInfo: 'Основная информация', modalDetailInfo: 'Подробности',
@@ -1673,6 +1690,7 @@ let currentTerm = (function () {
   try { return localStorage.getItem('pinhaoke_term') === 'summer' ? 'summer' : 'spring'; }
   catch (e) { return 'spring'; }
 })();
+let randomSeed = 0;  // re-rolled when user picks sort=random
 
 document.addEventListener('click', e => {
   if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
@@ -1820,6 +1838,11 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
       container.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('active'));
       opt.classList.add('active');
       container.classList.remove('open');
+      // Re-roll the random seed every time the user (re)picks 随机 so the same
+      // option gives a fresh shuffle; the seed then stays stable for paging.
+      if (filterId === 'filterSort' && opt.dataset.value === 'random') {
+        randomSeed = Math.floor(Math.random() * 2147483647) || 1;
+      }
       applyFilters();
     });
   });
@@ -1856,7 +1879,11 @@ function populateFilters(filters) {
     lang.all, csValues.filterDepartment);
 
   initCustomSelect('csSort', [
-    { value: 'pinyin', label: lang.sortPinyin },
+    { value: 'pinyin',       label: lang.sortPinyin },
+    { value: 'pinyin_desc',  label: lang.sortPinyinDesc },
+    { value: 'credits_asc',  label: lang.sortCreditsAsc },
+    { value: 'credits_desc', label: lang.sortCreditsDesc },
+    { value: 'random',       label: lang.sortRandom },
   ], lang.sortDefault, csValues.filterSort);
 
   initCustomSelect('csGrading',
@@ -1905,6 +1932,7 @@ async function fetchCourses() {
   if (weekday) params.set('weekday', weekday);
   if (grading) params.set('grading', grading);
   if (sort) params.set('sort', sort);
+  if (sort === 'random' && randomSeed) params.set('random_seed', randomSeed);
   params.set('lang', currentLang);
   params.set('term', currentTerm);
   params.set('page', currentPage);
@@ -2068,7 +2096,7 @@ async function showDetail(courseId) {
       [lang.fieldDepartment, tr('departments', c.department)],
       [lang.fieldTime, trSchedule(c.schedule)],
       [lang.fieldClassroom, c.classroom],
-      [lang.fieldEnrollment, c.enrollment],
+      [lang.fieldEnrollment, c.enrollment, lang.enrollmentCaveat],
       [lang.fieldPNP, c.pnp],
       [lang.modalGrading, tr('gradings', c.grading)],
       [lang.modalLanguage, tr('languages', c.language)],
@@ -2080,11 +2108,11 @@ async function showDetail(courseId) {
     if (c.weekly_hours) basicFields.push([lang.modalWeeklyHours, c.weekly_hours]);
     if (c.total_hours) basicFields.push([lang.modalTotalHours, c.total_hours]);
 
-    for (const [label, value] of basicFields) {
+    for (const [label, value, caveat] of basicFields) {
       if (value) {
         html += `<div class="modal-field">
           <span class="modal-field-label">${esc(label)}</span>
-          <span class="modal-field-value">${esc(value)}</span>
+          <span class="modal-field-value">${esc(value)}${caveat ? `<span class="modal-field-caveat">${esc(caveat)}</span>` : ''}</span>
         </div>`;
       }
     }
