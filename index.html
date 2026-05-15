@@ -1863,7 +1863,7 @@ function populateFilters(filters) {
     lang.all, csValues.filterCourseType);
 
   initCustomSelect('csCategory',
-    filters.categories.map(c => ({ value: c, label: tr('categories', c) })),
+    filters.categories.filter(c => c !== '专业必修').map(c => ({ value: c, label: tr('categories', c) })),
     lang.all, csValues.filterCategory);
 
   initCustomSelect('csCredits',
@@ -1947,14 +1947,27 @@ async function fetchCourses() {
 
     if (currentPage === 1) {
       currentCourses = data.courses;
+      renderCards();
     } else {
       currentCourses = currentCourses.concat(data.courses);
+      appendCards(data.courses);
     }
-
-    renderCards();
   } catch (e) {
     if (e.name !== 'AbortError') console.error(e);
   }
+}
+
+function appendCards(newCourses) {
+  const container = document.getElementById('resultsContainer');
+  const fragment = document.createDocumentFragment();
+  for (const course of newCourses) {
+    fragment.appendChild(createCard(course));
+  }
+  container.appendChild(fragment);
+
+  document.getElementById('loadMoreBtn').style.display =
+    currentCourses.length < totalCount ? 'block' : 'none';
+  updateResultsCount();
 }
 
 function renderCards() {

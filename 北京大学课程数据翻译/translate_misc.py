@@ -201,8 +201,12 @@ def call_api(text: str, langs, hint: str, max_retries: int = 3):
     raise last
 
 
-def fetch_jobs(jobs):
-    """Return list of (db_path, store_field, hint, course_id, source) needing work."""
+def fetch_jobs(jobs, allow_non_cn=False):
+    """Return list of (db_path, store_field, hint, course_id, source) needing work.
+
+    allow_non_cn=True keeps rows whose source is pure English/Latin (no CJK).
+    Use this to translate English-only course names into the other 6 langs.
+    """
     out = []
     for db_path, src_field, src_table, store_field, hint, is_long in jobs:
         conn = sqlite3.connect(db_path)
@@ -214,7 +218,7 @@ def fetch_jobs(jobs):
             f"WHERE {src_field} IS NOT NULL AND {src_field} != ''"
         ).fetchall()
         for cid, src in rows:
-            if not has_cn(src):
+            if not allow_non_cn and not has_cn(src):
                 continue
             have = {
                 r[0]
@@ -272,6 +276,10 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--db", choices=["ug", "gr", "summer", "all"], default="all",
                     help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad). Default: all.")
+    ap.add_argument("--allow-non-cn", action="store_true",
+                    help="Also process rows whose source has no Chinese characters "
+                         "(e.g. course_name is English-only). Use to translate "
+                         "purely English course names into the other 6 target langs.")
     args = ap.parse_args()
 
     setup_db(UG_DB)
@@ -293,7 +301,7 @@ def main():
         jobs.extend(LONG_JOBS)
     jobs = [j for j in jobs if j[0] in DB_FILTER]
 
-    pending = fetch_jobs(jobs)
+    pending = fetch_jobs(jobs, allow_non_cn=args.allow_non_cn)
     if args.limit:
         pending = pending[: args.limit]
 
