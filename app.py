@@ -21,7 +21,7 @@ from pathlib import Path
 import sqlite3
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -221,7 +221,7 @@ def get_filters(term: str = Query("spring", description="spring | summer")):
 
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
-    return {
+    payload = {
         "course_types": course_types,
         "categories": categories,
         "departments": departments,
@@ -229,6 +229,9 @@ def get_filters(term: str = Query("spring", description="spring | summer")):
         "gradings": gradings,
         "weekdays": weekdays,
     }
+    # Filter universes only change when DBs are rebuilt. 1 hour browser cache
+    # keeps cold-load fast without making a redeploy require a hard refresh.
+    return JSONResponse(payload, headers={"Cache-Control": "public, max-age=3600"})
 
 
 # ---- list ---------------------------------------------------------------------
@@ -242,8 +245,14 @@ def _build_where(
     conds = []
     params = []
     if q:
-        like = f"%{q}%"
-        conds.append("(t.course_name LIKE ? OR t.teacher LIKE ? OR t.classroom LIKE ?)")
+        # Escape LIKE wildcards so `100%` searches literal '%', not "any chars".
+        q_esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{q_esc}%"
+        conds.append(
+            "(t.course_name LIKE ? ESCAPE '\\' "
+            "OR t.teacher LIKE ? ESCAPE '\\' "
+            "OR t.classroom LIKE ? ESCAPE '\\')"
+        )
         params.extend([like, like, like])
     if type_:
         conds.append("t.course_type = ?")
@@ -315,7 +324,13 @@ def list_courses(
             # Earliest class period first; rows with no schedule sort last.
             "time_asc":     "(t.first_period IS NULL), t.first_period, t.course_name COLLATE NOCASE",
         }
-        order_by = sort_map.get(sort, "t._level, t.id")
+        # Default: course name asc (stable, mixes UG/GR in spring instead of
+        # piling all undergrad rows before any grad row). Empty names land last.
+        order_by = sort_map.get(
+            sort,
+            "(t.course_name = '' OR t.course_name IS NULL), "
+            "t.course_name COLLATE NOCASE, t.id",
+        )
     offset = (page - 1) * page_size
 
     union_sql = TERM_UNION_SQL[term]
@@ -414,10 +429,12 @@ def _parse_id(course_id: str):
 
 
 # Fields the translations table can override per (course_id, field, lang).
+# Only includes fields the frontend actually renders — keep in sync with the
+# detail SELECTs and modal rendering in index.html.
 TRANSLATABLE_FIELDS = (
     "course_name", "notes", "pnp", "classroom", "major",
-    "prerequisites", "ge_series", "textbook", "audience", "term",
-    "reference_book", "syllabus", "evaluation",
+    "prerequisites", "ge_series", "audience", "term",
+    "syllabus", "evaluation",
     "intro_cn", "extra_notes",
 )
 
@@ -437,15 +454,17 @@ def _apply_translations(cur, ns: str, local_id: int, lang: str, out: dict):
 
 
 # Shared SELECT for "UG-shape" detail rows (spring undergrad + summer undergrad).
+# Only selects fields the frontend renders — see TRANSLATABLE_FIELDS and the
+# modal renderer in index.html.
 _UG_DETAIL_SELECT = """
     SELECT '{prefix}' || b.id AS id, b.course_type, b.course_code, b.class_no,
            b.course_name, b.category, b.credits, b.teacher,
            b.department, b.major, b.grade,
-           b.schedule, b.classroom, b.schedule_raw, b.weekdays,
+           b.schedule, b.classroom,
            b.enrollment, b.pnp, b.notes,
            d.english_name, d.prerequisites, d.intro_cn, d.intro_en,
-           d.grading, d.ge_series, d.language, d.textbook,
-           d.reference_book, d.syllabus, d.evaluation
+           d.grading, d.ge_series, d.language,
+           d.syllabus, d.evaluation
     FROM basic_info b
     LEFT JOIN detail_info d ON d.course_id = b.id
     WHERE b.id = ?
@@ -455,11 +474,11 @@ _GR_DETAIL_SELECT = """
     SELECT 'g' || b.id AS id, '研究生课' AS course_type,
            b.course_code, b.class_no, b.course_name, b.category,
            b.credits, b.teacher, b.department, b.major, b.grade,
-           b.schedule, b.classroom, b.schedule_raw, b.weekdays,
+           b.schedule, b.classroom,
            b.enrollment, '' AS pnp, b.notes,
            d.english_name,
            d.weekly_hours, d.total_hours, d.term, d.audience,
-           d.reference_book, d.intro AS intro_cn, d.extra_notes
+           d.intro AS intro_cn, d.extra_notes
     FROM gr.basic_info b
     LEFT JOIN gr.detail_info d ON d.course_id = b.id
     WHERE b.id = ?
@@ -495,8 +514,8 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
     # Ensure all keys exist for both levels so frontend gating is consistent.
     for k in (
         "english_name", "prerequisites", "intro_cn", "intro_en",
-        "grading", "ge_series", "language", "textbook",
-        "reference_book", "syllabus", "evaluation",
+        "grading", "ge_series", "language",
+        "syllabus", "evaluation",
         "weekly_hours", "total_hours", "term", "audience", "extra_notes",
     ):
         out.setdefault(k, "")

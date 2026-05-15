@@ -209,7 +209,6 @@ body {
   z-index: 50;
 }
 
-.sponsor-link,
 .top-btn {
   display: inline-flex;
   align-items: center;
@@ -229,12 +228,6 @@ body {
   user-select: none;
 }
 
-.sponsor-link:hover {
-  border-color: var(--c-grad);
-  color: var(--c-grad);
-  background: var(--c-grad-soft);
-}
-
 .top-btn:hover {
   border-color: var(--ink-3);
   background: var(--bg);
@@ -242,7 +235,7 @@ body {
 }
 
 .top-btn:active { transform: scale(0.97); }
-.top-btn .icon, .sponsor-link .sponsor-icon { font-size: 0.86rem; }
+.top-btn .icon { font-size: 0.86rem; }
 
 /* lang dropdown */
 .font-selector { position: relative; }
@@ -1038,7 +1031,7 @@ body {
   .github-star { top: 14px; left: 0; font-size: 0.68rem; }
   .github-star svg { width: 20px; height: 20px; }
   .top-controls { top: 14px; right: 0; gap: 6px; }
-  .top-btn, .sponsor-link { padding: 6px 10px; font-size: 0.72rem; }
+  .top-btn { padding: 6px 10px; font-size: 0.72rem; }
   .search-box { padding: 12px 16px; }
   .filters { padding: 16px 14px; gap: 14px; }
   .course-card { padding: 16px 16px 16px 22px; }
@@ -1106,14 +1099,14 @@ var _hmt = _hmt || [];
 
   <!-- Filters -->
   <div class="filters" id="filtersContainer">
-    <!-- Row 1: 课程类型, 课程类别, 学分, 开课单位 -->
+    <!-- Row 1: 课程类型筛选 1, 课程类型筛选 2, 学分, 开课单位 -->
     <div class="filter-row">
       <div class="filter-group">
-        <label id="labelCourseType">课程类型</label>
+        <label id="labelCourseType">课程类型筛选 1</label>
         <div class="custom-select" id="csCourseType" data-filter="filterCourseType"></div>
       </div>
       <div class="filter-group">
-        <label id="labelCategory">课程类别</label>
+        <label id="labelCategory">课程类型筛选 2</label>
         <div class="custom-select" id="csCategory" data-filter="filterCategory"></div>
       </div>
       <div class="filter-group">
@@ -1189,7 +1182,7 @@ const i18n = {
     subtitleSummer: '北京大学2026暑期学期课程搜索(每学期更新)',
     termSpring: '2026春季学期', termSummer: '2026暑期学期',
     searchPlaceholder: '输入课程名、教师姓名或教室...',
-    labelCourseType: '课程类型', labelCategory: '课程类别',
+    labelCourseType: '课程类型筛选 1', labelCategory: '课程类型筛选 2',
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
     sortDefault: '默认', sortPinyin: '课程名 A→Z', sortPinyinDesc: '课程名 Z→A', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortTimeAsc: '上课时间 早→晚', sortRandom: '随机',
@@ -1226,7 +1219,7 @@ const i18n = {
     subtitleSummer: 'PKU Summer 2026 Course Search (Updated Every Semester)',
     termSpring: '2026 Spring', termSummer: '2026 Summer',
     searchPlaceholder: 'Search course name, teacher or classroom...',
-    labelCourseType: 'Course Type', labelCategory: 'Category',
+    labelCourseType: 'Course Type 1', labelCategory: 'Course Type 2',
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
     sortDefault: 'Default', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortTimeAsc: 'Earliest first', sortRandom: 'Random',
@@ -1263,7 +1256,7 @@ const i18n = {
     subtitleSummer: '北京大学2026年夏学期 授業検索（毎学期更新）',
     termSpring: '2026 春学期', termSummer: '2026 夏学期',
     searchPlaceholder: '授業名、教員名または教室を入力...',
-    labelCourseType: '科目種別', labelCategory: '科目区分',
+    labelCourseType: '科目種別 1', labelCategory: '科目種別 2',
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
     sortDefault: 'デフォルト', sortPinyin: '名前 A→Z', sortPinyinDesc: '名前 Z→A', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortTimeAsc: '早い時間順', sortRandom: 'ランダム',
@@ -1300,7 +1293,7 @@ const i18n = {
     subtitleSummer: '베이징대학교 2026 여름학기 강좌 검색 (매 학기 업데이트)',
     termSpring: '2026 봄학기', termSummer: '2026 여름학기',
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
-    labelCourseType: '강좌 유형', labelCategory: '강좌 분류',
+    labelCourseType: '강좌 유형 1', labelCategory: '강좌 유형 2',
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
     sortDefault: '기본', sortPinyin: '이름 A→Z', sortPinyinDesc: '이름 Z→A', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortTimeAsc: '이른 시간순', sortRandom: '무작위',
@@ -1337,7 +1330,7 @@ const i18n = {
     subtitleSummer: 'Recherche de cours PKU - \u00c9t\u00e9 2026 (Mise \u00e0 jour chaque semestre)',
     termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026',
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
-    labelCourseType: 'Type', labelCategory: 'Cat\u00e9gorie',
+    labelCourseType: 'Type 1', labelCategory: 'Type 2',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
     sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A→Z)', sortPinyinDesc: 'Nom (Z→A)', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortTimeAsc: 'T\u00f4t \u2192 tard', sortRandom: 'Al\u00e9atoire',
@@ -1374,7 +1367,7 @@ const i18n = {
     subtitleSummer: 'PKU Kurssuche - Sommer 2026 (Jedes Semester aktualisiert)',
     termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026',
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
-    labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
+    labelCourseType: 'Kurstyp 1', labelCategory: 'Kurstyp 2',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
     sortDefault: 'Standard', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortTimeAsc: 'Fr\u00fch \u2192 sp\u00e4t', sortRandom: 'Zuf\u00e4llig',
@@ -1411,7 +1404,7 @@ const i18n = {
     subtitleSummer: 'B\u00fasqueda de cursos PKU - Verano 2026 (Actualizado cada semestre)',
     termSpring: 'Primavera 2026', termSummer: 'Verano 2026',
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
-    labelCourseType: 'Tipo', labelCategory: 'Categor\u00eda',
+    labelCourseType: 'Tipo 1', labelCategory: 'Tipo 2',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
     sortDefault: 'Por defecto', sortPinyin: 'Nombre (A→Z)', sortPinyinDesc: 'Nombre (Z→A)', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortTimeAsc: 'Temprano \u2192 tarde', sortRandom: 'Aleatorio',
@@ -1448,7 +1441,7 @@ const i18n = {
     subtitleSummer: 'Поиск курсов ПКУ - Лето 2026 (Обновляется каждый семестр)',
     termSpring: 'Весна 2026', termSummer: 'Лето 2026',
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
-    labelCourseType: 'Тип курса', labelCategory: 'Категория',
+    labelCourseType: 'Тип курса 1', labelCategory: 'Тип курса 2',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
     sortDefault: 'По умолчанию', sortPinyin: 'Имя А→Я', sortPinyinDesc: 'Имя Я→А', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortTimeAsc: 'С раннего', sortRandom: 'Случайно',
@@ -1639,13 +1632,29 @@ const dataI18n = {
   },
 };
 
+// i18n note: short/closed-set values (categories, departments, course_type,
+// weekdays, titles, etc.) are translated client-side via dataI18n. Free-text
+// per-row fields (course_name, classroom, notes, intro_cn, …) come from the
+// backend's translations table and are already in the requested language by
+// the time they reach the frontend — do NOT pass those through tr().
+const _missingTrLogged = new Set();
 function tr(cat, key) {
   if (!key) return key || '';
   if (currentLang === 'zh') return key;
   const i = TR_IDX[currentLang];
   if (i === undefined) return key;
   const entry = dataI18n[cat] && dataI18n[cat][key];
-  return (entry && entry[i]) || key;
+  if (!entry || !entry[i]) {
+    // Surface dictionary gaps once per (cat,key,lang) so we notice when PKU
+    // ships a new department / category that nobody added to dataI18n.
+    const tag = cat + '|' + key + '|' + currentLang;
+    if (!_missingTrLogged.has(tag)) {
+      _missingTrLogged.add(tag);
+      console.warn('[i18n] missing translation:', cat, key, '→', currentLang);
+    }
+    return key;
+  }
+  return entry[i];
 }
 
 // Translate parenthetical titles inside "教师姓名(职称),..."
@@ -1681,24 +1690,41 @@ function trCourseName(course) {
   return course.course_name || '';
 }
 
-let currentLang = 'zh';
+let currentLang = (function () {
+  try {
+    const stored = localStorage.getItem('pinhaoke_lang');
+    return (stored && TR_IDX[stored] !== undefined) || stored === 'zh' ? stored : 'zh';
+  } catch (e) { return 'zh'; }
+})();
 let currentTerm = (function () {
   try { return localStorage.getItem('pinhaoke_term') === 'summer' ? 'summer' : 'spring'; }
   catch (e) { return 'spring'; }
 })();
 let randomSeed = 0;  // re-rolled when user picks sort=random
 
+// Categories that should never appear in the filter dropdown even if the DB
+// has them — keyed by term. Backend / data files are untouched, purely a UI veto.
+const HIDDEN_CATEGORIES = {
+  spring: new Set(['专业必修']),
+  summer: new Set(),
+};
+
 document.addEventListener('click', e => {
   if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
 });
 
 /* ===== Language Selector ===== */
+function refreshLangSelectorUI() {
+  document.getElementById('langLabel').textContent = i18n[currentLang].name;
+  document.querySelectorAll('#langDropdown .font-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.lang === currentLang);
+  });
+}
+
 function setLang(key) {
   currentLang = key;
-  document.getElementById('langLabel').textContent = i18n[key].name;
-  document.querySelectorAll('#langDropdown .font-option').forEach(el => {
-    el.classList.toggle('active', el.dataset.lang === key);
-  });
+  try { localStorage.setItem('pinhaoke_lang', key); } catch (e) {}
+  refreshLangSelectorUI();
   closeLangDropdown();
   applyI18n();
   if (cachedFilters) populateFilters(cachedFilters);
@@ -1751,17 +1777,38 @@ let fetchController = null;
 
 /* ===== Initialization ===== */
 let cachedFilters = null;
+const filtersByTerm = {}; // term → filters payload; survives the lifetime of the page
+let filtersController = null;
+
+async function loadFiltersForCurrentTerm() {
+  if (filtersByTerm[currentTerm]) {
+    cachedFilters = filtersByTerm[currentTerm];
+    populateFilters(cachedFilters);
+    return;
+  }
+  if (filtersController) filtersController.abort();
+  filtersController = new AbortController();
+  const resp = await fetch(
+    '/api/filters?term=' + encodeURIComponent(currentTerm),
+    { signal: filtersController.signal }
+  );
+  const data = await resp.json();
+  filtersByTerm[currentTerm] = data;
+  cachedFilters = data;
+  populateFilters(data);
+}
+
 async function init() {
   // Sync the toggle UI to whatever currentTerm was restored from localStorage.
   refreshTermToggleUI();
+  refreshLangSelectorUI();
   try {
-    const resp = await fetch('/api/filters?term=' + encodeURIComponent(currentTerm));
-    cachedFilters = await resp.json();
-    populateFilters(cachedFilters);
+    await loadFiltersForCurrentTerm();
     applyI18n();
     await fetchCourses();
     document.getElementById('loadingMsg').remove();
   } catch (e) {
+    if (e.name === 'AbortError') return;
     document.getElementById('loadingMsg').innerHTML =
       '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败</span>';
   }
@@ -1792,12 +1839,11 @@ async function setTerm(term) {
   if (currentModalCourseId) closeModal();
 
   try {
-    const resp = await fetch('/api/filters?term=' + encodeURIComponent(currentTerm));
-    cachedFilters = await resp.json();
-    populateFilters(cachedFilters);
+    await loadFiltersForCurrentTerm();
     applyI18n();
     await fetchCourses();
   } catch (e) {
+    if (e.name === 'AbortError') return;
     console.error(e);
   }
 }
@@ -1862,14 +1908,15 @@ function populateFilters(filters) {
     filters.course_types.map(ct => ({ value: ct, label: lang.courseTypes[ct] || ct })),
     lang.all, csValues.filterCourseType);
 
+  const hidden = HIDDEN_CATEGORIES[currentTerm] || new Set();
   initCustomSelect('csCategory',
-    filters.categories.filter(c => c !== '专业必修').map(c => ({ value: c, label: tr('categories', c) })),
+    filters.categories.filter(c => !hidden.has(c)).map(c => ({ value: c, label: tr('categories', c) })),
     lang.all, csValues.filterCategory);
 
   initCustomSelect('csCredits',
     filters.credits.filter(c => c !== 0).map(c => ({
       value: String(c),
-      label: c % 1 === 0 ? c.toFixed(0) : c.toFixed(1)
+      label: fmtCredits(c)
     })),
     lang.all, csValues.filterCredits);
 
@@ -1993,11 +2040,6 @@ function renderCards() {
   updateResultsCount();
 }
 
-function rerenderCards() {
-  if (currentCourses.length > 0) renderCards();
-  updateResultsCount();
-}
-
 function loadMore() {
   currentPage++;
   fetchCourses();
@@ -2012,11 +2054,27 @@ function getTypeBadgeClass(type) {
   if (type === '公选课') return 'badge-elective';
   if (type === '通识课') return 'badge-general';
   if (type === '研究生课') return 'badge-grad';
+  // Summer-only types: route to one of the existing 4 palettes so each type
+  // is still visually distinguishable from each other.
+  if (type === '英语课') return 'badge-elective';
+  if (type === '体育课') return 'badge-general';
+  if (type === '劳动教育课') return 'badge-general';
+  if (type === '政治课') return 'badge-grad';
+  if (type === '计算机基础课') return 'badge-major';
   return 'badge-major';
 }
 
 function getTypeBadgeText(type) {
   return i18n[currentLang].courseTypes[type] || type;
+}
+
+// Defensive credits formatter: tolerate null/undefined/NaN so a stray DB row
+// can't blow up rendering.
+function fmtCredits(v) {
+  if (v == null) return '-';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '-';
+  return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
 }
 
 function createCard(course) {
@@ -2030,7 +2088,7 @@ function createCard(course) {
       <div class="card-badges">
         <span class="badge ${getTypeBadgeClass(course.course_type)}">${esc(getTypeBadgeText(course.course_type))}</span>
         <span class="badge badge-category">${esc(tr('categories', course.category))}</span>
-        <span class="badge badge-credits">${course.credits % 1 === 0 ? course.credits.toFixed(0) : course.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
+        <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
       </div>
     </div>
     <div class="card-details">
@@ -2069,11 +2127,17 @@ function createCard(course) {
 
 /* ===== Detail Modal ===== */
 let currentModalCourseId = null;
+let detailController = null;
 
 async function showDetail(courseId) {
   const lang = i18n[currentLang];
   const overlay = document.getElementById('modalOverlay');
   const content = document.getElementById('modalContent');
+
+  // Abort any in-flight detail fetch so rapid taps / language switches don't
+  // resolve out of order and overwrite the latest content.
+  if (detailController) detailController.abort();
+  detailController = new AbortController();
 
   currentModalCourseId = courseId;
   content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${lang.modalLoading}</span></div>`;
@@ -2081,7 +2145,10 @@ async function showDetail(courseId) {
   document.body.style.overflow = 'hidden';
 
   try {
-    const resp = await fetch('/api/courses/' + courseId + '?lang=' + encodeURIComponent(currentLang));
+    const resp = await fetch(
+      '/api/courses/' + courseId + '?lang=' + encodeURIComponent(currentLang),
+      { signal: detailController.signal }
+    );
     const c = await resp.json();
     // Drop result if modal closed or switched to another course in the meantime.
     if (currentModalCourseId !== courseId || !overlay.classList.contains('open')) return;
@@ -2094,7 +2161,7 @@ async function showDetail(courseId) {
       <div class="modal-badges">
         <span class="badge ${getTypeBadgeClass(c.course_type)}">${esc(getTypeBadgeText(c.course_type))}</span>
         <span class="badge badge-category">${esc(tr('categories', c.category))}</span>
-        <span class="badge badge-credits">${c.credits % 1 === 0 ? c.credits.toFixed(0) : c.credits.toFixed(1)} ${esc(lang.fieldCredits)}</span>
+        <span class="badge badge-credits">${fmtCredits(c.credits)} ${esc(lang.fieldCredits)}</span>
       </div>`;
 
     // Basic info section
@@ -2190,6 +2257,7 @@ async function showDetail(courseId) {
 
     content.innerHTML = html;
   } catch (e) {
+    if (e.name === 'AbortError') return;
     content.innerHTML = '<div class="modal-loading">Failed to load details</div>';
   }
 }
