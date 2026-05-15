@@ -49,7 +49,7 @@ Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the pag
 | Endpoint | Notes |
 |---|---|
 | `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. Accepts `?term=spring\|summer` (default `spring`). |
-| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 50). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. |
+| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom` with `ESCAPE '\\'`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 10). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. **`course_type` and `category` are arrays** (merged across PKU's duplicate registrations — see merge section below). |
 | `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string — the prefix alone determines which DB to read, so **no `?term=` needed**. Accepts `?lang=`. |
 
 `lang` accepts `zh` (default — no translation lookup) or one of `en, ja, ko, fr, de, es, ru` (swaps fields from the relevant DB's `translations` table — see i18n section below).
@@ -107,6 +107,18 @@ If `index.html` deployment looks reverted to the old glassmorphism design, it's 
 
 `get_db()` in `app.py` opens `数据库/2026春季学期本科生课程.db` and `ATTACH`es the graduate DB as `gr`. All cross-DB queries use `UNION ALL` of `LIST_SELECT_UG` + `LIST_SELECT_GR` from one cursor. **Both SELECTs must produce the same column shape** for UNION — if you add a field to UG only, alias `''` (or `0`) on the GR side (or vice-versa).
 
+### List merges PKU duplicate registrations — `course_type` / `category` are arrays
+
+PKU's elective system lists the same physical class under multiple entries — same `course_code` + `class_no` + `teacher`, but a different `category` (e.g. `3S野外综合实习` appears as both `任选、劳动教育课` and `实习、劳动教育课`). Spring UG has 143 such duplicate groups, summer UG has 34. Plus 118 `course_code`s cross-listed UG↔GR (本研合上, e.g. 非线性光学 `00411040`).
+
+`/api/courses` wraps the UNION in a `GROUP BY course_code, class_no, COALESCE(NULLIF(teacher,''), id)` so each `(code, class_no, teacher)` collapses to one row. `course_type` and `category` are `GROUP_CONCAT(DISTINCT)`'d, then Python `split(',')`-ed into **arrays** in the JSON response (`"category": ["任选、劳动教育课", "实习、劳动教育课"]`). Everything else uses `MAX`. The representative `id` is `MIN(id)` — still a single prefixed string, so `/api/courses/{id}` keeps working unchanged.
+
+**Why include `class_no` in the key**: courses like 发展心理学 (`01630060`) run 5 parallel sections under one teacher — without `class_no` they'd be merged into one card instead of five.
+
+**Why UG↔GR cross-listed pairs are NOT merged**: UG uses `class_no='1'/'2'`, GR uses `'00'/'01'` — different namespaces. The 4 rows of 非线性光学 stay as 4 cards distinguished by the `专业课` / `研究生课` type badge, which is the desired UX.
+
+**Frontend contract**: list response is **arrays** for `course_type` and `category`; detail response is **strings** for the same fields. `asArray()` in `index.html` normalises both; always render through `courseTypeBadgesHTML()` / `categoryBadgesHTML()` (not direct `tr('categories', ...)` on the raw value).
+
 ### Course IDs are strings, not ints
 
 DB ids are namespaced by single-char prefix so the three DBs can coexist in URL space:
@@ -135,11 +147,11 @@ On the frontend, `setLang()` re-fetches the list AND any open modal so visible c
 
 Schedule strings look like `1~15周 每周周一10~11节 二教5111~15周 每周周四10~11节 二教511` — slot delimiters are missing and room numbers can merge into the next week range. `build_common.parse_schedule` handles it via regex with a 3-digit cap on room numbers; the JS `trSchedule()` localises the cleaned form. Don't naively split on whitespace.
 
-`build_common.parse_first_period` extracts the smallest `节` start across all slots of one course and stores it in `basic_info.first_period`. The `time_asc` sort uses it via `(first_period IS NULL), first_period, course_name COLLATE NOCASE` so blanks land at the bottom. If you rebuild a DB, the column is populated by the build scripts; if you change `parse_first_period` logic later, run a one-off `UPDATE basic_info SET first_period = ...` rather than wiping the DB (which would drop `translations`).
+`build_common.parse_first_period` extracts the smallest `节` start across all slots of one course and stores it in `basic_info.first_period`. The `time_asc` sort uses it via `(first_period IS NULL), first_period, course_name COLLATE NOCASE` so blanks land at the bottom. The default sort (no `sort=` param) is `course_name COLLATE NOCASE, id` with empty names pushed last via `(course_name = '' OR course_name IS NULL)`. If you rebuild a DB, the column is populated by the build scripts; if you change `parse_first_period` logic later, run a one-off `UPDATE basic_info SET first_period = ...` rather than wiping the DB (which would drop `translations`).
 
 ### sort=random uses a seeded deterministic shuffle
 
-The frontend re-rolls `randomSeed` whenever the user clicks 随机 and includes it in every subsequent `/api/courses` call so pagination stays stable. The backend builds `((CAST(SUBSTR(t.id, 2) AS INTEGER) * mul + level_offset + add) % 999983)` where `mul/add` are derived from the seed via two large primes and `level_offset` differs per `u/g/s` prefix to avoid hash collisions between e.g. `u123` and `g123`. Don't replace this with `ORDER BY RANDOM()` — that breaks pagination because each request gets a fresh order.
+The frontend re-rolls `randomSeed` whenever the user clicks 随机 and includes it in every subsequent `/api/courses` call so pagination stays stable. The backend builds `((CAST(SUBSTR(id, 2) AS INTEGER) * mul + level_offset + add) % 999983)` where `mul/add` are derived from the seed via two large primes and `level_offset` differs per `u/g/s` prefix (read off `SUBSTR(id, 1, 1)`) to avoid hash collisions between e.g. `u123` and `g123`. Note the expression has no `t.` prefix — it runs on the outer GROUP BY result where `id` is `MIN(id)` of the merged group. Don't replace this with `ORDER BY RANDOM()` — that breaks pagination because each request gets a fresh order.
 
 ### 归档/ folder
 

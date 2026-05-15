@@ -326,13 +326,28 @@ def list_courses(
             # Earliest class period first; rows with no schedule sort last.
             "time_asc":     "(first_period IS NULL), first_period, course_name COLLATE NOCASE",
         }
-        # Default: course name asc (stable, mixes UG/GR in spring instead of
-        # piling all undergrad rows before any grad row). Empty names land last.
-        order_by = sort_map.get(
-            sort,
-            "(course_name = '' OR course_name IS NULL), "
-            "course_name COLLATE NOCASE, id",
-        )
+        if sort in sort_map:
+            order_by = sort_map[sort]
+        else:
+            # Default sort: course name asc, empty names last. For summer term
+            # we additionally float "sociology-adjacent" courses to the very
+            # top — the summer audience is primarily 社会学系 / 中国社会科学
+            # 调查中心 partner students plus 爱心社, so this surfaces the most
+            # relevant offerings at first scroll. Spring term keeps a flat
+            # alphabetical default.
+            if term == "summer":
+                sociology_priority = (
+                    "(CASE WHEN department = '社会学系' "
+                    "OR department = '中国社会科学调查中心' "
+                    "OR course_name LIKE '%社会学%' THEN 0 ELSE 1 END), "
+                )
+            else:
+                sociology_priority = ""
+            order_by = (
+                f"{sociology_priority}"
+                "(course_name = '' OR course_name IS NULL), "
+                "course_name COLLATE NOCASE, id"
+            )
     offset = (page - 1) * page_size
 
     union_sql = TERM_UNION_SQL[term]

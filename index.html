@@ -1696,10 +1696,10 @@ let currentLang = (function () {
     return (stored && TR_IDX[stored] !== undefined) || stored === 'zh' ? stored : 'zh';
   } catch (e) { return 'zh'; }
 })();
-let currentTerm = (function () {
-  try { return localStorage.getItem('pinhaoke_term') === 'summer' ? 'summer' : 'spring'; }
-  catch (e) { return 'spring'; }
-})();
+// Always open a fresh tab on the spring term — the page is "the spring term
+// course catalog", and the summer toggle is an opt-in for users who came
+// looking for it. Don't restore the previous session's term.
+let currentTerm = 'spring';
 let randomSeed = 0;  // re-rolled when user picks sort=random
 
 // Categories that should never appear in the filter dropdown even if the DB
@@ -1826,7 +1826,6 @@ async function setTerm(term) {
   if (term !== 'spring' && term !== 'summer') return;
   if (term === currentTerm) return;
   currentTerm = term;
-  try { localStorage.setItem('pinhaoke_term', term); } catch (e) {}
   refreshTermToggleUI();
 
   // Filter universes differ between terms — wipe selected filter values and
