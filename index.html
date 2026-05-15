@@ -2077,6 +2077,24 @@ function fmtCredits(v) {
   return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
 }
 
+// List endpoint returns course_type / category as arrays (merged from multiple
+// PKU registration entries — e.g. "非线性光学" UG + GR, "3S野外综合实习" 任选+实习).
+// Detail endpoint still returns single strings. asArray() normalises both.
+function asArray(v) {
+  if (v == null) return [];
+  return Array.isArray(v) ? v : [v];
+}
+function courseTypeBadgesHTML(v) {
+  return asArray(v).map(t =>
+    `<span class="badge ${getTypeBadgeClass(t)}">${esc(getTypeBadgeText(t))}</span>`
+  ).join('');
+}
+function categoryBadgesHTML(v) {
+  return asArray(v).map(c =>
+    `<span class="badge badge-category">${esc(tr('categories', c))}</span>`
+  ).join('');
+}
+
 function createCard(course) {
   const lang = i18n[currentLang];
   const card = document.createElement('div');
@@ -2086,8 +2104,8 @@ function createCard(course) {
     <div class="card-header">
       <span class="course-name">${esc(trCourseName(course))}</span>
       <div class="card-badges">
-        <span class="badge ${getTypeBadgeClass(course.course_type)}">${esc(getTypeBadgeText(course.course_type))}</span>
-        <span class="badge badge-category">${esc(tr('categories', course.category))}</span>
+        ${courseTypeBadgesHTML(course.course_type)}
+        ${categoryBadgesHTML(course.category)}
         <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
       </div>
     </div>
@@ -2159,8 +2177,8 @@ async function showDetail(courseId) {
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-badges">
-        <span class="badge ${getTypeBadgeClass(c.course_type)}">${esc(getTypeBadgeText(c.course_type))}</span>
-        <span class="badge badge-category">${esc(tr('categories', c.category))}</span>
+        ${courseTypeBadgesHTML(c.course_type)}
+        ${categoryBadgesHTML(c.category)}
         <span class="badge badge-credits">${fmtCredits(c.credits)} ${esc(lang.fieldCredits)}</span>
       </div>`;
 

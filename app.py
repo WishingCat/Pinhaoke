@@ -306,40 +306,84 @@ def list_courses(
         # int param is already validated by FastAPI, safe to interpolate.
         # Two large primes mix the seed so even tiny seeds produce well-spread
         # mul/add values, giving genuinely different orderings per seed.
-        # The CASE per _level breaks 'u123' / 'g123' / 's123' hash collisions.
+        # The CASE per id prefix breaks 'u123' / 'g123' / 's123' hash collisions.
         seed = max(1, int(random_seed))
         mul = ((seed * 1664525) % 999983) or 7
         add = (seed * 1013904223) % 999983
+        # After GROUP BY the id column is the representative id (a single
+        # 'u123' / 'g456' / 's789' string), so we reach into it via SUBSTR.
         order_by = (
-            f"((CAST(SUBSTR(t.id, 2) AS INTEGER) * {mul} "
-            f"+ CASE t._level WHEN 'g' THEN 333331 WHEN 's' THEN 666661 ELSE 0 END "
+            f"((CAST(SUBSTR(id, 2) AS INTEGER) * {mul} "
+            f"+ CASE SUBSTR(id, 1, 1) WHEN 'g' THEN 333331 WHEN 's' THEN 666661 ELSE 0 END "
             f"+ {add}) % 999983)"
         )
     else:
         sort_map = {
-            "pinyin":       "t.course_name COLLATE NOCASE",
-            "pinyin_desc":  "t.course_name COLLATE NOCASE DESC",
-            "credits_asc":  "t.credits ASC, t.course_name COLLATE NOCASE",
-            "credits_desc": "t.credits DESC, t.course_name COLLATE NOCASE",
+            "pinyin":       "course_name COLLATE NOCASE",
+            "pinyin_desc":  "course_name COLLATE NOCASE DESC",
+            "credits_asc":  "credits ASC, course_name COLLATE NOCASE",
+            "credits_desc": "credits DESC, course_name COLLATE NOCASE",
             # Earliest class period first; rows with no schedule sort last.
-            "time_asc":     "(t.first_period IS NULL), t.first_period, t.course_name COLLATE NOCASE",
+            "time_asc":     "(first_period IS NULL), first_period, course_name COLLATE NOCASE",
         }
         # Default: course name asc (stable, mixes UG/GR in spring instead of
         # piling all undergrad rows before any grad row). Empty names land last.
         order_by = sort_map.get(
             sort,
-            "(t.course_name = '' OR t.course_name IS NULL), "
-            "t.course_name COLLATE NOCASE, t.id",
+            "(course_name = '' OR course_name IS NULL), "
+            "course_name COLLATE NOCASE, id",
         )
     offset = (page - 1) * page_size
 
     union_sql = TERM_UNION_SQL[term]
 
-    count_sql = f"SELECT COUNT(*) FROM {union_sql} AS t {where}"
-    list_sql = (
-        f"SELECT t.* FROM {union_sql} AS t {where} "
-        f"ORDER BY {order_by} LIMIT ? OFFSET ?"
-    )
+    # Cross-listed and duplicate-registered rows: PKU lists the same physical
+    # class multiple times — once per (category / undergrad-vs-grad) entry.
+    # We collapse them by (course_code, class_no, teacher), keeping every
+    # distinct course_type and category as a GROUP_CONCAT'd list.
+    #
+    # Why include class_no instead of just (code, teacher)?
+    #   - Some courses (e.g. 发展心理学 0163006) have ONE teacher running FIVE
+    #     parallel sections — they share (code, teacher) but are 5 real classes.
+    #     Dropping class_no from the key would erroneously merge them.
+    #   - Cross-listed UG↔GR rows use different class_no namespaces (UG '1' /
+    #     GR '00'), so they intentionally do NOT merge here; the UG and GR
+    #     cards are kept distinct and the badges show which is which.
+    #
+    # Rows missing a teacher (a handful in UG/GR) get a unique synthetic key
+    # so they never collapse with each other.
+    inner = f"SELECT * FROM {union_sql} AS t {where}"
+    merged_sql = f"""
+        SELECT
+            MIN(id) AS id,
+            GROUP_CONCAT(DISTINCT course_type) AS course_type,
+            MAX(course_code) AS course_code,
+            MAX(class_no) AS class_no,
+            MAX(course_name) AS course_name,
+            GROUP_CONCAT(DISTINCT category) AS category,
+            MAX(credits) AS credits,
+            MAX(teacher) AS teacher,
+            MAX(department) AS department,
+            MAX(major) AS major,
+            MAX(grade) AS grade,
+            MAX(schedule) AS schedule,
+            MAX(classroom) AS classroom,
+            MAX(weekdays) AS weekdays,
+            MIN(first_period) AS first_period,
+            MAX(enrollment) AS enrollment,
+            MAX(pnp) AS pnp,
+            MAX(notes) AS notes,
+            MAX(english_name) AS english_name,
+            MAX(grading) AS grading,
+            MAX(language) AS language,
+            MAX(audience) AS audience
+        FROM ({inner})
+        GROUP BY course_code, class_no,
+                 CASE WHEN teacher IS NULL OR teacher = '' THEN id ELSE teacher END
+    """
+
+    count_sql = f"SELECT COUNT(*) FROM ({merged_sql})"
+    list_sql = f"{merged_sql} ORDER BY {order_by} LIMIT ? OFFSET ?"
 
     # Maps id prefix → attached DB alias for translation lookup.
     PREFIX_TO_NS = {prefix: alias for (alias, _, prefix) in TERM_DBS[term]}
@@ -376,14 +420,20 @@ def list_courses(
         prefix = rid[0]
         local_id = int(rid[1:])
         trans = trans_by_prefix.get(prefix, {}).get(local_id, {})
+        # GROUP_CONCAT(DISTINCT) returns 'a,b' or '' or None. Categories and
+        # course_types have no embedded commas (verified in build_common), so
+        # splitting on ',' is safe. Empty / single-value cases collapse to a
+        # 1-element list so the frontend can iterate uniformly.
+        ct_raw = r["course_type"] or ""
+        cat_raw = r["category"] or ""
         courses.append(
             {
                 "id": rid,
-                "course_type": r["course_type"],
+                "course_type": [s for s in ct_raw.split(",") if s],
                 "course_code": r["course_code"],
                 "course_name": trans.get("course_name") or r["course_name"],
                 "english_name": r["english_name"],
-                "category": r["category"],
+                "category": [s for s in cat_raw.split(",") if s],
                 "credits": r["credits"],
                 "teacher": r["teacher"],
                 "class_no": r["class_no"],
