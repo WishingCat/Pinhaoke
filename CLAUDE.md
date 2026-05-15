@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -49,7 +49,7 @@ Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the pag
 | Endpoint | Notes |
 |---|---|
 | `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. Accepts `?term=spring\|summer` (default `spring`). |
-| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort=pinyin`, `lang`, `page` (≥1), `page_size` (1–200, default 50). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. |
+| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 50). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. |
 | `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string — the prefix alone determines which DB to read, so **no `?term=` needed**. Accepts `?lang=`. |
 
 `lang` accepts `zh` (default — no translation lookup) or one of `en, ja, ko, fr, de, es, ru` (swaps fields from the relevant DB's `translations` table — see i18n section below).
@@ -59,7 +59,7 @@ Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the pag
 ```bash
 python3 数据库构建脚本/build_undergrad_db.py     # 课程数据/北大本科*_25-26第2学期.json → 数据库/2026春季学期本科生课程.db (~2465 courses)
 python3 数据库构建脚本/build_graduate_db.py      # 课程数据/北大研究生课程_25-26第2学期.json → 数据库/2026春季学期研究生课程.db (~1379 courses)
-python3 北京大学选课网数据抓取/build_summer_db.py # 课程数据/北大暑期课程_25-26第3学期.json   → 数据库/2026暑期本科生课程.db (~114 courses)
+python3 北京大学选课网数据抓取/build_summer_db.py # 课程数据/北大暑期课程_25-26第3学期.json   → 数据库/2026暑期本科生课程.db (~194 courses)
 ```
 
 `build_common.py` (in `数据库构建脚本/`) holds shared parsing. The summer build script imports it via `sys.path` injection — there is only one copy of `build_common.py`, do not duplicate. **Rebuilding wipes the `translations` table** — back up the DBs before running, or re-run translation scripts after.
@@ -124,8 +124,8 @@ onclick="showDetail(${course.id})"     // BROKEN — JS parses u123 as a variabl
 
 ### i18n is hybrid (two stores)
 
-1. **Finite dictionaries in `index.html`** (`dataI18n` near line 1423): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
-2. **Per-row `translations` table in each DB** (UG + GR): for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/`.
+1. **Finite dictionaries in `index.html`** (`dataI18n` near line 1493): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
+2. **Per-row `translations` table in each DB** (UG + GR + Summer): for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/` (summer was filled to 100% across 10 fields × 7 langs ≈ 10010 rows in May 2026).
 
 Both endpoints accept `?lang=xx`; when `lang != 'zh'`, the backend swaps Chinese values for translations from the table. The list endpoint translates only card-visible fields (`course_name`, `classroom`, `notes`) to keep the query small; the detail endpoint translates everything in `TRANSLATABLE_FIELDS`.
 
@@ -134,6 +134,12 @@ On the frontend, `setLang()` re-fetches the list AND any open modal so visible c
 ### Schedule parsing is fragile
 
 Schedule strings look like `1~15周 每周周一10~11节 二教5111~15周 每周周四10~11节 二教511` — slot delimiters are missing and room numbers can merge into the next week range. `build_common.parse_schedule` handles it via regex with a 3-digit cap on room numbers; the JS `trSchedule()` localises the cleaned form. Don't naively split on whitespace.
+
+`build_common.parse_first_period` extracts the smallest `节` start across all slots of one course and stores it in `basic_info.first_period`. The `time_asc` sort uses it via `(first_period IS NULL), first_period, course_name COLLATE NOCASE` so blanks land at the bottom. If you rebuild a DB, the column is populated by the build scripts; if you change `parse_first_period` logic later, run a one-off `UPDATE basic_info SET first_period = ...` rather than wiping the DB (which would drop `translations`).
+
+### sort=random uses a seeded deterministic shuffle
+
+The frontend re-rolls `randomSeed` whenever the user clicks 随机 and includes it in every subsequent `/api/courses` call so pagination stays stable. The backend builds `((CAST(SUBSTR(t.id, 2) AS INTEGER) * mul + level_offset + add) % 999983)` where `mul/add` are derived from the seed via two large primes and `level_offset` differs per `u/g/s` prefix to avoid hash collisions between e.g. `u123` and `g123`. Don't replace this with `ORDER BY RANDOM()` — that breaks pagination because each request gets a fresh order.
 
 ### 归档/ folder
 

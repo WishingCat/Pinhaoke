@@ -1071,10 +1071,6 @@ var _hmt = _hmt || [];
       <span id="githubText">给项目点个 Star<br>欢迎反馈意见<br><span class="designer">Design By 祈愿的猫</span></span>
     </a>
     <div class="top-controls">
-      <a class="sponsor-link" href="https://github.com/WishingCat/Pinhaoke#%E5%A6%82%E6%9E%9C%E6%9C%89%E8%83%BD%E5%8A%9B%E7%9A%84%E8%AF%9D%E6%AC%A2%E8%BF%8E%E8%B5%9E%E5%8A%A9-%E5%BC%A5%E8%A1%A5%E7%BD%91%E7%AB%99%E7%9A%84%E8%BF%90%E8%A1%8C%E8%B4%B9%E7%94%A8" target="_blank" rel="noopener">
-        <span class="sponsor-icon">&#x1F496;</span>
-        <span>赞助支持</span>
-      </a>
       <div class="font-selector" id="langSelector">
         <button class="top-btn" onclick="toggleLangDropdown()">
           <span class="icon">&#x1F310;</span>
@@ -1172,7 +1168,7 @@ var _hmt = _hmt || [];
   <!-- Footer -->
   <div class="site-footer">
     <div class="footer-info">
-      <div class="footer-item"><strong>项目维护</strong> <span class="footer-names">祈愿的猫</span></div>
+      <div class="footer-item"><strong>鸣谢</strong> <span class="footer-names">北京大学爱心社 北京大学爱心社手语分社</span></div>
     </div>
     <div class="footer-msg">欢迎大家把网站分享给其他好朋友们！会一直更新下去为大家服务的~</div>
   </div>
@@ -1706,7 +1702,10 @@ function setLang(key) {
   closeLangDropdown();
   applyI18n();
   if (cachedFilters) populateFilters(cachedFilters);
-  rerenderCards();
+  // course_name / classroom / notes are translated server-side per ?lang=,
+  // so a stale `currentCourses` list still carries the old language's text.
+  // Re-fetch from page 1 instead of just re-rendering the cache.
+  applyFilters();
   // Re-fetch modal if open so intro/extra_notes update in new lang
   if (currentModalCourseId) showDetail(currentModalCourseId);
 }
@@ -1747,7 +1746,7 @@ function applyI18n() {
 let currentCourses = [];
 let totalCount = 0;
 let currentPage = 1;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 let fetchController = null;
 
 /* ===== Initialization ===== */
