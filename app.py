@@ -237,23 +237,34 @@ def get_filters(term: str = Query("spring", description="spring | summer")):
 # ---- list ---------------------------------------------------------------------
 
 
+def _like(s: str) -> str:
+    """Escape LIKE wildcards so `100%` searches literal '%', not "any chars"."""
+    return "%" + s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
 def _build_where(
     q: str, type_: str, category: str, credits_: str,
-    department: str, weekday: str, grading: str,
+    department: str, weekday: str, grading: str, classroom: str,
 ):
     """Build (where_clause, params) used inside the inner subquery alias `t`."""
     conds = []
     params = []
     if q:
-        # Escape LIKE wildcards so `100%` searches literal '%', not "any chars".
-        q_esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        like = f"%{q_esc}%"
+        like = _like(q)
         conds.append(
             "(t.course_name LIKE ? ESCAPE '\\' "
             "OR t.teacher LIKE ? ESCAPE '\\' "
-            "OR t.classroom LIKE ? ESCAPE '\\')"
+            "OR t.classroom LIKE ? ESCAPE '\\' "
+            "OR t.course_code LIKE ? ESCAPE '\\' "
+            "OR t.english_name LIKE ? ESCAPE '\\')"
         )
-        params.extend([like, like, like])
+        params.extend([like] * 5)
+    if classroom:
+        # Dedicated classroom filter: matches ONLY the classroom column, so it
+        # composes with q (the old frontend joined both into one q string,
+        # which produced a single "%q classroom%" LIKE that matched nothing).
+        conds.append("t.classroom LIKE ? ESCAPE '\\'")
+        params.append(_like(classroom))
     if type_:
         conds.append("t.course_type = ?")
         params.append(type_)
@@ -282,13 +293,14 @@ def _build_where(
 
 @app.get("/api/courses")
 def list_courses(
-    q: str = Query("", description="Search query"),
+    q: str = Query("", description="Search query (course name / teacher / classroom / course code / english name)"),
     type: str = Query("", description="Course type filter"),
     category: str = Query("", description="Category filter"),
     credits: str = Query("", description="Credits filter"),
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
+    classroom: str = Query("", description="Classroom filter (LIKE, classroom column only)"),
     sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
     random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
     lang: str = Query("zh", description="Display language"),
@@ -299,7 +311,7 @@ def list_courses(
     if term not in TERM_UNION_SQL:
         raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
 
-    where, params = _build_where(q, type, category, credits, department, weekday, grading)
+    where, params = _build_where(q, type, category, credits, department, weekday, grading, classroom)
 
     if sort == "random":
         # Deterministic shuffle: same seed → stable order across pagination.

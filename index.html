@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>北大课程搜索 | PKU Course Search</title>
+<meta name="description" content="拼好课 — 北京大学课程搜索：本科生 / 研究生 / 暑期课程，支持多语言、筛选与链接分享。PKU Course Search.">
+<meta name="theme-color" content="#F7F7F8">
+<script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,74 +16,125 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <style>
 /* ============================================================
-   PINHAOKE  ·  CLEAN MODERN
-   white surface · sharp ink · color-coded type strips
+   PINHAOKE  ·  V3
+   sticky topbar · light/dark themes · card grid · type strips
    ============================================================ */
 
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-button { font: inherit; cursor: pointer; }
+button { font: inherit; cursor: pointer; color: inherit; background: none; border: none; }
 input { font: inherit; }
+ul, ol { list-style: none; }
+h1, h2, h3 { font-weight: inherit; font-size: inherit; }
+.hidden { display: none !important; }
 
 /* ===== Tokens ===== */
 :root {
   /* surfaces */
-  --bg:           #FAFAFA;
+  --bg:           #F7F7F8;
   --surface:      #FFFFFF;
-  --surface-2:    #F5F5F5;
+  --surface-2:    #F1F2F4;
+  --topbar-bg:    rgba(255, 255, 255, 0.85);
 
   /* ink scale */
-  --ink:          #0A0A0A;
-  --ink-2:        #404040;
-  --ink-3:        #737373;
-  --ink-4:        #A3A3A3;
+  --ink:          #101217;
+  --ink-2:        #3F444D;
+  --ink-3:        #6F747E;
+  --ink-4:        #A4A9B2;
 
   /* borders */
-  --border:       #E5E5E5;
-  --border-2:     #D4D4D4;
-  --border-soft:  #F1F1F1;
+  --border:       #E4E6EA;
+  --border-2:     #CFD3D9;
+  --border-soft:  #EFF0F2;
 
   /* single bold accent */
-  --accent:       #1E40AF;
-  --accent-deep:  #1E3A8A;
-  --accent-soft:  #DBEAFE;
-  --accent-mist:  #EFF6FF;
+  --accent:       #2453D6;
+  --accent-deep:  #1D45B8;
+  --accent-soft:  #D9E4FB;
+  --accent-mist:  #EDF3FD;
 
   /* course-type colors (left strip + badge) */
   --c-elective:        #4F46E5;
   --c-elective-soft:   #EEF2FF;
-  --c-elective-border: rgba(79, 70, 229, 0.20);
+  --c-elective-border: rgba(79, 70, 229, 0.22);
 
   --c-general:         #059669;
   --c-general-soft:    #ECFDF5;
-  --c-general-border:  rgba(5, 150, 105, 0.22);
+  --c-general-border:  rgba(5, 150, 105, 0.24);
 
   --c-major:           #D97706;
   --c-major-soft:      #FFFBEB;
-  --c-major-border:    rgba(217, 119, 6, 0.25);
+  --c-major-border:    rgba(217, 119, 6, 0.28);
 
   --c-grad:            #E11D48;
   --c-grad-soft:       #FFF1F2;
-  --c-grad-border:     rgba(225, 29, 72, 0.22);
+  --c-grad-border:     rgba(225, 29, 72, 0.24);
 
   /* radii / shadows */
   --r-xs: 4px;
-  --r-sm: 6px;
+  --r-sm: 7px;
   --r:    10px;
   --r-lg: 14px;
 
-  --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
-  --shadow-sm: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
-  --shadow:    0 4px 12px rgba(10, 10, 10, 0.06), 0 2px 4px rgba(10, 10, 10, 0.04);
-  --shadow-lg: 0 12px 28px rgba(10, 10, 10, 0.10), 0 4px 8px rgba(10, 10, 10, 0.06);
-  --shadow-xl: 0 24px 48px rgba(10, 10, 10, 0.16);
+  --shadow-xs: 0 1px 2px rgba(16, 18, 23, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 18, 23, 0.06), 0 1px 2px rgba(16, 18, 23, 0.04);
+  --shadow:    0 4px 14px rgba(16, 18, 23, 0.07), 0 2px 4px rgba(16, 18, 23, 0.04);
+  --shadow-lg: 0 12px 28px rgba(16, 18, 23, 0.11), 0 4px 8px rgba(16, 18, 23, 0.06);
+  --shadow-xl: 0 24px 48px rgba(16, 18, 23, 0.18);
 
   /* fonts */
   --f-sans: 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  color-scheme: light;
 }
 
-html { background: var(--bg); }
+html[data-theme="dark"] {
+  --bg:           #0E1013;
+  --surface:      #16181D;
+  --surface-2:    #1D2026;
+  --topbar-bg:    rgba(22, 24, 29, 0.85);
+
+  --ink:          #F0F1F4;
+  --ink-2:        #C3C7CE;
+  --ink-3:        #8B909A;
+  --ink-4:        #5B606A;
+
+  --border:       #272B32;
+  --border-2:     #363B44;
+  --border-soft:  #20242A;
+
+  --accent:       #7396F2;
+  --accent-deep:  #8FACF6;
+  --accent-soft:  rgba(90, 130, 240, 0.28);
+  --accent-mist:  rgba(90, 130, 240, 0.14);
+
+  --c-elective:        #9299FF;
+  --c-elective-soft:   rgba(99, 102, 241, 0.16);
+  --c-elective-border: rgba(146, 153, 255, 0.32);
+
+  --c-general:         #34D399;
+  --c-general-soft:    rgba(16, 185, 129, 0.14);
+  --c-general-border:  rgba(52, 211, 153, 0.32);
+
+  --c-major:           #FBBF24;
+  --c-major-soft:      rgba(217, 119, 6, 0.15);
+  --c-major-border:    rgba(251, 191, 36, 0.32);
+
+  --c-grad:            #FB7185;
+  --c-grad-soft:       rgba(225, 29, 72, 0.16);
+  --c-grad-border:     rgba(251, 113, 133, 0.32);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow:    0 4px 14px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+html { background: var(--bg); scroll-behavior: smooth; }
 
 body {
   font-family: var(--f-sans);
@@ -101,141 +155,120 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border-2); border: 2px solid var(--bg); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
+  html { scroll-behavior: auto; }
+}
+
 /* ===== Container ===== */
 .container {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 28px 28px 80px;
+  padding: 0 28px 80px;
   position: relative;
 }
 
 /* ============================================================
-   HEADER
+   TOPBAR
    ============================================================ */
 
-.header {
-  text-align: center;
-  padding: 64px 20px 40px;
-  position: relative;
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  background: var(--topbar-bg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
 }
 
-.header h1 {
-  font-family: var(--f-sans);
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: -0.015em;
-  line-height: 1.1;
-  background: none;
-  -webkit-text-fill-color: initial;
-}
-
-.header .subtitle {
-  font-size: 0.95rem;
-  color: var(--ink-3);
-  margin-top: 14px;
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-/* Term toggle (春季 / 暑期) — segmented control under subtitle */
-.term-toggle {
-  display: inline-flex;
-  margin-top: 18px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 4px;
-  gap: 2px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-}
-.term-toggle button {
-  border: none;
-  background: transparent;
-  padding: 7px 18px;
-  border-radius: 999px;
-  font-size: 0.88rem;
-  color: var(--ink-3);
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-.term-toggle button:hover { color: var(--ink); }
-.term-toggle button.active {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(30,64,175,0.25);
-}
-@media (max-width: 640px) {
-  .term-toggle { margin-top: 14px; }
-  .term-toggle button { padding: 6px 14px; font-size: 0.82rem; }
-}
-
-/* github link upper-left */
-.github-star {
-  position: absolute;
-  top: 24px; left: 0;
+.topbar-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 28px;
+  height: 58px;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand {
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: var(--ink-3);
-  font-size: 0.74rem;
-  line-height: 1.5;
-  font-family: var(--f-sans);
-  transition: color 0.2s ease;
 }
 
-.github-star:hover { color: var(--ink); }
-
-.github-star svg {
-  flex-shrink: 0;
-  width: 22px; height: 22px;
-  fill: var(--ink-3);
-  transition: fill 0.2s ease;
+.brand-mark {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent) 0%, #7C5CFC 100%);
+  color: #FFFFFF;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: 0 2px 6px rgba(36, 83, 214, 0.35);
 }
 
-.github-star:hover svg { fill: var(--ink); }
+.brand-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
 
-.github-star .designer { color: var(--accent); font-weight: 500; }
-
-/* upper-right controls */
-.top-controls {
-  position: absolute;
-  top: 24px; right: 0;
+.topbar-actions {
   display: flex;
-  gap: 8px;
   align-items: center;
-  z-index: 50;
+  gap: 8px;
 }
 
 .top-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 7px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-xs);
   text-decoration: none;
   color: var(--ink-2);
-  font-size: 0.78rem;
-  font-family: var(--f-sans);
+  font-size: 0.8rem;
   font-weight: 500;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
   user-select: none;
 }
 
-.top-btn:hover {
-  border-color: var(--ink-3);
-  background: var(--bg);
-  color: var(--ink);
+.top-btn:hover { border-color: var(--ink-3); background: var(--bg); color: var(--ink); }
+.top-btn:active { transform: scale(0.97); }
+.top-btn svg { width: 15px; height: 15px; }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.top-btn:active { transform: scale(0.97); }
-.top-btn .icon { font-size: 0.86rem; }
+.icon-btn:hover { border-color: var(--ink-3); background: var(--bg); color: var(--ink); }
+.icon-btn:active { transform: scale(0.95); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* theme toggle: show sun in dark mode, moon in light mode */
+html[data-theme="dark"] .theme-icon-moon { display: none; }
+html:not([data-theme="dark"]) .theme-icon-sun { display: none; }
 
 /* lang dropdown */
 .font-selector { position: relative; }
@@ -245,13 +278,13 @@ body {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 180px;
+  min-width: 170px;
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
+  z-index: 600;
   animation: pop-in 0.15s ease;
 }
 
@@ -266,14 +299,11 @@ body {
   display: block;
   width: 100%;
   padding: 8px 12px;
-  border: none;
-  background: none;
   text-align: left;
   font-size: 0.85rem;
   color: var(--ink-2);
-  font-family: var(--f-sans);
   border-radius: var(--r-sm);
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .font-option:hover { background: var(--bg); color: var(--ink); }
@@ -284,14 +314,66 @@ body {
   font-weight: 600;
 }
 
-.font-option .font-name { display: block; }
-.font-option .font-desc { font-size: 0.72rem; color: var(--ink-4); margin-top: 1px; }
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.hero {
+  text-align: center;
+  padding: 52px 16px 8px;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.1rem);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.hero .subtitle {
+  font-size: 0.95rem;
+  color: var(--ink-3);
+  margin-top: 12px;
+}
+
+/* Term toggle (春季 / 暑期) — segmented control */
+.term-toggle {
+  display: inline-flex;
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px;
+  gap: 2px;
+  box-shadow: var(--shadow-xs);
+}
+
+.term-toggle button {
+  padding: 7px 18px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  color: var(--ink-3);
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.term-toggle button:hover { color: var(--ink); }
+
+.term-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(36, 83, 214, 0.3);
+}
+
+html[data-theme="dark"] .term-toggle button.active { color: #0E1013; }
 
 /* ============================================================
    SEARCH
    ============================================================ */
 
-.search-section { margin: 28px 0 20px; }
+.search-section { margin: 26px 0 18px; }
 
 .search-box {
   display: flex;
@@ -311,8 +393,8 @@ body {
 }
 
 .search-box .search-icon {
+  width: 18px; height: 18px;
   color: var(--ink-4);
-  font-size: 1rem;
   flex-shrink: 0;
 }
 
@@ -323,20 +405,65 @@ body {
   background: transparent;
   font-size: 1rem;
   color: var(--ink);
-  font-family: var(--f-sans);
+  min-width: 0;
 }
 
 .search-box input::placeholder { color: var(--ink-4); }
+
+.search-clear {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  font-size: 1rem;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-clear:hover { background: var(--border); color: var(--ink); }
 
 /* ============================================================
    FILTERS
    ============================================================ */
 
+.filters-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 9px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.filters-toggle svg { width: 15px; height: 15px; }
+
+.filters-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+html[data-theme="dark"] .filters-badge { color: #0E1013; }
+
 .filters {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
   padding: 20px 22px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -344,28 +471,30 @@ body {
   box-shadow: var(--shadow-xs);
 }
 
-.filter-row {
+.filter-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  width: 100%;
 }
 
-@media (max-width: 860px) { .filter-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .filter-row { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+@media (max-width: 900px) { .filter-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) {
+  .filters-toggle { display: inline-flex; }
+  .filters { display: none; }
+  .filters.open { display: block; }
+  .filter-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+@media (max-width: 400px) { .filter-grid { grid-template-columns: 1fr; } }
 
 .filter-group { position: relative; }
 
 .filter-group label {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  color: var(--ink-2);
+  color: var(--ink-3);
   margin-bottom: 6px;
   padding-left: 2px;
-  text-transform: none;
-  letter-spacing: 0;
-  font-family: var(--f-sans);
 }
 
 .filter-group input,
@@ -379,7 +508,7 @@ body {
   font-size: 0.9rem;
   color: var(--ink);
   font-family: var(--f-sans);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .filter-group input:hover,
@@ -396,7 +525,7 @@ body {
 
 .filter-group input::placeholder { color: var(--ink-4); }
 
-/* custom select */
+/* ===== custom select ===== */
 .custom-select { position: relative; }
 
 .custom-select-trigger {
@@ -405,7 +534,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 34px;
+  padding-right: 32px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
@@ -415,7 +544,6 @@ body {
   border-color: var(--accent);
   background-color: var(--surface);
   box-shadow: 0 0 0 3px var(--accent-mist);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231E40AF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 .custom-select-dropdown {
@@ -423,9 +551,7 @@ body {
   position: absolute;
   top: calc(100% + 4px);
   left: 0; right: 0;
-  max-height: 280px;
-  overflow-y: auto;
-  z-index: 200;
+  z-index: 300;
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -436,17 +562,37 @@ body {
 
 .custom-select.open .custom-select-dropdown { display: block; }
 
+.cs-search-wrap {
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+}
+
+.cs-search {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  outline: none;
+  background: var(--bg);
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+
+.cs-search:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-mist); }
+
+.cs-options { max-height: 250px; overflow-y: auto; }
+
 .custom-select-option {
   padding: 8px 12px;
   font-size: 0.86rem;
   color: var(--ink-2);
-  font-family: var(--f-sans);
   cursor: pointer;
   border-radius: var(--r-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .custom-select-option:hover { background: var(--bg); color: var(--ink); }
@@ -457,23 +603,88 @@ body {
   font-weight: 600;
 }
 
+/* compact variant (sort control in toolbar) */
+.cs-compact { min-width: 150px; }
+.cs-compact .custom-select-trigger { padding: 7px 30px 7px 12px; font-size: 0.84rem; background-color: var(--surface); }
+.cs-compact .custom-select-dropdown { left: auto; right: 0; min-width: 170px; }
+
 /* ============================================================
-   RESULTS META
+   ACTIVE FILTER CHIPS
    ============================================================ */
 
-.results-info {
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.chips:empty { display: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px 5px 12px;
+  background: var(--accent-mist);
+  border: 1px solid var(--accent-soft);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--accent);
+  max-width: 100%;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.chip:hover { border-color: var(--accent); }
+
+.chip .chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip .chip-x {
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.65;
+}
+
+.chip:hover .chip-x { opacity: 1; }
+
+/* ============================================================
+   RESULTS TOOLBAR
+   ============================================================ */
+
+.results-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
   padding: 0 2px;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .results-count {
   font-size: 0.9rem;
   color: var(--ink-3);
 }
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.sort-label {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) { .sort-label { display: none; } }
 
 .clear-btn {
   padding: 7px 14px;
@@ -482,106 +693,112 @@ body {
   background: var(--surface);
   font-size: 0.8rem;
   color: var(--ink-2);
-  font-family: var(--f-sans);
   font-weight: 500;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
-.clear-btn:hover {
-  border-color: var(--ink-3);
-  color: var(--ink);
-  background: var(--bg);
-}
-
+.clear-btn:hover { border-color: var(--ink-3); color: var(--ink); background: var(--bg); }
 .clear-btn:active { transform: scale(0.97); }
 
 /* ============================================================
-   COURSE CARDS  ·  Type-coded left strip
+   COURSE CARDS  ·  responsive grid + type-coded left strip
    ============================================================ */
 
 .results {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr));
+  gap: 14px;
+  align-items: stretch;
 }
 
 .course-card {
   position: relative;
-  padding: 20px 24px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 18px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-xs);
   overflow: hidden;
+  cursor: pointer;
   transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
-  animation: card-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation: card-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
-/* left color strip — neutral default */
+/* left color strip, keyed off data-strip set in JS */
 .course-card::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 4px;
   background: var(--ink-4);
-  transition: background 0.2s ease;
 }
 
-/* type-specific strip via :has() (modern browsers; falls back to neutral gray) */
-.course-card:has(.badge-elective)::before { background: var(--c-elective); }
-.course-card:has(.badge-general)::before  { background: var(--c-general); }
-.course-card:has(.badge-major)::before    { background: var(--c-major); }
-.course-card:has(.badge-grad)::before     { background: var(--c-grad); }
+.course-card[data-strip="elective"]::before { background: var(--c-elective); }
+.course-card[data-strip="general"]::before  { background: var(--c-general); }
+.course-card[data-strip="major"]::before    { background: var(--c-major); }
+.course-card[data-strip="grad"]::before     { background: var(--c-grad); }
 
 .course-card:hover {
   border-color: var(--border-2);
   box-shadow: var(--shadow);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
-/* staggered entrance */
+.course-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-mist), var(--shadow);
+}
+
 .course-card:nth-child(1) { animation-delay: 0.02s; }
 .course-card:nth-child(2) { animation-delay: 0.05s; }
 .course-card:nth-child(3) { animation-delay: 0.08s; }
 .course-card:nth-child(4) { animation-delay: 0.11s; }
 .course-card:nth-child(5) { animation-delay: 0.14s; }
 .course-card:nth-child(6) { animation-delay: 0.17s; }
-.course-card:nth-child(7) { animation-delay: 0.20s; }
-.course-card:nth-child(8) { animation-delay: 0.23s; }
-.course-card:nth-child(n+9) { animation-delay: 0.26s; }
+.course-card:nth-child(n+7) { animation-delay: 0.2s; }
 
 @keyframes card-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.card-header {
+.card-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 12px;
+  gap: 12px;
 }
 
+.card-title-wrap { flex: 1; min-width: 0; }
+
 .course-name {
-  font-family: var(--f-sans);
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   font-weight: 600;
   color: var(--ink);
   line-height: 1.4;
   letter-spacing: -0.005em;
-  flex: 1;
+}
+
+.card-code {
+  margin-top: 3px;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
 }
 
 .card-badges {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
 }
 
-/* Solid colored badges — clear, scannable */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -590,35 +807,15 @@ body {
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 600;
-  font-family: var(--f-sans);
   letter-spacing: 0.01em;
   white-space: nowrap;
   line-height: 1.45;
 }
 
-.badge-elective {
-  color: var(--c-elective);
-  background: var(--c-elective-soft);
-  border-color: var(--c-elective-border);
-}
-
-.badge-general {
-  color: var(--c-general);
-  background: var(--c-general-soft);
-  border-color: var(--c-general-border);
-}
-
-.badge-major {
-  color: var(--c-major);
-  background: var(--c-major-soft);
-  border-color: var(--c-major-border);
-}
-
-.badge-grad {
-  color: var(--c-grad);
-  background: var(--c-grad-soft);
-  border-color: var(--c-grad-border);
-}
+.badge-elective { color: var(--c-elective); background: var(--c-elective-soft); border-color: var(--c-elective-border); }
+.badge-general  { color: var(--c-general);  background: var(--c-general-soft);  border-color: var(--c-general-border); }
+.badge-major    { color: var(--c-major);    background: var(--c-major-soft);    border-color: var(--c-major-border); }
+.badge-grad     { color: var(--c-grad);     background: var(--c-grad-soft);     border-color: var(--c-grad-border); }
 
 .badge-category {
   color: var(--ink-2);
@@ -628,95 +825,86 @@ body {
 }
 
 .badge-credits {
+  flex-shrink: 0;
   color: var(--ink);
-  background: var(--surface);
+  background: var(--surface-2);
   border-color: var(--border);
   font-family: var(--f-mono);
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  padding: 3px 8px;
+  padding: 3px 9px;
 }
 
-/* details */
-.card-details {
+.card-meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 6px 24px;
-  margin-top: 2px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 6px 20px;
 }
 
-.detail-item {
+.card-meta li {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 0.9rem;
-  font-family: var(--f-sans);
+  font-size: 0.87rem;
   color: var(--ink-2);
-  line-height: 1.6;
+  line-height: 1.55;
+  min-width: 0;
 }
 
-.detail-label {
-  color: var(--ink-3);
-  white-space: nowrap;
+.card-meta li svg {
+  width: 14px; height: 14px;
   flex-shrink: 0;
-  font-size: 0.8rem;
-  min-width: 3.5em;
+  color: var(--ink-4);
+  transform: translateY(2px);
 }
 
-.detail-value {
-  color: var(--ink);
-  white-space: pre-line;
-}
+.card-meta li span { white-space: pre-line; }
 
-.detail-value.notes {
-  color: var(--ink-3);
-  font-size: 0.84rem;
-}
-
-/* card footer — solid primary button */
-.card-footer {
-  margin-top: 14px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-}
-
-.detail-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 20px;
-  border: 1px solid var(--ink);
-  border-radius: var(--r-sm);
-  background: var(--ink);
-  font-family: var(--f-sans);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #FFFFFF;
-  cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: all 0.2s ease;
-  letter-spacing: 0.01em;
-}
-
-.detail-btn::after {
-  content: '→';
-  display: inline-block;
+.card-arrow {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 0.78rem;
   font-weight: 500;
-  transition: transform 0.2s ease;
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
 }
 
-.detail-btn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.30);
-  transform: translateY(-1px);
+.course-card:hover .card-arrow,
+.course-card:focus-visible .card-arrow { opacity: 1; transform: translateX(0); }
+
+@media (hover: none) { .card-arrow { opacity: 0.8; transform: none; } }
+
+/* ============================================================
+   SKELETON LOADING
+   ============================================================ */
+
+.skel-card {
+  padding: 18px 20px 18px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.detail-btn:hover::after { transform: translateX(3px); }
-.detail-btn:active { transform: translateY(0); box-shadow: var(--shadow-xs); }
+.skel-line {
+  height: 13px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border-soft) 50%, var(--surface-2) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
 
 /* ============================================================
    MODAL
@@ -726,7 +914,7 @@ body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(10, 10, 10, 0.55);
+  background: rgba(8, 9, 12, 0.6);
   z-index: 1000;
   justify-content: center;
   align-items: center;
@@ -740,14 +928,13 @@ body {
 
 .modal-content {
   width: 100%;
-  max-width: 760px;
-  max-height: 86vh;
+  max-width: 780px;
+  max-height: 88vh;
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-xl);
-  padding: 32px 36px;
   position: relative;
   animation: modal-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -757,22 +944,51 @@ body {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.modal-header {
+.modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
-  gap: 16px;
+  gap: 14px;
+  padding: 22px 28px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .modal-title {
-  font-family: var(--f-sans);
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.35;
   letter-spacing: -0.01em;
 }
+
+.modal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.modal-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.modal-action:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-mist); }
+.modal-action svg { width: 14px; height: 14px; }
 
 .modal-close {
   flex-shrink: 0;
@@ -782,40 +998,35 @@ body {
   background: var(--surface);
   color: var(--ink-3);
   font-size: 1.15rem;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
-.modal-close:hover {
-  border-color: var(--ink);
-  color: var(--ink);
-  background: var(--bg);
-}
+.modal-close:hover { border-color: var(--ink); color: var(--ink); background: var(--bg); }
+
+.modal-body { padding: 18px 28px 30px; }
 
 .modal-badges {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
   border-bottom: 1px solid var(--border-soft);
 }
 
 .modal-section { margin-bottom: 24px; }
+.modal-section:last-child { margin-bottom: 0; }
 
 .modal-section-title {
-  font-family: var(--f-sans);
   font-size: 0.74rem;
   font-weight: 700;
   color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 12px;
-  padding-bottom: 0;
-  border-bottom: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -835,23 +1046,15 @@ body {
   gap: 12px 28px;
 }
 
-.modal-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.modal-field { display: flex; flex-direction: column; gap: 2px; }
 
 .modal-field-label {
-  font-family: var(--f-sans);
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--ink-3);
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .modal-field-value {
-  font-family: var(--f-sans);
   font-size: 0.94rem;
   color: var(--ink);
   white-space: pre-line;
@@ -874,39 +1077,35 @@ body {
   background: var(--bg);
   border: 1px solid var(--border-soft);
   border-radius: var(--r-sm);
-  font-family: var(--f-sans);
   font-size: 0.9rem;
   line-height: 1.75;
   color: var(--ink-2);
   margin-top: 4px;
-  letter-spacing: 0;
 }
 
 .modal-loading {
   text-align: center;
   padding: 60px 20px;
   color: var(--ink-3);
-  font-family: var(--f-sans);
   font-size: 0.92rem;
 }
 
 /* ============================================================
-   LOAD MORE
+   LOAD MORE / STATES
    ============================================================ */
 
 .load-more {
   display: block;
-  margin: 32px auto 0;
+  margin: 28px auto 0;
   padding: 11px 36px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface);
   box-shadow: var(--shadow-xs);
-  font-family: var(--f-sans);
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--ink-2);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .load-more:hover {
@@ -918,32 +1117,24 @@ body {
 
 .load-more:active { transform: scale(0.98); }
 
-/* ============================================================
-   STATES
-   ============================================================ */
+#scrollSentinel { height: 1px; }
 
 .state-msg {
+  grid-column: 1 / -1;
   text-align: center;
-  padding: 80px 20px;
+  padding: 72px 20px;
   color: var(--ink-3);
-  font-family: var(--f-sans);
   font-size: 0.95rem;
-  letter-spacing: 0;
-}
-
-.state-msg .icon {
-  font-size: 2rem;
-  margin-bottom: 12px;
-  display: block;
-  opacity: 0.5;
-}
-
-.loading-overlay-inline {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
+  gap: 14px;
+}
+
+.state-msg svg {
+  width: 34px; height: 34px;
+  color: var(--ink-4);
+  opacity: 0.7;
 }
 
 .spinner {
@@ -952,18 +1143,37 @@ body {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  margin-bottom: 16px;
+  margin: 0 auto 16px;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.loading-overlay-inline .loading-label {
-  color: var(--ink-3);
-  font-size: 0.9rem;
-  font-family: var(--f-sans);
-  font-style: normal;
-  letter-spacing: 0;
+/* ============================================================
+   BACK TO TOP
+   ============================================================ */
+
+.back-top {
+  position: fixed;
+  right: 22px;
+  bottom: 26px;
+  z-index: 400;
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.2s ease, color 0.2s ease;
 }
+
+.back-top.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.back-top:hover { border-color: var(--accent); color: var(--accent); }
+.back-top svg { width: 18px; height: 18px; }
 
 /* ============================================================
    FOOTER
@@ -972,10 +1182,7 @@ body {
 .site-footer {
   margin-top: 64px;
   padding: 32px 0 8px;
-  background: transparent;
-  border: none;
   border-top: 1px solid var(--border);
-  box-shadow: none;
   text-align: center;
 }
 
@@ -983,15 +1190,13 @@ body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 32px;
+  gap: 12px 32px;
   margin-bottom: 14px;
 }
 
 .footer-item {
   font-size: 0.85rem;
   color: var(--ink-3);
-  font-family: var(--f-sans);
-  letter-spacing: 0;
 }
 
 .footer-item strong {
@@ -1000,23 +1205,23 @@ body {
   color: var(--ink-3);
   font-weight: 500;
   font-size: 0.8rem;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
-.footer-names {
-  color: var(--ink);
-  font-weight: 500;
-  font-family: var(--f-sans);
+.footer-names { color: var(--ink); font-weight: 500; }
+
+.footer-link {
+  color: var(--ink-3);
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
+
+.footer-link:hover { color: var(--accent); }
+.footer-link .designer { color: var(--accent); font-weight: 500; }
 
 .footer-msg {
   font-size: 0.84rem;
   color: var(--ink-4);
   line-height: 1.8;
-  font-family: var(--f-sans);
-  font-style: normal;
-  letter-spacing: 0;
 }
 
 /* ============================================================
@@ -1024,25 +1229,31 @@ body {
    ============================================================ */
 
 @media (max-width: 640px) {
-  .container { padding: 20px 16px 60px; }
-  .header { padding: 100px 14px 32px; }
-  .header h1 { font-size: 2.2rem; }
-  .header .subtitle { font-size: 0.86rem; margin-top: 10px; }
-  .github-star { top: 14px; left: 0; font-size: 0.68rem; }
-  .github-star svg { width: 20px; height: 20px; }
-  .top-controls { top: 14px; right: 0; gap: 6px; }
-  .top-btn { padding: 6px 10px; font-size: 0.72rem; }
+  .container { padding: 0 16px 60px; }
+  .topbar-inner { padding: 0 16px; height: 52px; }
+  .brand-name { font-size: 0.98rem; }
+  .top-btn { padding: 6px 10px; font-size: 0.74rem; }
+  .icon-btn { width: 31px; height: 31px; }
+  .hero { padding: 36px 8px 4px; }
+  .hero h1 { font-size: 2.1rem; }
+  .hero .subtitle { font-size: 0.86rem; margin-top: 10px; }
+  .term-toggle { margin-top: 14px; }
+  .term-toggle button { padding: 6px 14px; font-size: 0.82rem; }
+  .search-section { margin: 20px 0 14px; }
   .search-box { padding: 12px 16px; }
-  .filters { padding: 16px 14px; gap: 14px; }
-  .course-card { padding: 16px 16px 16px 22px; }
-  .card-header { flex-direction: column; gap: 10px; }
-  .card-badges { gap: 6px; }
-  .card-details { grid-template-columns: 1fr; gap: 4px 0; }
-  .modal-content { padding: 24px 20px; }
-  .modal-title { font-size: 1.2rem; }
+  .filters { padding: 16px 14px; }
+  .course-card { padding: 16px 16px 16px 20px; }
+  .card-meta { grid-template-columns: 1fr; gap: 4px 0; }
+  .modal-overlay { padding: 12px; }
+  .modal-head { padding: 18px 18px 12px; }
+  .modal-body { padding: 14px 18px 24px; }
+  .modal-title { font-size: 1.18rem; }
   .modal-grid { grid-template-columns: 1fr; gap: 12px; }
-  .detail-btn { padding: 9px 18px; }
+  .modal-action span { display: none; }
+  .modal-action { padding: 7px 9px; }
+  .back-top { right: 14px; bottom: 18px; }
 }
+
 </style>
 <script>
 var _hmt = _hmt || [];
@@ -1056,31 +1267,44 @@ var _hmt = _hmt || [];
 </head>
 <body>
 
-<div class="container">
-  <!-- Header -->
-  <div class="header">
-    <a class="github-star" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      <span id="githubText">给项目点个 Star<br>欢迎反馈意见<br><span class="designer">Design By 祈愿的猫</span></span>
+<!-- Topbar -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">拼</span>
+      <span class="brand-name" id="brandName">拼好课</span>
     </a>
-    <div class="top-controls">
+    <div class="topbar-actions">
       <div class="font-selector" id="langSelector">
-        <button class="top-btn" onclick="toggleLangDropdown()">
-          <span class="icon">&#x1F310;</span>
+        <button class="top-btn" onclick="toggleLangDropdown()" aria-haspopup="listbox" aria-label="Language">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <span id="langLabel">中文</span>
         </button>
         <div class="font-dropdown" id="langDropdown">
-          <button class="font-option active" data-lang="zh" onclick="setLang('zh')"><span class="font-name">中文</span></button>
-          <button class="font-option" data-lang="en" onclick="setLang('en')"><span class="font-name">English</span></button>
-          <button class="font-option" data-lang="ja" onclick="setLang('ja')"><span class="font-name">日本語</span></button>
-          <button class="font-option" data-lang="ko" onclick="setLang('ko')"><span class="font-name">한국어</span></button>
-          <button class="font-option" data-lang="fr" onclick="setLang('fr')"><span class="font-name">Fran&ccedil;ais</span></button>
-          <button class="font-option" data-lang="de" onclick="setLang('de')"><span class="font-name">Deutsch</span></button>
-          <button class="font-option" data-lang="es" onclick="setLang('es')"><span class="font-name">Espa&ntilde;ol</span></button>
-          <button class="font-option" data-lang="ru" onclick="setLang('ru')"><span class="font-name">Русский</span></button>
+          <button class="font-option active" data-lang="zh" onclick="setLang('zh')">中文</button>
+          <button class="font-option" data-lang="en" onclick="setLang('en')">English</button>
+          <button class="font-option" data-lang="ja" onclick="setLang('ja')">日本語</button>
+          <button class="font-option" data-lang="ko" onclick="setLang('ko')">한국어</button>
+          <button class="font-option" data-lang="fr" onclick="setLang('fr')">Fran&ccedil;ais</button>
+          <button class="font-option" data-lang="de" onclick="setLang('de')">Deutsch</button>
+          <button class="font-option" data-lang="es" onclick="setLang('es')">Espa&ntilde;ol</button>
+          <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
         </div>
       </div>
+      <button class="icon-btn" onclick="toggleTheme()" aria-label="切换深色 / 浅色模式" title="Light / Dark">
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub — 给项目点个 Star">
+        <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
     </div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Hero -->
+  <div class="hero">
     <h1 id="title">拼好课</h1>
     <p class="subtitle" id="subtitle">北京大学2026春季学期课程搜索(每学期更新)</p>
     <div class="term-toggle" role="tablist" aria-label="学期切换">
@@ -1092,15 +1316,21 @@ var _hmt = _hmt || [];
   <!-- Search -->
   <div class="search-section">
     <div class="search-box">
-      <span class="search-icon">&#x1F50D;</span>
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="searchInput" placeholder="输入课程名、教师姓名或教室..." oninput="debouncedSearch()">
+      <button class="search-clear hidden" id="searchClear" onclick="clearSearch()" aria-label="清空搜索">&times;</button>
     </div>
   </div>
 
-  <!-- Filters -->
+  <!-- Filters (collapsible on mobile) -->
+  <button class="filters-toggle" id="filtersToggle" onclick="toggleFiltersPanel()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    <span id="filtersBtnText">筛选</span>
+    <span class="filters-badge hidden" id="filtersBadge"></span>
+  </button>
+
   <div class="filters" id="filtersContainer">
-    <!-- Row 1: 课程类型筛选 1, 课程类型筛选 2, 学分, 开课单位 -->
-    <div class="filter-row">
+    <div class="filter-grid">
       <div class="filter-group">
         <label id="labelCourseType">课程类型筛选 1</label>
         <div class="custom-select" id="csCourseType" data-filter="filterCourseType"></div>
@@ -1117,13 +1347,6 @@ var _hmt = _hmt || [];
         <label id="labelDepartment">开课单位</label>
         <div class="custom-select" id="csDepartment" data-filter="filterDepartment"></div>
       </div>
-    </div>
-    <!-- Row 2: 排序, 成绩记载方式, 上课时间, 教室 -->
-    <div class="filter-row">
-      <div class="filter-group">
-        <label id="labelSort">排序</label>
-        <div class="custom-select" id="csSort" data-filter="filterSort"></div>
-      </div>
       <div class="filter-group">
         <label id="labelGrading">成绩记载方式</label>
         <div class="custom-select" id="csGrading" data-filter="filterGrading"></div>
@@ -1139,37 +1362,46 @@ var _hmt = _hmt || [];
     </div>
   </div>
 
-  <!-- Results Info -->
-  <div class="results-info">
-    <span class="results-count" id="resultsCount"></span>
-    <button class="clear-btn" id="clearBtn" onclick="clearAll()">清除筛选</button>
-  </div>
+  <!-- Active filter chips -->
+  <div class="chips" id="activeChips"></div>
 
-  <!-- Results -->
-  <div class="results" id="resultsContainer">
-    <div class="loading-overlay-inline" id="loadingMsg">
-      <div class="spinner"></div>
-      <span class="loading-label" id="loadingText">正在加载课程数据...</span>
+  <!-- Results toolbar: count + sort + clear -->
+  <div class="results-toolbar">
+    <span class="results-count" id="resultsCount"></span>
+    <div class="toolbar-right">
+      <span class="sort-label" id="labelSort">排序</span>
+      <div class="custom-select cs-compact" id="csSort" data-filter="filterSort"></div>
+      <button class="clear-btn hidden" id="clearBtn" onclick="clearAll()">清除筛选</button>
     </div>
   </div>
 
-  <!-- Load More -->
+  <!-- Results -->
+  <div class="results" id="resultsContainer"></div>
+
+  <!-- Auto-load sentinel + fallback button -->
+  <div id="scrollSentinel"></div>
   <button class="load-more" id="loadMoreBtn" onclick="loadMore()" style="display:none;">
     <span id="loadMoreText">加载更多</span>
   </button>
 
   <!-- Footer -->
-  <div class="site-footer">
+  <footer class="site-footer">
     <div class="footer-info">
       <div class="footer-item"><strong>鸣谢</strong> <span class="footer-names">北京大学爱心社 北京大学爱心社手语分社</span></div>
+      <div class="footer-item"><a class="footer-link" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener">给项目点个 Star · 欢迎反馈意见 · <span class="designer">Design By 祈愿的猫</span></a></div>
     </div>
     <div class="footer-msg">欢迎大家把网站分享给其他好朋友们！会一直更新下去为大家服务的~</div>
-  </div>
+  </footer>
 </div>
+
+<!-- Back to top -->
+<button class="back-top" id="backTop" aria-label="回到顶部" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+</button>
 
 <!-- Detail Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal-content" id="modalContent"></div>
+  <div class="modal-content" id="modalContent" role="dialog" aria-modal="true"></div>
 </div>
 
 <script>
@@ -1189,6 +1421,7 @@ const i18n = {
     labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
+    filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
@@ -1226,6 +1459,7 @@ const i18n = {
     labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
+    filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
@@ -1263,6 +1497,7 @@ const i18n = {
     labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
+    filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
@@ -1300,6 +1535,7 @@ const i18n = {
     labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
+    filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
@@ -1337,6 +1573,7 @@ const i18n = {
     labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
+    filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9',
     loadingText: 'Chargement des donn\u00e9es...',
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
@@ -1374,6 +1611,7 @@ const i18n = {
     labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
+    filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
@@ -1411,6 +1649,7 @@ const i18n = {
     labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
+    filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
@@ -1448,6 +1687,7 @@ const i18n = {
     labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
+    filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
@@ -1690,6 +1930,7 @@ function trCourseName(course) {
   return course.course_name || '';
 }
 
+/* ===== Global state ===== */
 let currentLang = (function () {
   try {
     const stored = localStorage.getItem('pinhaoke_lang');
@@ -1698,9 +1939,12 @@ let currentLang = (function () {
 })();
 // Always open a fresh tab on the spring term — the page is "the spring term
 // course catalog", and the summer toggle is an opt-in for users who came
-// looking for it. Don't restore the previous session's term.
+// looking for it. A shared link with ?term=summer overrides this in
+// readURLState(); the previous session's term is never restored.
 let currentTerm = 'spring';
 let randomSeed = 0;  // re-rolled when user picks sort=random
+
+const WEEKDAYS_CN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 // Categories that should never appear in the filter dropdown even if the DB
 // has them — keyed by term. Backend / data files are untouched, purely a UI veto.
@@ -1709,11 +1953,82 @@ const HIDDEN_CATEGORIES = {
   summer: new Set(),
 };
 
-document.addEventListener('click', e => {
-  if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
-});
+/* ===== Inline SVG icons (stroke = currentColor) ===== */
+const ICONS = {
+  teacher: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  dept: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>',
+  time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  room: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  empty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>',
+};
 
-/* ===== Language Selector ===== */
+/* ===== Theme (data-theme set pre-paint by the inline <head> script) ===== */
+function getTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function applyThemeMeta() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = getTheme() === 'dark' ? '#0E1013' : '#F7F7F8';
+}
+
+function toggleTheme() {
+  const next = getTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('pinhaoke_theme', next); } catch (e) {}
+  applyThemeMeta();
+}
+
+/* ===== URL state — shareable links =====
+   q / room / filters / sort / term / lang / course all live in the query
+   string. replaceState only, so browser history isn't polluted with every
+   keystroke; a copied URL reproduces the exact view (and open modal). */
+function readURLState() {
+  const p = new URLSearchParams(location.search);
+  const lang = p.get('lang');
+  if (lang && (lang === 'zh' || TR_IDX[lang] !== undefined)) currentLang = lang;
+  if (p.get('term') === 'summer') currentTerm = 'summer';
+  document.getElementById('searchInput').value = p.get('q') || '';
+  document.getElementById('filterClassroom').value = p.get('room') || '';
+  csValues.filterCourseType = p.get('type') || '';
+  csValues.filterCategory   = p.get('cat') || '';
+  csValues.filterCredits    = p.get('credits') || '';
+  csValues.filterDepartment = p.get('dept') || '';
+  csValues.filterWeekday    = p.get('day') || '';
+  csValues.filterGrading    = p.get('grading') || '';
+  csValues.filterSort       = p.get('sort') || '';
+  if (csValues.filterSort === 'random') {
+    const seed = parseInt(p.get('seed'), 10);
+    randomSeed = seed > 0 ? seed : (Math.floor(Math.random() * 2147483647) || 1);
+  }
+  return p.get('course') || '';
+}
+
+function syncURL() {
+  const p = new URLSearchParams();
+  const q = document.getElementById('searchInput').value.trim();
+  const room = document.getElementById('filterClassroom').value.trim();
+  if (q) p.set('q', q);
+  if (room) p.set('room', room);
+  if (csValues.filterCourseType) p.set('type', csValues.filterCourseType);
+  if (csValues.filterCategory)   p.set('cat', csValues.filterCategory);
+  if (csValues.filterCredits)    p.set('credits', csValues.filterCredits);
+  if (csValues.filterDepartment) p.set('dept', csValues.filterDepartment);
+  if (csValues.filterWeekday)    p.set('day', csValues.filterWeekday);
+  if (csValues.filterGrading)    p.set('grading', csValues.filterGrading);
+  if (csValues.filterSort) {
+    p.set('sort', csValues.filterSort);
+    if (csValues.filterSort === 'random' && randomSeed) p.set('seed', randomSeed);
+  }
+  if (currentTerm !== 'spring') p.set('term', currentTerm);
+  if (currentLang !== 'zh') p.set('lang', currentLang);
+  if (currentModalCourseId) p.set('course', currentModalCourseId);
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+}
+
+/* ===== Language selector ===== */
 function refreshLangSelectorUI() {
   document.getElementById('langLabel').textContent = i18n[currentLang].name;
   document.querySelectorAll('#langDropdown .font-option').forEach(el => {
@@ -1747,6 +2062,7 @@ function closeLangDropdown() {
 function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
+  document.getElementById('brandName').textContent = lang.title;
   document.getElementById('subtitle').textContent =
     currentTerm === 'summer' ? lang.subtitleSummer : lang.subtitleSpring;
   document.getElementById('termSpringBtn').textContent = lang.termSpring;
@@ -1762,20 +2078,23 @@ function applyI18n() {
   document.getElementById('labelWeekday').textContent = lang.labelWeekday;
   document.getElementById('labelClassroom').textContent = lang.labelClassroom;
   document.getElementById('filterClassroom').placeholder = lang.classroomPlaceholder;
+  document.getElementById('filtersBtnText').textContent = lang.filtersBtn;
   document.getElementById('clearBtn').textContent = lang.clearBtn;
   document.getElementById('loadMoreText').textContent = lang.loadMoreText;
-  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : currentLang;
   updateResultsCount();
+  renderChips();
 }
 
 /* ===== Data ===== */
 let currentCourses = [];
 let totalCount = 0;
 let currentPage = 1;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 let fetchController = null;
+let isFetching = false;
 
-/* ===== Initialization ===== */
+/* ===== Filters loading ===== */
 let cachedFilters = null;
 const filtersByTerm = {}; // term → filters payload; survives the lifetime of the page
 let filtersController = null;
@@ -1799,19 +2118,42 @@ async function loadFiltersForCurrentTerm() {
 }
 
 async function init() {
-  // Sync the toggle UI to whatever currentTerm was restored from localStorage.
+  const pendingCourse = readURLState();
   refreshTermToggleUI();
   refreshLangSelectorUI();
+  applyI18n();
+  document.getElementById('searchClear').classList.toggle(
+    'hidden', !document.getElementById('searchInput').value);
+  renderSkeletons();
+
+  // Auto-load next page when the sentinel scrolls into view; the visible
+  // "load more" button stays as a fallback for browsers without IO.
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && !isFetching &&
+          currentCourses.length > 0 && currentCourses.length < totalCount) {
+        loadMore();
+      }
+    }, { rootMargin: '600px 0px' }).observe(document.getElementById('scrollSentinel'));
+  }
+
+  window.addEventListener('scroll', () => {
+    document.getElementById('backTop').classList.toggle('show', window.scrollY > 600);
+  }, { passive: true });
+
+  applyThemeMeta();
+
   try {
     await loadFiltersForCurrentTerm();
-    applyI18n();
+    renderChips();
     await fetchCourses();
-    document.getElementById('loadingMsg').remove();
   } catch (e) {
     if (e.name === 'AbortError') return;
-    document.getElementById('loadingMsg').innerHTML =
-      '<span class="icon">&#x26A0;</span><span>Failed to load data / 数据加载失败</span>';
+    renderError();
   }
+
+  // Deep link: ?course=u123 opens the detail modal directly.
+  if (pendingCourse) showDetail(pendingCourse);
 }
 
 function refreshTermToggleUI() {
@@ -1829,10 +2171,12 @@ async function setTerm(term) {
   refreshTermToggleUI();
 
   // Filter universes differ between terms — wipe selected filter values and
-  // the search box, then reload filters + cards for the new term.
+  // the search box (sort survives, it's term-independent), then reload
+  // filters + cards for the new term.
   document.getElementById('searchInput').value = '';
   document.getElementById('filterClassroom').value = '';
-  Object.keys(csValues).forEach(k => { csValues[k] = ''; });
+  document.getElementById('searchClear').classList.add('hidden');
+  Object.keys(csValues).forEach(k => { if (k !== 'filterSort') csValues[k] = ''; });
   currentPage = 1;
   // Close any open modal — its id may belong to the other term.
   if (currentModalCourseId) closeModal();
@@ -1847,7 +2191,7 @@ async function setTerm(term) {
   }
 }
 
-/* ===== Custom Select Component ===== */
+/* ===== Custom select component ===== */
 const csValues = {}; // track selected values: { filterId: value }
 
 function initCustomSelect(containerId, options, allText, defaultValue) {
@@ -1856,24 +2200,53 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
   csValues[filterId] = defaultValue || '';
 
   const defaultOpt = defaultValue ? options.find(o => o.value === defaultValue) : null;
-  const triggerText = defaultOpt ? defaultOpt.label : allText;
+  // A URL-restored value that's missing from the option list (e.g. stale
+  // shared link) still shows as the trigger text so the user sees what's applied.
+  const triggerText = defaultOpt ? defaultOpt.label : (defaultValue || allText);
+  const searchable = options.length > 12;
 
-  let html = `<div class="custom-select-trigger">${esc(triggerText)}</div>`;
+  let html = `<div class="custom-select-trigger" tabindex="0" role="button">${esc(triggerText)}</div>`;
   html += `<div class="custom-select-dropdown">`;
+  if (searchable) {
+    html += `<div class="cs-search-wrap"><input type="text" class="cs-search" placeholder="${esc(i18n[currentLang].selectSearch)}"></div>`;
+  }
+  html += `<div class="cs-options">`;
   html += `<div class="custom-select-option${!defaultValue ? ' active' : ''}" data-value="">${esc(allText)}</div>`;
   for (const opt of options) {
     const isActive = defaultValue === opt.value ? ' active' : '';
     html += `<div class="custom-select-option${isActive}" data-value="${esc(opt.value)}">${esc(opt.label)}</div>`;
   }
-  html += `</div>`;
+  html += `</div></div>`;
   container.innerHTML = html;
 
   const trigger = container.querySelector('.custom-select-trigger');
-  trigger.addEventListener('click', e => {
-    e.stopPropagation();
+  const searchInput = container.querySelector('.cs-search');
+
+  function openSelect() {
     closeAllSelects(container);
+    const opening = !container.classList.contains('open');
     container.classList.toggle('open');
+    if (opening && searchInput) {
+      searchInput.value = '';
+      container.querySelectorAll('.custom-select-option').forEach(o => { o.style.display = ''; });
+      setTimeout(() => searchInput.focus(), 0);
+    }
+  }
+
+  trigger.addEventListener('click', e => { e.stopPropagation(); openSelect(); });
+  trigger.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSelect(); }
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('click', e => e.stopPropagation());
+    searchInput.addEventListener('input', () => {
+      const kw = searchInput.value.trim().toLowerCase();
+      container.querySelectorAll('.custom-select-option').forEach(o => {
+        o.style.display = !kw || o.textContent.toLowerCase().includes(kw) ? '' : 'none';
+      });
+    });
+  }
 
   container.querySelectorAll('.custom-select-option').forEach(opt => {
     opt.addEventListener('click', () => {
@@ -1897,8 +2270,6 @@ function closeAllSelects(except) {
     if (cs !== except) cs.classList.remove('open');
   });
 }
-
-document.addEventListener('click', () => closeAllSelects());
 
 function populateFilters(filters) {
   const lang = i18n[currentLang];
@@ -1936,47 +2307,106 @@ function populateFilters(filters) {
     filters.gradings.map(g => ({ value: g, label: tr('gradings', g) })),
     lang.all, csValues.filterGrading);
 
-  const weekdaysCN = ['周一','周二','周三','周四','周五','周六','周日'];
   initCustomSelect('csWeekday',
-    weekdaysCN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
+    WEEKDAYS_CN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
     lang.all, csValues.filterWeekday);
 }
 
-/* ===== Search & Filter ===== */
+/* ===== Active filter chips ===== */
+function chipItems() {
+  const lang = i18n[currentLang];
+  const items = [];
+  const q = document.getElementById('searchInput').value.trim();
+  const room = document.getElementById('filterClassroom').value.trim();
+  if (q) items.push({ k: 'q', label: '“' + q + '”' });
+  if (room) items.push({ k: 'room', label: lang.labelClassroom + ': ' + room });
+  if (csValues.filterCourseType) items.push({ k: 'filterCourseType', label: getTypeBadgeText(csValues.filterCourseType) });
+  if (csValues.filterCategory) items.push({ k: 'filterCategory', label: tr('categories', csValues.filterCategory) });
+  if (csValues.filterCredits) items.push({ k: 'filterCredits', label: fmtCredits(csValues.filterCredits) + ' ' + lang.fieldCredits });
+  if (csValues.filterDepartment) items.push({ k: 'filterDepartment', label: tr('departments', csValues.filterDepartment) });
+  if (csValues.filterWeekday) {
+    const idx = WEEKDAYS_CN.indexOf(csValues.filterWeekday);
+    items.push({ k: 'filterWeekday', label: idx >= 0 ? lang.weekdays[idx] : csValues.filterWeekday });
+  }
+  if (csValues.filterGrading) items.push({ k: 'filterGrading', label: tr('gradings', csValues.filterGrading) });
+  return items;
+}
+
+function renderChips() {
+  const wrap = document.getElementById('activeChips');
+  if (!wrap) return;
+  const items = chipItems();
+  wrap.innerHTML = items.map(it =>
+    `<button class="chip" data-k="${esc(it.k)}" title="${esc(i18n[currentLang].clearBtn)}">` +
+    `<span class="chip-label">${esc(it.label)}</span><span class="chip-x">&times;</span></button>`
+  ).join('');
+  wrap.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => removeChip(chip.dataset.k));
+  });
+  document.getElementById('clearBtn').classList.toggle('hidden', items.length === 0);
+  const badge = document.getElementById('filtersBadge');
+  badge.textContent = items.length;
+  badge.classList.toggle('hidden', items.length === 0);
+}
+
+function removeChip(k) {
+  if (k === 'q') {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchClear').classList.add('hidden');
+  } else if (k === 'room') {
+    document.getElementById('filterClassroom').value = '';
+  } else {
+    csValues[k] = '';
+    if (cachedFilters) populateFilters(cachedFilters);
+  }
+  applyFilters();
+}
+
+function toggleFiltersPanel() {
+  document.getElementById('filtersContainer').classList.toggle('open');
+}
+
+/* ===== Search & filter ===== */
 let debounceTimer = null;
 function debouncedSearch() {
+  document.getElementById('searchClear').classList.toggle(
+    'hidden', !document.getElementById('searchInput').value);
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(applyFilters, 300);
 }
 
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClear').classList.add('hidden');
+  applyFilters();
+}
+
 function applyFilters() {
   currentPage = 1;
+  renderChips();
   fetchCourses();
 }
 
 async function fetchCourses() {
   if (fetchController) fetchController.abort();
-  fetchController = new AbortController();
+  const ctrl = new AbortController();
+  fetchController = ctrl;
+  isFetching = true;
 
   const params = new URLSearchParams();
   const q = document.getElementById('searchInput').value.trim();
   const classroom = document.getElementById('filterClassroom').value.trim();
-  const type = csValues.filterCourseType || '';
-  const category = csValues.filterCategory || '';
-  const credits = csValues.filterCredits || '';
-  const department = csValues.filterDepartment || '';
-  const weekday = csValues.filterWeekday || '';
-  const grading = csValues.filterGrading || '';
   const sort = csValues.filterSort || '';
 
-  const searchTerms = [q, classroom].filter(Boolean).join(' ');
-  if (searchTerms) params.set('q', searchTerms);
-  if (type) params.set('type', type);
-  if (category) params.set('category', category);
-  if (credits) params.set('credits', credits);
-  if (department) params.set('department', department);
-  if (weekday) params.set('weekday', weekday);
-  if (grading) params.set('grading', grading);
+  if (q) params.set('q', q);
+  // Dedicated backend param — composes with q instead of being glued into it.
+  if (classroom) params.set('classroom', classroom);
+  if (csValues.filterCourseType) params.set('type', csValues.filterCourseType);
+  if (csValues.filterCategory)   params.set('category', csValues.filterCategory);
+  if (csValues.filterCredits)    params.set('credits', csValues.filterCredits);
+  if (csValues.filterDepartment) params.set('department', csValues.filterDepartment);
+  if (csValues.filterWeekday)    params.set('weekday', csValues.filterWeekday);
+  if (csValues.filterGrading)    params.set('grading', csValues.filterGrading);
   if (sort) params.set('sort', sort);
   if (sort === 'random' && randomSeed) params.set('random_seed', randomSeed);
   params.set('lang', currentLang);
@@ -1984,10 +2414,12 @@ async function fetchCourses() {
   params.set('page', currentPage);
   params.set('page_size', PAGE_SIZE);
 
+  if (currentPage === 1) renderSkeletons();
+  syncURL();
+
   try {
-    const resp = await fetch('/api/courses?' + params.toString(), {
-      signal: fetchController.signal
-    });
+    const resp = await fetch('/api/courses?' + params.toString(), { signal: ctrl.signal });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     totalCount = data.total;
 
@@ -1999,14 +2431,56 @@ async function fetchCourses() {
       appendCards(data.courses);
     }
   } catch (e) {
-    if (e.name !== 'AbortError') console.error(e);
+    if (e.name !== 'AbortError') {
+      console.error(e);
+      if (currentPage === 1) renderError();
+    }
+  } finally {
+    // Only the latest in-flight request may clear the flag — an aborted older
+    // request's finally must not unlock auto-load while the new one runs.
+    if (fetchController === ctrl) isFetching = false;
   }
 }
 
-function appendCards(newCourses) {
+/* ===== Rendering ===== */
+function renderSkeletons() {
   const container = document.getElementById('resultsContainer');
+  let html = '';
+  for (let i = 0; i < 6; i++) {
+    html += '<div class="skel-card">' +
+      '<div class="skel-line" style="width:55%"></div>' +
+      '<div class="skel-line" style="width:30%;height:10px"></div>' +
+      '<div class="skel-line" style="width:82%"></div>' +
+      '<div class="skel-line" style="width:68%"></div>' +
+      '</div>';
+  }
+  container.innerHTML = html;
+  document.getElementById('resultsCount').textContent = i18n[currentLang].loadingText;
+  document.getElementById('loadMoreBtn').style.display = 'none';
+}
+
+function renderError() {
+  document.getElementById('resultsContainer').innerHTML =
+    `<div class="state-msg">${ICONS.empty}<span>Failed to load data / 数据加载失败</span></div>`;
+  document.getElementById('loadMoreBtn').style.display = 'none';
+}
+
+function renderCards() {
+  const container = document.getElementById('resultsContainer');
+  const lang = i18n[currentLang];
+
+  if (currentCourses.length === 0 && currentPage === 1) {
+    container.innerHTML =
+      `<div class="state-msg">${ICONS.empty}<span>${esc(lang.emptyText)}</span>` +
+      `<button class="clear-btn" onclick="clearAll()">${esc(lang.clearBtn)}</button></div>`;
+    document.getElementById('loadMoreBtn').style.display = 'none';
+    updateResultsCount();
+    return;
+  }
+
+  container.innerHTML = '';
   const fragment = document.createDocumentFragment();
-  for (const course of newCourses) {
+  for (const course of currentCourses) {
     fragment.appendChild(createCard(course));
   }
   container.appendChild(fragment);
@@ -2016,20 +2490,10 @@ function appendCards(newCourses) {
   updateResultsCount();
 }
 
-function renderCards() {
+function appendCards(newCourses) {
   const container = document.getElementById('resultsContainer');
-  const lang = i18n[currentLang];
-
-  if (currentCourses.length === 0 && currentPage === 1) {
-    container.innerHTML = `<div class="state-msg"><span class="icon">&#x1F50D;</span><span>${lang.emptyText}</span></div>`;
-    document.getElementById('loadMoreBtn').style.display = 'none';
-    updateResultsCount();
-    return;
-  }
-
-  container.innerHTML = '';
   const fragment = document.createDocumentFragment();
-  for (const course of currentCourses) {
+  for (const course of newCourses) {
     fragment.appendChild(createCard(course));
   }
   container.appendChild(fragment);
@@ -2083,66 +2547,72 @@ function asArray(v) {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
 }
+
 function courseTypeBadgesHTML(v) {
   return asArray(v).map(t =>
     `<span class="badge ${getTypeBadgeClass(t)}">${esc(getTypeBadgeText(t))}</span>`
   ).join('');
 }
+
 function categoryBadgesHTML(v) {
   return asArray(v).map(c =>
     `<span class="badge badge-category">${esc(tr('categories', c))}</span>`
   ).join('');
 }
 
+// Left strip color follows the first course_type of the card.
+function stripKey(types) {
+  const first = asArray(types)[0];
+  return getTypeBadgeClass(first).replace('badge-', '');
+}
+
 function createCard(course) {
   const lang = i18n[currentLang];
-  const card = document.createElement('div');
+  const card = document.createElement('article');
   card.className = 'course-card';
+  card.dataset.strip = stripKey(course.course_type);
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+
+  const codeBits = [];
+  if (course.course_code) codeBits.push(esc(course.course_code));
+  if (course.class_no) codeBits.push(esc(lang.modalClassNo) + ' ' + esc(String(course.class_no)));
 
   let html = `
-    <div class="card-header">
-      <span class="course-name">${esc(trCourseName(course))}</span>
-      <div class="card-badges">
-        ${courseTypeBadgesHTML(course.course_type)}
-        ${categoryBadgesHTML(course.category)}
-        <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
+    <div class="card-top">
+      <div class="card-title-wrap">
+        <h3 class="course-name">${esc(trCourseName(course))}</h3>
+        ${codeBits.length ? `<div class="card-code">${codeBits.join(' &middot; ')}</div>` : ''}
       </div>
+      <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
     </div>
-    <div class="card-details">
-      <div class="detail-item">
-        <span class="detail-label">${esc(lang.fieldTeacher)}</span>
-        <span class="detail-value">${esc(trTeacher(course.teacher) || '-')}</span>
-      </div>
-      <div class="detail-item">
-        <span class="detail-label">${esc(lang.fieldDepartment)}</span>
-        <span class="detail-value">${esc(tr('departments', course.department))}</span>
-      </div>`;
+    <div class="card-badges">
+      ${courseTypeBadgesHTML(course.course_type)}
+      ${categoryBadgesHTML(course.category)}
+    </div>
+    <ul class="card-meta">
+      <li>${ICONS.teacher}<span>${esc(trTeacher(course.teacher) || '-')}</span></li>
+      <li>${ICONS.dept}<span>${esc(tr('departments', course.department))}</span></li>`;
 
   if (course.schedule) {
-    html += `
-      <div class="detail-item">
-        <span class="detail-label">${esc(lang.fieldTime)}</span>
-        <span class="detail-value">${esc(trSchedule(course.schedule))}</span>
-      </div>`;
+    html += `<li>${ICONS.time}<span>${esc(trSchedule(course.schedule))}</span></li>`;
   }
   if (course.classroom) {
-    html += `
-      <div class="detail-item">
-        <span class="detail-label">${esc(lang.fieldClassroom)}</span>
-        <span class="detail-value">${esc(course.classroom)}</span>
-      </div>`;
+    html += `<li>${ICONS.room}<span>${esc(course.classroom)}</span></li>`;
   }
 
-  html += `</div>
-    <div class="card-footer">
-      <button class="detail-btn" onclick="showDetail('${course.id}')">${esc(lang.detailBtn)}</button>
-    </div>`;
+  html += `</ul>
+    <span class="card-arrow" aria-hidden="true">${esc(lang.detailBtn)} &rarr;</span>`;
 
   card.innerHTML = html;
+  card.addEventListener('click', () => showDetail(course.id));
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDetail(course.id); }
+  });
   return card;
 }
 
-/* ===== Detail Modal ===== */
+/* ===== Detail modal ===== */
 let currentModalCourseId = null;
 let detailController = null;
 
@@ -2157,24 +2627,30 @@ async function showDetail(courseId) {
   detailController = new AbortController();
 
   currentModalCourseId = courseId;
-  content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${lang.modalLoading}</span></div>`;
+  content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${esc(lang.modalLoading)}</span></div>`;
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  syncURL();
 
   try {
     const resp = await fetch(
-      '/api/courses/' + courseId + '?lang=' + encodeURIComponent(currentLang),
+      '/api/courses/' + encodeURIComponent(courseId) + '?lang=' + encodeURIComponent(currentLang),
       { signal: detailController.signal }
     );
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const c = await resp.json();
     // Drop result if modal closed or switched to another course in the meantime.
     if (currentModalCourseId !== courseId || !overlay.classList.contains('open')) return;
 
     let html = `
-      <div class="modal-header">
+      <div class="modal-head">
         <span class="modal-title">${esc(trCourseName(c))}</span>
-        <button class="modal-close" onclick="closeModal()">&times;</button>
+        <div class="modal-head-actions">
+          <button class="modal-action" id="copyLinkBtn" onclick="copyCourseLink()">${ICONS.link}<span>${esc(lang.copyLink)}</span></button>
+          <button class="modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+        </div>
       </div>
+      <div class="modal-body">
       <div class="modal-badges">
         ${courseTypeBadgesHTML(c.course_type)}
         ${categoryBadgesHTML(c.category)}
@@ -2215,7 +2691,7 @@ async function showDetail(courseId) {
     }
     html += '</div></div>';
 
-    // English name (show when not zh OR when there is one and zh viewer wants both)
+    // English name (shown to non-EN viewers; EN viewers already see it as title)
     if (c.english_name && currentLang !== 'en') {
       html += `<div class="modal-section">
         <div class="modal-section-title">${esc(lang.modalEnglishName)}</div>
@@ -2270,12 +2746,43 @@ async function showDetail(courseId) {
         </div>`;
       }
     }
-    html += '</div>';
+    html += '</div></div>';
 
     content.innerHTML = html;
+    content.scrollTop = 0;
   } catch (e) {
     if (e.name === 'AbortError') return;
     content.innerHTML = '<div class="modal-loading">Failed to load details</div>';
+  }
+}
+
+async function copyCourseLink() {
+  if (!currentModalCourseId) return;
+  const url = location.origin + location.pathname +
+    '?course=' + encodeURIComponent(currentModalCourseId);
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    ok = true;
+  } catch (e) {
+    // http / older browsers: fall back to a hidden textarea + execCommand.
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e2) { ok = false; }
+  }
+  const btn = document.getElementById('copyLinkBtn');
+  if (btn && ok) {
+    const span = btn.querySelector('span');
+    const original = span.textContent;
+    span.textContent = i18n[currentLang].copied;
+    setTimeout(() => { span.textContent = original; }, 1600);
   }
 }
 
@@ -2283,12 +2790,10 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
   document.body.style.overflow = '';
   currentModalCourseId = null;
+  syncURL();
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
-
+/* ===== Misc ===== */
 function esc(str) {
   if (!str) return '';
   const d = document.createElement('div');
@@ -2299,22 +2804,31 @@ function esc(str) {
 function clearAll() {
   document.getElementById('searchInput').value = '';
   document.getElementById('filterClassroom').value = '';
-  // Reset all custom selects
-  document.querySelectorAll('.custom-select').forEach(cs => {
-    const filterId = cs.dataset.filter;
-    csValues[filterId] = '';
-    const trigger = cs.querySelector('.custom-select-trigger');
-    const firstOpt = cs.querySelector('.custom-select-option');
-    if (trigger && firstOpt) trigger.textContent = firstOpt.textContent;
-    cs.querySelectorAll('.custom-select-option').forEach((o, i) => {
-      o.classList.toggle('active', i === 0);
-    });
-  });
+  document.getElementById('searchClear').classList.add('hidden');
+  // Reset filter selects; sort is a view preference, not a filter — keep it.
+  ['filterCourseType', 'filterCategory', 'filterCredits',
+   'filterDepartment', 'filterWeekday', 'filterGrading'].forEach(k => { csValues[k] = ''; });
+  if (cachedFilters) populateFilters(cachedFilters);
   applyFilters();
 }
 
+/* ===== Global listeners ===== */
+document.addEventListener('click', e => {
+  if (!document.getElementById('langSelector').contains(e.target)) closeLangDropdown();
+  closeAllSelects();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeAllSelects();
+    closeLangDropdown();
+  }
+});
+
 /* ===== Start ===== */
 document.addEventListener('DOMContentLoaded', init);
+
 </script>
 </body>
 </html>

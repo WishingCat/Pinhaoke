@@ -49,7 +49,7 @@ Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the pag
 | Endpoint | Notes |
 |---|---|
 | `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. Accepts `?term=spring\|summer` (default `spring`). |
-| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom` with `ESCAPE '\\'`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 10). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. **`course_type` and `category` are arrays** (merged across PKU's duplicate registrations — see merge section below). |
+| `GET /api/courses` | Cards list. Query params: `term` (`spring\|summer`, default `spring`), `q` (LIKEs `course_name / teacher / classroom / course_code / english_name` with `ESCAPE '\\'`), `classroom` (LIKE on classroom column only — composes with `q`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 50; frontend uses 20). Returns `{total, courses[]}` with each row carrying string `id` like `u123` / `g456` / `s789`. **`course_type` and `category` are arrays** (merged across PKU's duplicate registrations — see merge section below). |
 | `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string — the prefix alone determines which DB to read, so **no `?term=` needed**. Accepts `?lang=`. |
 
 `lang` accepts `zh` (default — no translation lookup) or one of `en, ja, ko, fr, de, es, ru` (swaps fields from the relevant DB's `translations` table — see i18n section below).
@@ -128,15 +128,13 @@ DB ids are namespaced by single-char prefix so the three DBs can coexist in URL 
 
 `_parse_id` splits the prefix into `(term, level, local_id)`. `_apply_translations` uses `ns = "gr" if level == "g" else "main"` to pick which attached DB's `translations` table to read.
 
-**Gotcha**: in `createCard()`, the detail-button onclick must quote `course.id`:
-```js
-onclick="showDetail('${course.id}')"   // correct — 'u123' is a string
-onclick="showDetail(${course.id})"     // BROKEN — JS parses u123 as a variable
-```
+**Gotcha**: `course.id` is a string like `'u123'` — never interpolate it unquoted into inline JS (`onclick="showDetail(${course.id})"` parses `u123` as a variable). `createCard()` sidesteps this entirely by attaching the click via `card.addEventListener('click', () => showDetail(course.id))`; keep it that way.
+
+**URL state**: the frontend mirrors search/filters/sort/term/lang and the open modal (`?course=u123`) into the query string via `history.replaceState` (`syncURL()` / `readURLState()` in `index.html`) so any view is shareable. New filters must be wired into both functions plus `chipItems()` (active-filter chips) or they silently drop out of shared links.
 
 ### i18n is hybrid (two stores)
 
-1. **Finite dictionaries in `index.html`** (`dataI18n` near line 1493): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
+1. **Finite dictionaries in `index.html`** (`const dataI18n`, ~line 1720): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
 2. **Per-row `translations` table in each DB** (UG + GR + Summer): for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/` (summer was filled to 100% across 10 fields × 7 langs ≈ 10010 rows in May 2026).
 
 Both endpoints accept `?lang=xx`; when `lang != 'zh'`, the backend swaps Chinese values for translations from the table. The list endpoint translates only card-visible fields (`course_name`, `classroom`, `notes`) to keep the query small; the detail endpoint translates everything in `TRANSLATABLE_FIELDS`.
