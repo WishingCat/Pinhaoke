@@ -1149,10 +1149,17 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
 
 .modal-field { display: flex; flex-direction: column; gap: 3px; }
 
+/* field labels follow the course-type color (same source as card borders) */
+.modal-content { --modal-c: var(--accent); }
+.modal-content[data-strip="elective"] { --modal-c: var(--c-elective); }
+.modal-content[data-strip="general"]  { --modal-c: var(--c-general); }
+.modal-content[data-strip="major"]    { --modal-c: var(--c-major); }
+.modal-content[data-strip="grad"]     { --modal-c: var(--c-grad); }
+
 .modal-field-label {
   font-size: 0.76rem;
   font-weight: 650;
-  color: var(--accent);
+  color: var(--modal-c);
   letter-spacing: 0.03em;
 }
 
@@ -2783,6 +2790,9 @@ async function showDetail(courseId) {
     const c = await resp.json();
     // Drop result if modal closed or switched to another course in the meantime.
     if (currentModalCourseId !== courseId || !overlay.classList.contains('open')) return;
+
+    // Field-label accent follows the course-type color, same as the card border.
+    content.dataset.strip = stripKey(c.course_type);
 
     let html = `
       <div class="modal-head">
