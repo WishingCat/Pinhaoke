@@ -267,8 +267,6 @@ html[data-theme="dark"] .theme-icon-moon { display: none; }
 html:not([data-theme="dark"]) .theme-icon-sun { display: none; }
 
 /* sponsor button + hover card */
-.sponsor-wrap { position: relative; }
-
 .sponsor-btn {
   color: #E11D48;
   border-color: rgba(225, 29, 72, 0.35);
@@ -285,7 +283,10 @@ html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB71
 
 .sponsor-btn svg { fill: currentColor; stroke: none; }
 
-.sponsor-tip {
+/* shared hover tip card (sponsor / about) */
+.tip-wrap { position: relative; }
+
+.tip-card {
   display: none;
   position: absolute;
   top: calc(100% + 8px);
@@ -305,8 +306,33 @@ html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB71
   pointer-events: none;
 }
 
-.sponsor-wrap:hover .sponsor-tip,
-.sponsor-wrap:focus-within .sponsor-tip { display: block; }
+.tip-wrap:hover .tip-card,
+.tip-wrap:focus-within .tip-card { display: block; }
+
+/* about card: label + value rows */
+.about-tip { width: 232px; }
+
+.about-row { display: flex; gap: 12px; }
+.about-row + .about-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.about-label {
+  flex-shrink: 0;
+  width: 4em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-4);
+  line-height: 1.75;
+}
+
+.about-val {
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.75;
+}
 
 /* lang dropdown */
 .font-selector { position: relative; }
@@ -797,6 +823,23 @@ html[data-theme="dark"] .filters-badge { color: #0E1013; }
               0 2px 6px rgba(16, 18, 23, 0.06);
   transform: translateY(-2px);
 }
+
+/* dark theme: same tint logic but tuned for dark surfaces — the bright
+   dark-palette type colors need a higher mix to stay visible against the
+   near-black border, and the hover glow can afford more color on dark bg */
+html[data-theme="dark"] .course-card {
+  border-color: color-mix(in srgb, var(--card-c) 42%, var(--border));
+}
+
+html[data-theme="dark"] .course-card::after { opacity: 0.1; }
+
+html[data-theme="dark"] .course-card:hover {
+  border-color: color-mix(in srgb, var(--card-c) 85%, var(--border));
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--card-c) 30%, transparent),
+              0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
 
 .course-card:focus-visible {
   outline: none;
@@ -1325,12 +1368,21 @@ var _hmt = _hmt || [];
       <span class="brand-name" id="brandName">拼好课</span>
     </a>
     <div class="topbar-actions">
-      <div class="sponsor-wrap">
+      <div class="tip-wrap">
         <a class="top-btn sponsor-btn" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span>赞助</span>
         </a>
-        <div class="sponsor-tip" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
+        <div class="tip-card" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
+      </div>
+      <div class="tip-wrap">
+        <button class="icon-btn" type="button" aria-label="关于本项目">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+        <div class="tip-card about-tip" role="tooltip">
+          <div class="about-row"><span class="about-label">项目开发</span><span class="about-val">祈愿的猫</span></div>
+          <div class="about-row"><span class="about-label">鸣谢</span><span class="about-val">北京大学手语分社<br>Lynn<br>理性的狂想家</span></div>
+        </div>
       </div>
       <div class="font-selector" id="langSelector">
         <button class="top-btn" onclick="toggleLangDropdown()" aria-haspopup="listbox" aria-label="Language">
