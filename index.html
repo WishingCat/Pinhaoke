@@ -6,7 +6,7 @@
 <title>北大课程搜索 | PKU Course Search</title>
 <meta name="description" content="拼好课 — 北京大学课程搜索：本科生 / 研究生 / 暑期课程，支持多语言、筛选与链接分享。PKU Course Search.">
 <meta name="theme-color" content="#F7F7F8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232E63E7'/%3E%3Cstop offset='1' stop-color='%237C5CFC'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Ccircle cx='29' cy='29' r='11.5' fill='none' stroke='%23fff' stroke-width='5.5'/%3E%3Cline x1='38' y1='38' x2='47' y2='47' stroke='%23fff' stroke-width='5.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232E63E7'/%3E%3Cstop offset='1' stop-color='%237C5CFC'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Ccircle cx='29' cy='29' r='12' fill='none' stroke='%23fff' stroke-width='5'/%3E%3Cline x1='38.5' y1='38.5' x2='47' y2='47' stroke='%23fff' stroke-width='5.5' stroke-linecap='round'/%3E%3Ccircle cx='25.5' cy='26.5' r='1.9' fill='%23fff'/%3E%3Ccircle cx='32.5' cy='26.5' r='1.9' fill='%23fff'/%3E%3Cpath d='M24.5 31.5 q4.5 4 9 0' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="192x192" href="/Images/favicon-192.png">
 <link rel="apple-touch-icon" href="/Images/apple-touch-icon.png">
 <script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
@@ -1110,48 +1110,81 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   border-bottom: 1px solid var(--border-soft);
 }
 
-.modal-section { margin-bottom: 24px; }
+.modal-section { margin-bottom: 28px; }
 .modal-section:last-child { margin-bottom: 0; }
 
+/* prominent section headings: gradient bar + bold ink text */
 .modal-section-title {
-  font-size: 0.74rem;
+  position: relative;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  color: var(--ink);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  margin-bottom: 14px;
+  padding-left: 12px;
 }
 
 .modal-section-title::before {
   content: '';
-  width: 14px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 1.1em;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #2E63E7, #7C5CFC);
 }
 
 .modal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px 28px;
+  gap: 14px 26px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
 }
 
-.modal-field { display: flex; flex-direction: column; gap: 2px; }
+.modal-field { display: flex; flex-direction: column; gap: 3px; }
 
 .modal-field-label {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--ink-3);
+  color: var(--ink-4);
+  letter-spacing: 0.03em;
 }
 
 .modal-field-value {
   font-size: 0.94rem;
+  font-weight: 500;
   color: var(--ink);
   white-space: pre-line;
-  line-height: 1.65;
+  line-height: 1.6;
+}
+
+/* single-value sections (english name / GE series / notes …) align with title text */
+.modal-section > .modal-field-value { padding-left: 12px; font-weight: 400; }
+
+/* sub-headings of long-text blocks inside 详细信息 */
+.modal-sub-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+
+.modal-sub-label::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--accent);
 }
 
 .modal-field-caveat {
@@ -1364,7 +1397,7 @@ var _hmt = _hmt || [];
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">
-      <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="phkGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E63E7"/><stop offset="1" stop-color="#7C5CFC"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#phkGrad)"/><circle cx="29" cy="29" r="11.5" fill="none" stroke="#fff" stroke-width="5.5"/><line x1="38" y1="38" x2="47" y2="47" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/></svg>
+      <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="phkGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E63E7"/><stop offset="1" stop-color="#7C5CFC"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#phkGrad)"/><circle cx="29" cy="29" r="12" fill="none" stroke="#fff" stroke-width="5"/><line x1="38.5" y1="38.5" x2="47" y2="47" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><circle cx="25.5" cy="26.5" r="1.9" fill="#fff"/><circle cx="32.5" cy="26.5" r="1.9" fill="#fff"/><path d="M24.5 31.5 q4.5 4 9 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
       <span class="brand-name" id="brandName">拼好课</span>
     </a>
     <div class="topbar-actions">
@@ -2850,7 +2883,7 @@ async function showDetail(courseId) {
     for (const [label, value] of longFields) {
       if (value) {
         html += `<div style="margin-bottom:16px">
-          <div class="modal-field-label" style="margin-bottom:6px">${esc(label)}</div>
+          <div class="modal-sub-label">${esc(label)}</div>
           <div class="modal-field-value long-text">${esc(value)}</div>
         </div>`;
       }
