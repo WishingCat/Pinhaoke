@@ -50,11 +50,11 @@ h1, h2, h3 { font-weight: inherit; font-size: inherit; }
   --border-2:     #CFD3D9;
   --border-soft:  #EFF0F2;
 
-  /* single bold accent */
-  --accent:       #2453D6;
-  --accent-deep:  #1D45B8;
-  --accent-soft:  #D9E4FB;
-  --accent-mist:  #EDF3FD;
+  /* single bold accent — 与 Pin logo 同源的青绿色系 */
+  --accent:       #0F8A7D;
+  --accent-deep:  #0C6F65;
+  --accent-soft:  #C9EEE7;
+  --accent-mist:  #E8F7F3;
 
   /* course-type colors (left strip + badge) */
   --c-elective:        #4F46E5;
@@ -107,10 +107,10 @@ html[data-theme="dark"] {
   --border-2:     #363B44;
   --border-soft:  #20242A;
 
-  --accent:       #7396F2;
-  --accent-deep:  #8FACF6;
-  --accent-soft:  rgba(90, 130, 240, 0.28);
-  --accent-mist:  rgba(90, 130, 240, 0.14);
+  --accent:       #46D6B8;
+  --accent-deep:  #6BE3CA;
+  --accent-soft:  rgba(70, 214, 184, 0.28);
+  --accent-mist:  rgba(70, 214, 184, 0.13);
 
   --c-elective:        #9299FF;
   --c-elective-soft:   rgba(99, 102, 241, 0.16);
@@ -386,27 +386,58 @@ html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB71
 
 .hero {
   text-align: center;
-  padding: 52px 16px 8px;
+  padding: 56px 16px 8px;
+  position: relative;
+}
+
+/* 标题背后的品牌柔光：logo 薄荷绿 + 一点公选靛蓝 */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -30px; left: 50%;
+  width: min(720px, 92vw); height: 250px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(45% 60% at 33% 42%, rgba(53, 198, 167, 0.17), transparent 70%),
+    radial-gradient(40% 55% at 67% 46%, rgba(79, 70, 229, 0.10), transparent 70%);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .hero::before {
+  background:
+    radial-gradient(45% 60% at 33% 42%, rgba(53, 198, 167, 0.12), transparent 70%),
+    radial-gradient(40% 55% at 67% 46%, rgba(115, 150, 242, 0.10), transparent 70%);
 }
 
 .hero h1 {
-  font-size: clamp(2.2rem, 5vw, 3.1rem);
-  font-weight: 700;
-  color: var(--ink);
+  position: relative;
+  font-size: clamp(2.3rem, 5vw, 3.3rem);
+  font-weight: 800;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.15;
+  background-image: linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html[data-theme="dark"] .hero h1 {
+  background-image: linear-gradient(118deg, #5CE8C6 8%, #35C6A7 58%, #27A68E 94%);
 }
 
 .hero .subtitle {
+  position: relative;
   font-size: 0.95rem;
   color: var(--ink-3);
-  margin-top: 12px;
+  margin-top: 13px;
 }
 
 /* Term toggle (春季 / 暑期) — segmented control */
 .term-toggle {
+  position: relative;
   display: inline-flex;
-  margin-top: 18px;
+  margin-top: 20px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
@@ -428,12 +459,17 @@ html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB71
 .term-toggle button:hover { color: var(--ink); }
 
 .term-toggle button.active {
-  background: var(--accent);
+  background: linear-gradient(135deg, #2FBE9E, #167B72);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(36, 83, 214, 0.3);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(22, 123, 114, 0.35);
 }
 
-html[data-theme="dark"] .term-toggle button.active { color: #0E1013; }
+html[data-theme="dark"] .term-toggle button.active {
+  background: linear-gradient(135deg, #4FE0BE, #2BB593);
+  color: #0E1013;
+  box-shadow: none;
+}
 
 /* ============================================================
    SEARCH
@@ -530,17 +566,17 @@ html[data-theme="dark"] .filters-badge { color: #0E1013; }
 
 .filters {
   margin-bottom: 16px;
-  padding: 20px 22px;
+  padding: 22px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 18px 16px;
 }
 
 @media (max-width: 900px) { .filter-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -555,20 +591,41 @@ html[data-theme="dark"] .filters-badge { color: #0E1013; }
 .filter-group { position: relative; }
 
 .filter-group label {
-  display: block;
-  font-size: 0.76rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--ink-3);
-  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+  margin-bottom: 7px;
   padding-left: 2px;
 }
+
+/* 字段小图标：伪元素 + mask 着色，i18n 重写 label 文本时不受影响 */
+.filter-group label::before {
+  content: '';
+  width: 13px; height: 13px;
+  flex-shrink: 0;
+  background: var(--accent);
+  -webkit-mask: var(--fl-icon) no-repeat center / contain;
+  mask: var(--fl-icon) no-repeat center / contain;
+}
+
+#labelCourseType { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z'/%3E%3Cline x1='7' y1='7' x2='7.01' y2='7'/%3E%3C/svg%3E"); }
+#labelCategory { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 2 7 12 12 22 7 12 2'/%3E%3Cpolyline points='2 17 12 22 22 17'/%3E%3Cpolyline points='2 12 12 17 22 12'/%3E%3C/svg%3E"); }
+#labelCredits { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 10L12 5 2 10l10 5 10-5z'/%3E%3Cpath d='M6 12.5V17c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5'/%3E%3C/svg%3E"); }
+#labelDepartment { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21h18'/%3E%3Cpath d='M5 21V7l7-4 7 4v14'/%3E%3Cpath d='M9 21v-6h6v6'/%3E%3C/svg%3E"); }
+#labelGrading { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2'/%3E%3Crect x='9' y='3' width='6' height='4' rx='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E"); }
+#labelWeekday { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E"); }
+#labelClassroom { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E"); }
 
 .filter-group input,
 .custom-select-trigger {
   width: 100%;
-  padding: 9px 14px;
+  padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r);
   outline: none;
   background: var(--bg);
   font-size: 0.9rem;
@@ -1136,7 +1193,7 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   width: 4px;
   height: 1.1em;
   border-radius: 3px;
-  background: linear-gradient(180deg, #2E63E7, #7C5CFC);
+  background: linear-gradient(180deg, #2FBE9E, #167B72);
 }
 
 .modal-grid {
@@ -1495,11 +1552,11 @@ var _hmt = _hmt || [];
   <div class="filters" id="filtersContainer">
     <div class="filter-grid">
       <div class="filter-group">
-        <label id="labelCourseType">课程类型筛选 1</label>
+        <label id="labelCourseType">课程类型</label>
         <div class="custom-select" id="csCourseType" data-filter="filterCourseType"></div>
       </div>
       <div class="filter-group">
-        <label id="labelCategory">课程类型筛选 2</label>
+        <label id="labelCategory">课程类别</label>
         <div class="custom-select" id="csCategory" data-filter="filterCategory"></div>
       </div>
       <div class="filter-group">
@@ -1578,7 +1635,7 @@ const i18n = {
     subtitleSummer: '北京大学2026暑期学期课程搜索(每学期更新)',
     termSpring: '2026春季学期', termSummer: '2026暑期学期',
     searchPlaceholder: '输入课程名、教师姓名或教室...',
-    labelCourseType: '课程类型筛选 1', labelCategory: '课程类型筛选 2',
+    labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
     sortDefault: '默认', sortPinyin: '课程名 A→Z', sortPinyinDesc: '课程名 Z→A', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortTimeAsc: '上课时间 早→晚', sortRandom: '随机',
@@ -1616,7 +1673,7 @@ const i18n = {
     subtitleSummer: 'PKU Summer 2026 Course Search (Updated Every Semester)',
     termSpring: '2026 Spring', termSummer: '2026 Summer',
     searchPlaceholder: 'Search course name, teacher or classroom...',
-    labelCourseType: 'Course Type 1', labelCategory: 'Course Type 2',
+    labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
     sortDefault: 'Default', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortTimeAsc: 'Earliest first', sortRandom: 'Random',
@@ -1654,7 +1711,7 @@ const i18n = {
     subtitleSummer: '北京大学2026年夏学期 授業検索（毎学期更新）',
     termSpring: '2026 春学期', termSummer: '2026 夏学期',
     searchPlaceholder: '授業名、教員名または教室を入力...',
-    labelCourseType: '科目種別 1', labelCategory: '科目種別 2',
+    labelCourseType: '科目種別', labelCategory: 'カテゴリー',
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
     sortDefault: 'デフォルト', sortPinyin: '名前 A→Z', sortPinyinDesc: '名前 Z→A', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortTimeAsc: '早い時間順', sortRandom: 'ランダム',
@@ -1692,7 +1749,7 @@ const i18n = {
     subtitleSummer: '베이징대학교 2026 여름학기 강좌 검색 (매 학기 업데이트)',
     termSpring: '2026 봄학기', termSummer: '2026 여름학기',
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
-    labelCourseType: '강좌 유형 1', labelCategory: '강좌 유형 2',
+    labelCourseType: '강좌 유형', labelCategory: '카테고리',
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
     sortDefault: '기본', sortPinyin: '이름 A→Z', sortPinyinDesc: '이름 Z→A', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortTimeAsc: '이른 시간순', sortRandom: '무작위',
@@ -1730,7 +1787,7 @@ const i18n = {
     subtitleSummer: 'Recherche de cours PKU - \u00c9t\u00e9 2026 (Mise \u00e0 jour chaque semestre)',
     termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026',
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
-    labelCourseType: 'Type 1', labelCategory: 'Type 2',
+    labelCourseType: 'Type de cours', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
     sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A→Z)', sortPinyinDesc: 'Nom (Z→A)', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortTimeAsc: 'T\u00f4t \u2192 tard', sortRandom: 'Al\u00e9atoire',
@@ -1768,7 +1825,7 @@ const i18n = {
     subtitleSummer: 'PKU Kurssuche - Sommer 2026 (Jedes Semester aktualisiert)',
     termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026',
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
-    labelCourseType: 'Kurstyp 1', labelCategory: 'Kurstyp 2',
+    labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
     sortDefault: 'Standard', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortTimeAsc: 'Fr\u00fch \u2192 sp\u00e4t', sortRandom: 'Zuf\u00e4llig',
@@ -1806,7 +1863,7 @@ const i18n = {
     subtitleSummer: 'B\u00fasqueda de cursos PKU - Verano 2026 (Actualizado cada semestre)',
     termSpring: 'Primavera 2026', termSummer: 'Verano 2026',
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
-    labelCourseType: 'Tipo 1', labelCategory: 'Tipo 2',
+    labelCourseType: 'Tipo de curso', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
     sortDefault: 'Por defecto', sortPinyin: 'Nombre (A→Z)', sortPinyinDesc: 'Nombre (Z→A)', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortTimeAsc: 'Temprano \u2192 tarde', sortRandom: 'Aleatorio',
@@ -1844,7 +1901,7 @@ const i18n = {
     subtitleSummer: 'Поиск курсов ПКУ - Лето 2026 (Обновляется каждый семестр)',
     termSpring: 'Весна 2026', termSummer: 'Лето 2026',
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
-    labelCourseType: 'Тип курса 1', labelCategory: 'Тип курса 2',
+    labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
     sortDefault: 'По умолчанию', sortPinyin: 'Имя А→Я', sortPinyinDesc: 'Имя Я→А', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortTimeAsc: 'С раннего', sortRandom: 'Случайно',
