@@ -6,7 +6,7 @@
 <title>北大课程搜索 | PKU Course Search</title>
 <meta name="description" content="拼好课 — 北京大学课程搜索：本科生 / 研究生 / 暑期课程，支持多语言、筛选与链接分享。PKU Course Search.">
 <meta name="theme-color" content="#F7F7F8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='55' y1='32' x2='156' y2='152' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%2335C6A7'/%3E%3Cstop offset='1' stop-color='%23167B72'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='24' y='24' width='132' height='132' rx='34' fill='%23F6FFFC'/%3E%3Cpath d='M58 145V52C58 45 64 41 73 41H99C125 41 142 55 142 76C142 96 125 104 100 104H80' fill='none' stroke='url(%23g)' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cg fill='none' stroke='%23233F48' stroke-width='9.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='109' cy='126' r='6.2' fill='%23233F48' stroke='none'/%3E%3Cpath d='M109 139V150'/%3E%3Cpath d='M128 150V128M128 140C133 132 142 128 148 132C151 135 151 142 151 150'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='30' y1='20' x2='160' y2='170' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%2335C6A7'/%3E%3Cstop offset='1' stop-color='%23167B72'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='url(%23g)'/%3E%3Cg transform='translate(90,90) scale(1.3) translate(-100,-93)'%3E%3Cpath d='M58 145V52C58 45 64 41 73 41H99C125 41 142 55 142 76C142 96 125 104 100 104H80' fill='none' stroke='%23fff' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="192x192" href="/Images/favicon-192.png">
 <link rel="apple-touch-icon" href="/Images/apple-touch-icon.png">
 <script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
@@ -311,29 +311,70 @@ html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB71
 .tip-wrap:hover .tip-card,
 .tip-wrap:focus-within .tip-card { display: block; }
 
-/* about card: label + value rows */
-.about-tip { width: 232px; }
+/* about card: brand header + people rows */
+.about-tip { width: 246px; padding: 0; overflow: hidden; }
 
-.about-row { display: flex; gap: 12px; }
-.about-row + .about-row {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-soft);
+.about-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(120deg, rgba(53, 198, 167, 0.16), rgba(22, 123, 114, 0.05));
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.about-label {
-  flex-shrink: 0;
-  width: 4em;
-  font-size: 0.72rem;
-  font-weight: 600;
+.about-head svg { width: 27px; height: 27px; flex-shrink: 0; border-radius: 7px; }
+
+.about-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3;
+  background-image: linear-gradient(118deg, #2FBE9E, #167B72);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html[data-theme="dark"] .about-title { background-image: linear-gradient(118deg, #5CE8C6, #35C6A7); }
+
+.about-sub { font-size: 0.68rem; color: var(--ink-3); line-height: 1.4; margin-top: 1px; }
+
+.about-body { padding: 11px 14px 13px; }
+
+.about-sec {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   color: var(--ink-4);
-  line-height: 1.75;
+  margin: 10px 0 6px;
 }
 
-.about-val {
+.about-sec:first-child { margin-top: 0; }
+
+.about-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--ink);
-  line-height: 1.75;
+  line-height: 1.4;
+}
+
+.about-person + .about-person { margin-top: 6px; }
+
+/* 首字头像圆片，--av 内联指定各自渐变色 */
+.about-avatar {
+  width: 21px; height: 21px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--av, linear-gradient(135deg, #2FBE9E, #167B72));
 }
 
 /* lang dropdown */
@@ -1491,8 +1532,21 @@ var _hmt = _hmt || [];
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         </button>
         <div class="tip-card about-tip" role="tooltip">
-          <div class="about-row"><span class="about-label">项目开发</span><span class="about-val">祈愿的猫</span></div>
-          <div class="about-row"><span class="about-label">鸣谢</span><span class="about-val">北京大学手语分社<br>Lynn<br>理性的狂想家</span></div>
+          <div class="about-head">
+            <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="abG" x1="30" y1="20" x2="160" y2="170" gradientUnits="userSpaceOnUse"><stop stop-color="#35C6A7"/><stop offset="1" stop-color="#167B72"/></linearGradient></defs><rect width="180" height="180" rx="40" fill="url(#abG)"/><g transform="translate(90,90) scale(1.3) translate(-100,-93)"><path d="M58 145V52C58 45 64 41 73 41H99C125 41 142 55 142 76C142 96 125 104 100 104H80" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+            <div>
+              <div class="about-title">拼好课</div>
+              <div class="about-sub">纯公益项目 · 每学期更新</div>
+            </div>
+          </div>
+          <div class="about-body">
+            <div class="about-sec">项目开发</div>
+            <div class="about-person"><span class="about-avatar">祈</span>祈愿的猫</div>
+            <div class="about-sec">鸣谢</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #6366F1, #4F46E5)">北</span>北京大学手语分社</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #F59E0B, #D97706)">L</span>Lynn</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #F43F5E, #E11D48)">理</span>理性的狂想家</div>
+          </div>
         </div>
       </div>
       <div class="font-selector" id="langSelector">
