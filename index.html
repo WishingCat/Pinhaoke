@@ -1490,6 +1490,16 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   .modal-action span { display: none; }
   .modal-action { padding: 7px 9px; }
   .back-top { right: 14px; bottom: 18px; }
+  /* 小屏上悬浮提示卡改为固定定位、屏内居中，避免超出屏幕左缘 */
+  .tip-wrap .tip-card {
+    position: fixed;
+    top: 60px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: 340px;
+    margin: 0 auto;
+  }
 }
 
 /* 超窄屏（老款/小屏手机）：语言按钮只留地球图标，副标题缩小到单行 */
@@ -1520,13 +1530,26 @@ var _hmt = _hmt || [];
       <span class="brand-name" id="brandName">拼好课</span>
     </a>
     <div class="topbar-actions">
-      <div class="tip-wrap">
-        <a class="top-btn sponsor-btn" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span>赞助</span>
-        </a>
-        <div class="tip-card" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
+      <div class="font-selector" id="langSelector">
+        <button class="top-btn" onclick="toggleLangDropdown()" aria-haspopup="listbox" aria-label="Language">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span id="langLabel">中文</span>
+        </button>
+        <div class="font-dropdown" id="langDropdown">
+          <button class="font-option active" data-lang="zh" onclick="setLang('zh')">中文</button>
+          <button class="font-option" data-lang="en" onclick="setLang('en')">English</button>
+          <button class="font-option" data-lang="ja" onclick="setLang('ja')">日本語</button>
+          <button class="font-option" data-lang="ko" onclick="setLang('ko')">한국어</button>
+          <button class="font-option" data-lang="fr" onclick="setLang('fr')">Fran&ccedil;ais</button>
+          <button class="font-option" data-lang="de" onclick="setLang('de')">Deutsch</button>
+          <button class="font-option" data-lang="es" onclick="setLang('es')">Espa&ntilde;ol</button>
+          <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
+        </div>
       </div>
+      <button class="icon-btn" onclick="toggleTheme()" aria-label="切换深色 / 浅色模式" title="Light / Dark">
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
       <div class="tip-wrap">
         <button class="icon-btn" type="button" aria-label="关于本项目">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -1549,29 +1572,16 @@ var _hmt = _hmt || [];
           </div>
         </div>
       </div>
-      <div class="font-selector" id="langSelector">
-        <button class="top-btn" onclick="toggleLangDropdown()" aria-haspopup="listbox" aria-label="Language">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <span id="langLabel">中文</span>
-        </button>
-        <div class="font-dropdown" id="langDropdown">
-          <button class="font-option active" data-lang="zh" onclick="setLang('zh')">中文</button>
-          <button class="font-option" data-lang="en" onclick="setLang('en')">English</button>
-          <button class="font-option" data-lang="ja" onclick="setLang('ja')">日本語</button>
-          <button class="font-option" data-lang="ko" onclick="setLang('ko')">한국어</button>
-          <button class="font-option" data-lang="fr" onclick="setLang('fr')">Fran&ccedil;ais</button>
-          <button class="font-option" data-lang="de" onclick="setLang('de')">Deutsch</button>
-          <button class="font-option" data-lang="es" onclick="setLang('es')">Espa&ntilde;ol</button>
-          <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
-        </div>
-      </div>
-      <button class="icon-btn" onclick="toggleTheme()" aria-label="切换深色 / 浅色模式" title="Light / Dark">
-        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      </button>
       <a class="icon-btn" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub — 给项目点个 Star">
         <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       </a>
+      <div class="tip-wrap">
+        <a class="top-btn sponsor-btn" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span>赞助</span>
+        </a>
+        <div class="tip-card" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
+      </div>
     </div>
   </div>
 </header>
