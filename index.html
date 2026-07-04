@@ -2083,7 +2083,7 @@ function trCourseName(course) {
 let currentLang = (function () {
   try {
     const stored = localStorage.getItem('pinhaoke_lang');
-    return (stored && TR_IDX[stored] !== undefined) || stored === 'zh' ? stored : 'zh';
+    return stored === 'zh' || TR_IDX[stored] !== undefined ? stored : 'zh';
   } catch (e) { return 'zh'; }
 })();
 // Always open a fresh tab on the spring term — the page is "the spring term
@@ -2092,6 +2092,10 @@ let currentLang = (function () {
 // readURLState(); the previous session's term is never restored.
 let currentTerm = 'spring';
 let randomSeed = 0;  // re-rolled when user picks sort=random
+
+function newRandomSeed() {
+  return Math.floor(Math.random() * 2147483647) || 1;
+}
 
 const WEEKDAYS_CN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
@@ -2149,7 +2153,7 @@ function readURLState() {
   csValues.filterSort       = p.get('sort') || '';
   if (csValues.filterSort === 'random') {
     const seed = parseInt(p.get('seed'), 10);
-    randomSeed = seed > 0 ? seed : (Math.floor(Math.random() * 2147483647) || 1);
+    randomSeed = seed > 0 ? seed : newRandomSeed();
   }
   return p.get('course') || '';
 }
@@ -2407,7 +2411,7 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
       // Re-roll the random seed every time the user (re)picks 随机 so the same
       // option gives a fresh shuffle; the seed then stays stable for paging.
       if (filterId === 'filterSort' && opt.dataset.value === 'random') {
-        randomSeed = Math.floor(Math.random() * 2147483647) || 1;
+        randomSeed = newRandomSeed();
       }
       applyFilters();
     });
@@ -2628,15 +2632,7 @@ function renderCards() {
   }
 
   container.innerHTML = '';
-  const fragment = document.createDocumentFragment();
-  for (const course of currentCourses) {
-    fragment.appendChild(createCard(course));
-  }
-  container.appendChild(fragment);
-
-  document.getElementById('loadMoreBtn').style.display =
-    currentCourses.length < totalCount ? 'block' : 'none';
-  updateResultsCount();
+  appendCards(currentCourses);
 }
 
 function appendCards(newCourses) {
@@ -2662,18 +2658,22 @@ function updateResultsCount() {
     i18n[currentLang].resultsCount(currentCourses.length, totalCount);
 }
 
+// Course type → badge palette. Summer-only types are routed onto the four
+// existing palettes so each type stays visually distinguishable; anything
+// unknown falls back to badge-major.
+const TYPE_BADGE_CLASS = {
+  '公选课': 'badge-elective',
+  '通识课': 'badge-general',
+  '研究生课': 'badge-grad',
+  '英语课': 'badge-elective',
+  '体育课': 'badge-general',
+  '劳动教育课': 'badge-general',
+  '政治课': 'badge-grad',
+  '计算机基础课': 'badge-major',
+};
+
 function getTypeBadgeClass(type) {
-  if (type === '公选课') return 'badge-elective';
-  if (type === '通识课') return 'badge-general';
-  if (type === '研究生课') return 'badge-grad';
-  // Summer-only types: route to one of the existing 4 palettes so each type
-  // is still visually distinguishable from each other.
-  if (type === '英语课') return 'badge-elective';
-  if (type === '体育课') return 'badge-general';
-  if (type === '劳动教育课') return 'badge-general';
-  if (type === '政治课') return 'badge-grad';
-  if (type === '计算机基础课') return 'badge-major';
-  return 'badge-major';
+  return TYPE_BADGE_CLASS[type] || 'badge-major';
 }
 
 function getTypeBadgeText(type) {

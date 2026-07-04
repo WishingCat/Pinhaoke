@@ -30,7 +30,7 @@ UG_DB = DB_DIR / "2026春季学期本科生课程.db"
 GR_DB = DB_DIR / "2026春季学期研究生课程.db"
 SUMMER_DB = DB_DIR / "2026暑期本科生课程.db"
 
-# (alias, path, id_prefix, list_select_var_name)
+# (alias, path, id_prefix)
 TERM_DBS = {
     "spring": [
         ("main", UG_DB, "u"),
@@ -64,9 +64,13 @@ def get_db(term: str = "spring"):
 
 # Common basic columns plus course_type. Undergrad has it natively; graduate
 # synthesises '研究生课'. pnp only exists on undergrad.
-LIST_SELECT_UG = """
+#
+# Spring UG and summer UG share the exact same schema and live in `main` when
+# their term is active — only the id prefix differs ('u' vs 's'), so both list
+# SELECTs come from this one template.
+_UG_LIST_SELECT = """
     SELECT
-        'u' || b.id            AS id,
+        '{prefix}' || b.id     AS id,
         b.course_type          AS course_type,
         b.course_code          AS course_code,
         b.class_no             AS class_no,
@@ -88,10 +92,13 @@ LIST_SELECT_UG = """
         d.grading              AS grading,
         d.language             AS language,
         ''                     AS audience,
-        'u'                    AS _level
+        '{prefix}'             AS _level
     FROM basic_info b
     LEFT JOIN detail_info d ON d.course_id = b.id
 """
+
+LIST_SELECT_UG = _UG_LIST_SELECT.format(prefix="u")
+LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(prefix="s")
 
 LIST_SELECT_GR = """
     SELECT
@@ -122,37 +129,6 @@ LIST_SELECT_GR = """
     LEFT JOIN gr.detail_info d ON d.course_id = b.id
 """
 
-# Summer undergrad: same schema as spring UG, but lives alone in `main` when
-# term=summer is active. Prefix 's' to keep ids unique across terms.
-LIST_SELECT_SUMMER = """
-    SELECT
-        's' || b.id            AS id,
-        b.course_type          AS course_type,
-        b.course_code          AS course_code,
-        b.class_no             AS class_no,
-        b.course_name          AS course_name,
-        b.category             AS category,
-        b.credits              AS credits,
-        b.teacher              AS teacher,
-        b.department           AS department,
-        b.major                AS major,
-        b.grade                AS grade,
-        b.schedule             AS schedule,
-        b.classroom            AS classroom,
-        b.weekdays             AS weekdays,
-        b.first_period         AS first_period,
-        b.enrollment           AS enrollment,
-        b.pnp                  AS pnp,
-        b.notes                AS notes,
-        d.english_name         AS english_name,
-        d.grading              AS grading,
-        d.language             AS language,
-        ''                     AS audience,
-        's'                    AS _level
-    FROM basic_info b
-    LEFT JOIN detail_info d ON d.course_id = b.id
-"""
-
 # Pre-built UNION expressions for each term.
 TERM_UNION_SQL = {
     "spring": f"({LIST_SELECT_UG} UNION ALL {LIST_SELECT_GR})",
@@ -168,56 +144,55 @@ def get_filters(term: str = Query("spring", description="spring | summer")):
     with get_db(term) as conn:
         c = conn.cursor()
 
+        def col(sql: str) -> list:
+            return [r[0] for r in c.execute(sql)]
+
         if term == "spring":
-            course_types = [r[0] for r in c.execute(
+            course_types = col(
                 """SELECT DISTINCT course_type FROM basic_info
                    WHERE course_type != ''
                    UNION
                    SELECT '研究生课'
                    ORDER BY 1"""
-            )]
-            categories = [r[0] for r in c.execute(
+            )
+            categories = col(
                 """SELECT DISTINCT category FROM basic_info WHERE category != ''
                    UNION
                    SELECT DISTINCT category FROM gr.basic_info WHERE category != ''
                    ORDER BY 1"""
-            )]
-            departments = [r[0] for r in c.execute(
+            )
+            departments = col(
                 """SELECT DISTINCT department FROM basic_info WHERE department != ''
                    UNION
                    SELECT DISTINCT department FROM gr.basic_info WHERE department != ''
                    ORDER BY 1"""
-            )]
-            credits = [r[0] for r in c.execute(
+            )
+            credits = col(
                 """SELECT DISTINCT credits FROM basic_info
                    UNION
                    SELECT DISTINCT credits FROM gr.basic_info
                    ORDER BY 1"""
-            )]
-            gradings = [r[0] for r in c.execute(
-                """SELECT DISTINCT grading FROM detail_info
-                   WHERE grading != '' ORDER BY grading"""
-            )]
+            )
         else:  # summer — single DB
-            course_types = [r[0] for r in c.execute(
+            course_types = col(
                 """SELECT DISTINCT course_type FROM basic_info
                    WHERE course_type != '' ORDER BY 1"""
-            )]
-            categories = [r[0] for r in c.execute(
+            )
+            categories = col(
                 """SELECT DISTINCT category FROM basic_info
                    WHERE category != '' ORDER BY 1"""
-            )]
-            departments = [r[0] for r in c.execute(
+            )
+            departments = col(
                 """SELECT DISTINCT department FROM basic_info
                    WHERE department != '' ORDER BY 1"""
-            )]
-            credits = [r[0] for r in c.execute(
-                "SELECT DISTINCT credits FROM basic_info ORDER BY 1"
-            )]
-            gradings = [r[0] for r in c.execute(
-                """SELECT DISTINCT grading FROM detail_info
-                   WHERE grading != '' ORDER BY grading"""
-            )]
+            )
+            credits = col("SELECT DISTINCT credits FROM basic_info ORDER BY 1")
+
+        # grading only exists on undergrad detail_info, which is `main` in both terms.
+        gradings = col(
+            """SELECT DISTINCT grading FROM detail_info
+               WHERE grading != '' ORDER BY grading"""
+        )
 
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -483,6 +458,10 @@ def list_courses(
 # ---- detail -------------------------------------------------------------------
 
 
+# id prefix → term whose DB set contains that level's courses.
+_PREFIX_TERM = {"u": "spring", "g": "spring", "s": "summer"}
+
+
 def _parse_id(course_id: str):
     """Return (term, level, local_id) or (None, None, None) on parse failure.
 
@@ -492,17 +471,14 @@ def _parse_id(course_id: str):
     if not course_id:
         return None, None, None
     prefix = course_id[0]
+    term = _PREFIX_TERM.get(prefix)
+    if term is None:
+        return None, None, None
     try:
         local_id = int(course_id[1:])
     except ValueError:
         return None, None, None
-    if prefix == "u":
-        return "spring", "u", local_id
-    if prefix == "g":
-        return "spring", "g", local_id
-    if prefix == "s":
-        return "summer", "s", local_id
-    return None, None, None
+    return term, prefix, local_id
 
 
 # Fields the translations table can override per (course_id, field, lang).
@@ -570,19 +546,16 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
 
     with get_db(term) as conn:
         cur = conn.cursor()
-        if level == "u":
-            sql = _UG_DETAIL_SELECT.format(prefix="u")
-        elif level == "s":
-            sql = _UG_DETAIL_SELECT.format(prefix="s")
-        else:
+        if level == "g":
             sql = _GR_DETAIL_SELECT
+        else:  # 'u' / 's' share the UG shape; the prefix is the level itself
+            sql = _UG_DETAIL_SELECT.format(prefix=level)
         row = cur.execute(sql, (local_id,)).fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        keys = row.keys()
-        out = {k: row[k] for k in keys}
+        out = dict(row)
 
         # Replace every translatable field with its translation when present.
         ns = "gr" if level == "g" else "main"
