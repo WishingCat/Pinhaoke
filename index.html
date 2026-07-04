@@ -144,7 +144,7 @@ body {
   color: var(--ink);
   line-height: 1.55;
   min-height: 100vh;
-  background: var(--bg);
+  /* 页面底色由 html 承载：body 保持透明，z-index:-1 的环境柔光才能露出来 */
   font-feature-settings: "kern" 1, "palt" 1;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -152,6 +152,35 @@ body {
 }
 
 ::selection { background: var(--accent); color: #FFFFFF; }
+
+/* ===== Page ambient glow — very faint aurora anchored to the viewport,
+   drifts slowly so the whole page feels alive without pulling focus ===== */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -10% -10% auto -10%;
+  height: 620px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 60% at 15% 0%, rgba(53, 198, 167, 0.10), transparent 62%),
+    radial-gradient(34% 56% at 88% 4%, rgba(79, 70, 229, 0.07), transparent 60%),
+    radial-gradient(30% 50% at 60% 30%, rgba(20, 96, 106, 0.05), transparent 66%);
+  filter: blur(6px);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+}
+
+html[data-theme="dark"] body::before {
+  background:
+    radial-gradient(38% 60% at 15% 0%, rgba(53, 198, 167, 0.12), transparent 62%),
+    radial-gradient(34% 56% at 88% 4%, rgba(115, 150, 242, 0.09), transparent 60%),
+    radial-gradient(30% 50% at 60% 30%, rgba(70, 214, 184, 0.06), transparent 66%);
+}
+
+@keyframes aurora-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(0, 14px, 0) scale(1.05); }
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -161,6 +190,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
   html { scroll-behavior: auto; }
+  /* 无限交替的环境光动画在 0.001s 时长下会逐帧闪烁，直接关掉 */
+  body::before { animation: none !important; }
 }
 
 /* ===== Container ===== */
@@ -183,6 +214,16 @@ body {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
+}
+
+/* 底边叠一条渐变发丝，从品牌侧的青绿淡出 */
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 40%, transparent), color-mix(in srgb, var(--accent) 12%, transparent) 40%, transparent 78%);
 }
 
 .topbar-inner {
@@ -439,8 +480,8 @@ html[data-theme="dark"] .about-title { background-image: linear-gradient(118deg,
   width: min(720px, 92vw); height: 250px;
   transform: translateX(-50%);
   background:
-    radial-gradient(45% 60% at 33% 42%, rgba(53, 198, 167, 0.17), transparent 70%),
-    radial-gradient(40% 55% at 67% 46%, rgba(79, 70, 229, 0.10), transparent 70%);
+    radial-gradient(45% 60% at 33% 42%, rgba(53, 198, 167, 0.14), transparent 70%),
+    radial-gradient(40% 55% at 67% 46%, rgba(79, 70, 229, 0.09), transparent 70%);
   filter: blur(8px);
   pointer-events: none;
 }
@@ -606,6 +647,7 @@ html[data-theme="dark"] .term-toggle button.active {
 html[data-theme="dark"] .filters-badge { color: #0E1013; }
 
 .filters {
+  position: relative;
   margin-bottom: 16px;
   padding: 22px 24px;
   background: var(--surface);
@@ -613,6 +655,24 @@ html[data-theme="dark"] .filters-badge { color: #0E1013; }
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
 }
+
+/* 顶部一条极淡的青绿柔光，让筛选卡不再是一块纯白
+   （不能用 overflow:hidden 裁切——会剪掉下拉菜单，圆角由伪元素自己收） */
+.filters::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 120px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  pointer-events: none;
+  background: radial-gradient(120% 100% at 0% 0%, rgba(53, 198, 167, 0.07), transparent 60%);
+}
+
+html[data-theme="dark"] .filters::before {
+  background: radial-gradient(120% 100% at 0% 0%, rgba(70, 214, 184, 0.06), transparent 60%);
+}
+
+.filter-grid { position: relative; }
 
 .filter-grid {
   display: grid;
@@ -901,20 +961,20 @@ html[data-theme="dark"] .filters-badge { color: #0E1013; }
 .course-card[data-strip="major"]    { --card-c: var(--c-major); }
 .course-card[data-strip="grad"]     { --card-c: var(--c-grad); }
 
-/* soft color aura in the top-right corner, brightens on hover */
+/* soft color aura in the top-right corner — kept very faint, hover brings a whisper more */
 .course-card::after {
   content: '';
   position: absolute;
-  top: -48px; right: -48px;
-  width: 140px; height: 140px;
+  top: -58px; right: -58px;
+  width: 128px; height: 128px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--card-c) 0%, transparent 70%);
-  opacity: 0.08;
+  background: radial-gradient(circle, var(--card-c) 0%, transparent 68%);
+  opacity: 0.045;
   pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.course-card:hover::after { opacity: 0.16; transform: scale(1.2); }
+.course-card:hover::after { opacity: 0.09; transform: scale(1.15); }
 
 .course-card:hover {
   border-color: color-mix(in srgb, var(--card-c) 80%, var(--border));
@@ -931,7 +991,7 @@ html[data-theme="dark"] .course-card {
   border-color: color-mix(in srgb, var(--card-c) 42%, var(--border));
 }
 
-html[data-theme="dark"] .course-card::after { opacity: 0.1; }
+html[data-theme="dark"] .course-card::after { opacity: 0.07; }
 
 html[data-theme="dark"] .course-card:hover {
   border-color: color-mix(in srgb, var(--card-c) 85%, var(--border));
@@ -939,7 +999,7 @@ html[data-theme="dark"] .course-card:hover {
               0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
-html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
+html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 
 .course-card:focus-visible {
   outline: none;
@@ -1146,7 +1206,8 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   align-items: flex-start;
   gap: 14px;
   padding: 22px 28px 14px;
-  background: var(--surface);
+  /* 底层 surface 保证 sticky 滚动时不透内容，上层是一抹青绿薄光 */
+  background: linear-gradient(120deg, rgba(53, 198, 167, 0.07), rgba(53, 198, 167, 0) 48%), var(--surface);
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -1342,10 +1403,16 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
 }
 
 .load-more:hover {
-  border-color: var(--ink);
-  color: var(--ink);
-  background: var(--bg);
-  box-shadow: var(--shadow);
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: linear-gradient(120deg, rgba(53, 198, 167, 0.10), rgba(53, 198, 167, 0.02) 65%), var(--surface);
+  box-shadow: 0 4px 14px rgba(22, 123, 114, 0.14), 0 2px 4px rgba(16, 18, 23, 0.04);
+}
+
+html[data-theme="dark"] .load-more:hover {
+  color: var(--accent);
+  background: linear-gradient(120deg, rgba(70, 214, 184, 0.10), rgba(70, 214, 184, 0.02) 65%), var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 .load-more:active { transform: scale(0.98); }
@@ -1370,11 +1437,13 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   opacity: 0.7;
 }
 
+/* 锥形渐变圆环加载指示：颜色沿圆周由透明渐入青绿 */
 .spinner {
   width: 32px; height: 32px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
   border-radius: 50%;
+  background: conic-gradient(from 90deg, transparent 8%, var(--accent));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
   animation: spin 0.8s linear infinite;
   margin: 0 auto 16px;
 }
@@ -1413,10 +1482,38 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
    ============================================================ */
 
 .site-footer {
+  position: relative;
   margin-top: 64px;
-  padding: 32px 0 8px;
-  border-top: 1px solid var(--border);
+  padding: 34px 0 8px;
   text-align: center;
+}
+
+/* 渐变发丝分隔线：中间青绿最亮，两端淡出 */
+.site-footer::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 90%);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 55%, transparent) 50%, transparent);
+}
+
+/* 分隔线上方一抹极淡柔光 */
+.site-footer::after {
+  content: '';
+  position: absolute;
+  top: -28px; left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 80%);
+  height: 90px;
+  pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 100%, rgba(53, 198, 167, 0.10), transparent 70%);
+  filter: blur(6px);
+}
+
+html[data-theme="dark"] .site-footer::after {
+  background: radial-gradient(60% 100% at 50% 100%, rgba(70, 214, 184, 0.09), transparent 70%);
 }
 
 .footer-info {
