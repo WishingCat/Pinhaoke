@@ -6,7 +6,7 @@
 <title>北大课程搜索 | PKU Course Search</title>
 <meta name="description" content="拼好课 — 北京大学课程搜索：本科生 / 研究生 / 暑期课程，支持多语言、筛选与链接分享。PKU Course Search.">
 <meta name="theme-color" content="#F7F7F8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232E63E7'/%3E%3Cstop offset='1' stop-color='%237C5CFC'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Ccircle cx='29' cy='29' r='12' fill='none' stroke='%23fff' stroke-width='5'/%3E%3Cline x1='38.5' y1='38.5' x2='47' y2='47' stroke='%23fff' stroke-width='5.5' stroke-linecap='round'/%3E%3Ccircle cx='25.5' cy='26.5' r='1.9' fill='%23fff'/%3E%3Ccircle cx='32.5' cy='26.5' r='1.9' fill='%23fff'/%3E%3Cpath d='M24.5 31.5 q4.5 4 9 0' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CclipPath id='c'%3E%3Crect width='64' height='64' rx='15'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg clip-path='url(%23c)'%3E%3Crect width='32' height='32' fill='%234F46E5'/%3E%3Crect x='32' width='32' height='32' fill='%23059669'/%3E%3Crect y='32' width='32' height='32' fill='%23D97706'/%3E%3Crect x='32' y='32' width='32' height='32' fill='%23E11D48'/%3E%3Ccircle cx='32' cy='16' r='6.5' fill='%234F46E5'/%3E%3Ccircle cx='48' cy='32' r='6.5' fill='%23059669'/%3E%3Ccircle cx='32' cy='48' r='6.5' fill='%23E11D48'/%3E%3Ccircle cx='16' cy='32' r='6.5' fill='%23D97706'/%3E%3Cpath d='M32 0 V9.5 A6.5 6.5 0 0 1 32 22.5 V41.5 A6.5 6.5 0 0 0 32 54.5 V64 M0 32 H9.5 A6.5 6.5 0 0 1 22.5 32 H41.5 A6.5 6.5 0 0 0 54.5 32 H64' fill='none' stroke='%23fff' stroke-width='3.2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="192x192" href="/Images/favicon-192.png">
 <link rel="apple-touch-icon" href="/Images/apple-touch-icon.png">
 <script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
@@ -201,6 +201,7 @@ body {
   align-items: center;
   gap: 10px;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -214,6 +215,7 @@ body {
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .topbar-actions {
@@ -1364,7 +1366,12 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
 @media (max-width: 640px) {
   .container { padding: 0 16px 60px; }
   .topbar-inner { padding: 0 16px; height: 52px; }
+  .brand { gap: 8px; }
   .brand-name { font-size: 0.98rem; }
+  .topbar-actions { gap: 6px; }
+  /* 小屏顶栏空间有限：赞助按钮只留爱心图标，避免品牌名被挤换行 */
+  .sponsor-btn span { display: none; }
+  .sponsor-btn { padding: 6px 8px; }
   .top-btn { padding: 6px 10px; font-size: 0.74rem; }
   .icon-btn { width: 31px; height: 31px; }
   .hero { padding: 36px 8px 4px; }
@@ -1387,6 +1394,12 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.18; }
   .back-top { right: 14px; bottom: 18px; }
 }
 
+/* 超窄屏（老款/小屏手机）：语言按钮只留地球图标，副标题缩小到单行 */
+@media (max-width: 400px) {
+  #langLabel { display: none; }
+  .hero .subtitle { font-size: 0.78rem; }
+}
+
 </style>
 <script>
 var _hmt = _hmt || [];
@@ -1404,7 +1417,8 @@ var _hmt = _hmt || [];
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">
-      <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="phkGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E63E7"/><stop offset="1" stop-color="#7C5CFC"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#phkGrad)"/><circle cx="29" cy="29" r="12" fill="none" stroke="#fff" stroke-width="5"/><line x1="38.5" y1="38.5" x2="47" y2="47" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><circle cx="25.5" cy="26.5" r="1.9" fill="#fff"/><circle cx="32.5" cy="26.5" r="1.9" fill="#fff"/><path d="M24.5 31.5 q4.5 4 9 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <!-- 四色拼图：四块 = 站内四种课程类型色（公选/通识/专业/研究生），"拼"好课 -->
+      <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><clipPath id="phkClip"><rect width="64" height="64" rx="15"/></clipPath></defs><g clip-path="url(#phkClip)"><rect width="32" height="32" fill="#4F46E5"/><rect x="32" width="32" height="32" fill="#059669"/><rect y="32" width="32" height="32" fill="#D97706"/><rect x="32" y="32" width="32" height="32" fill="#E11D48"/><circle cx="32" cy="16" r="6.5" fill="#4F46E5"/><circle cx="48" cy="32" r="6.5" fill="#059669"/><circle cx="32" cy="48" r="6.5" fill="#E11D48"/><circle cx="16" cy="32" r="6.5" fill="#D97706"/><path d="M32 0 V9.5 A6.5 6.5 0 0 1 32 22.5 V41.5 A6.5 6.5 0 0 0 32 54.5 V64 M0 32 H9.5 A6.5 6.5 0 0 1 22.5 32 H41.5 A6.5 6.5 0 0 0 54.5 32 H64" fill="none" stroke="#fff" stroke-width="3.2"/></g></svg>
       <span class="brand-name" id="brandName">拼好课</span>
     </a>
     <div class="topbar-actions">
@@ -1536,8 +1550,9 @@ var _hmt = _hmt || [];
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-info">
-      <div class="footer-item"><strong>鸣谢</strong> <span class="footer-names">北京大学爱心社 北京大学爱心社手语分社</span></div>
-      <div class="footer-item"><a class="footer-link" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener">给项目点个 Star · 欢迎反馈意见 · <span class="designer">Design By 祈愿的猫</span></a></div>
+      <div class="footer-item"><strong>项目开发</strong> <span class="footer-names">祈愿的猫</span></div>
+      <div class="footer-item"><strong>鸣谢</strong> <span class="footer-names">北京大学手语分社 · Lynn · 理性的狂想家</span></div>
+      <div class="footer-item"><a class="footer-link" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener">给项目点个 Star · <span class="designer">欢迎反馈意见</span></a></div>
     </div>
     <div class="footer-msg">欢迎大家把网站分享给其他好朋友们！会一直更新下去为大家服务的~</div>
   </footer>
