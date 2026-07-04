@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="pinhaoke Pin light icon">
+  <defs>
+    <linearGradient id="pinhaokeMarkGradient" x1="55" y1="32" x2="156" y2="152" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35C6A7"/>
+      <stop offset="1" stop-color="#167B72"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="132" height="132" rx="34" fill="#F6FFFC"/>
+  <path d="M58 145V52C58 45 64 41 73 41H99C125 41 142 55 142 76C142 96 125 104 100 104H80" fill="none" stroke="url(#pinhaokeMarkGradient)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="none" stroke="#233F48" stroke-width="9.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="109" cy="126" r="6.2" fill="#233F48" stroke="none"/>
+    <path d="M109 139V150"/>
+    <path d="M128 150V128M128 140C133 132 142 128 148 132C151 135 151 142 151 150"/>
+  </g>
+</svg>
