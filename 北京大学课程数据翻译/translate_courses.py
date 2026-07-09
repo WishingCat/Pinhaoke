@@ -44,6 +44,7 @@ UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
 SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
 FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
+FALL_GR_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期研究生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -110,8 +111,8 @@ def fetch_pending_undergrad(db_path: str = UG_DB):
     return pending
 
 
-def fetch_pending_grad(field_src: str, field_store: str):
-    conn = sqlite3.connect(GR_DB)
+def fetch_pending_grad(field_src: str, field_store: str, db_path: str = GR_DB):
+    conn = sqlite3.connect(db_path)
     rows = conn.execute(
         f"SELECT course_id, {field_src} FROM detail_info "
         f"WHERE {field_src} IS NOT NULL AND {field_src} != ''"
@@ -220,7 +221,10 @@ def main():
     ap.add_argument("--workers", type=int, default=10,
                     help="Parallel API workers.")
     ap.add_argument("--only",
-                    choices=["ug_intro", "gr_intro", "gr_extra", "summer_intro", "fall_intro"],
+                    choices=[
+                        "ug_intro", "gr_intro", "gr_extra", "summer_intro", "fall_intro",
+                        "fall_gr_intro", "fall_gr_extra",
+                    ],
                     help="Restrict to one job for testing.")
     args = ap.parse_args()
 
@@ -229,18 +233,23 @@ def main():
     setup_db(GR_DB)
     setup_db(SUMMER_DB)
     setup_db(FALL_DB)
+    setup_db(FALL_GR_DB)
 
     print("== Pending lists ==")
     ug = fetch_pending_undergrad(UG_DB)
-    gr_intro = fetch_pending_grad("intro", "intro_cn")
-    gr_extra = fetch_pending_grad("extra_notes", "extra_notes")
+    gr_intro = fetch_pending_grad("intro", "intro_cn", GR_DB)
+    gr_extra = fetch_pending_grad("extra_notes", "extra_notes", GR_DB)
     summer = fetch_pending_undergrad(SUMMER_DB)
     fall = fetch_pending_undergrad(FALL_DB)
+    fall_gr_intro = fetch_pending_grad("intro", "intro_cn", FALL_GR_DB)
+    fall_gr_extra = fetch_pending_grad("extra_notes", "extra_notes", FALL_GR_DB)
     print(f"  undergrad intro_cn : {len(ug):4d} rows")
     print(f"  graduate  intro    : {len(gr_intro):4d} rows")
     print(f"  graduate  extra    : {len(gr_extra):4d} rows")
     print(f"  summer    intro_cn : {len(summer):4d} rows")
     print(f"  fall      intro_cn : {len(fall):4d} rows")
+    print(f"  fall grad intro    : {len(fall_gr_intro):4d} rows")
+    print(f"  fall grad extra    : {len(fall_gr_extra):4d} rows")
 
     jobs = []
     if args.only in (None, "ug_intro"):
@@ -253,6 +262,10 @@ def main():
         jobs.append((SUMMER_DB, "intro_cn", summer))
     if args.only in (None, "fall_intro"):
         jobs.append((FALL_DB, "intro_cn", fall))
+    if args.only in (None, "fall_gr_intro"):
+        jobs.append((FALL_GR_DB, "intro_cn", fall_gr_intro))
+    if args.only in (None, "fall_gr_extra"):
+        jobs.append((FALL_GR_DB, "extra_notes", fall_gr_extra))
 
     all_items = []
     for db, field, items in jobs:

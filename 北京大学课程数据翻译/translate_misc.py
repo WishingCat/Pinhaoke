@@ -51,6 +51,7 @@ UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
 SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
 FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
+FALL_GR_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期研究生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -126,6 +127,20 @@ SHORT_JOBS = [
      "General Education core/elective series name", False),
     (FALL_DB, "textbook",      "detail_info", "textbook",
      "Textbook citation(s)", False),
+
+    # 26-27 fall graduate (same schema as spring GR, plus syllabus handled as long)
+    (FALL_GR_DB, "course_name", "basic_info",  "course_name",
+     "Chinese university course title", False),
+    (FALL_GR_DB, "notes",       "basic_info",  "notes",
+     "Short course-registration note", False),
+    (FALL_GR_DB, "classroom",   "basic_info",  "classroom",
+     "Classroom or building+room", False),
+    (FALL_GR_DB, "major",       "basic_info",  "major",
+     "Major / specialization restriction", False),
+    (FALL_GR_DB, "audience",    "detail_info", "audience",
+     "Target audience (e.g. 硕博 = Master & PhD)", False),
+    (FALL_GR_DB, "term",        "detail_info", "term",
+     "Academic term / semester", False),
 ]
 LONG_JOBS = [
     (UG_DB, "syllabus",     "detail_info", "syllabus",
@@ -152,6 +167,12 @@ LONG_JOBS = [
      "Long-form teacher/student course evaluations (preserve structure)", True),
     (FALL_DB, "reference_book","detail_info","reference_book",
      "Reference book list", True),
+
+    # 26-27 fall graduate
+    (FALL_GR_DB, "reference_book","detail_info","reference_book",
+     "Reference book list (citations, may be long)", True),
+    (FALL_GR_DB, "syllabus",     "detail_info", "syllabus",
+     "Long-form syllabus / weekly schedule (preserve newlines and structure)", True),
 ]
 
 
@@ -272,7 +293,7 @@ def fetch_jobs(jobs, allow_non_cn=False):
 
 def reuse_english_for_course_names():
     """Copy english_name into translations as (course_id, 'course_name', 'en')."""
-    for db_path in (UG_DB, GR_DB, SUMMER_DB, FALL_DB):
+    for db_path in (UG_DB, GR_DB, SUMMER_DB, FALL_DB, FALL_GR_DB):
         conn = sqlite3.connect(db_path)
         rows = conn.execute(
             "SELECT course_id, english_name FROM detail_info "
@@ -309,8 +330,8 @@ def main():
     ap.add_argument("--phase", choices=["short", "long", "all"], default="short")
     ap.add_argument("--workers", type=int, default=15)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--db", choices=["ug", "gr", "summer", "fall", "all"], default="all",
-                    help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad, fall = 26-27 fall undergrad). Default: all.")
+    ap.add_argument("--db", choices=["ug", "gr", "summer", "fall", "fall_gr", "all"], default="all",
+                    help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad, fall = 26-27 fall undergrad, fall_gr = 26-27 fall graduate). Default: all.")
     ap.add_argument("--allow-non-cn", action="store_true",
                     help="Also process rows whose source has no Chinese characters "
                          "(e.g. course_name is English-only). Use to translate "
@@ -328,7 +349,8 @@ def main():
         "gr":     {GR_DB},
         "summer": {SUMMER_DB},
         "fall":   {FALL_DB},
-        "all":    {UG_DB, GR_DB, SUMMER_DB, FALL_DB},
+        "fall_gr": {FALL_GR_DB},
+        "all":    {UG_DB, GR_DB, SUMMER_DB, FALL_DB, FALL_GR_DB},
     }[args.db]
 
     jobs = []

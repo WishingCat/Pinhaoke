@@ -95,6 +95,8 @@ bash /opt/pinhaoke/deploy/update.sh    # git pull + venv check + systemd reload 
 
 `deploy/update.sh` is the only sanctioned deploy path. systemd unit `pinhaoke.service` runs `uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2` as `www-data`. Nginx (`deploy/nginx.conf`) proxies `/` to `:8000` and serves `/Images/` directly.
 
+The fall DB files are stored with Git LFS because the translated undergraduate DB exceeds GitHub's 100 MiB normal-blob limit. The production server has `git-lfs` installed, and `deploy/update.sh` runs `git lfs pull` whenever `.gitattributes` contains LFS filters.
+
 If `index.html` deployment looks reverted to the old glassmorphism design, it's **always browser/CDN cache** — verify with `curl -s http://127.0.0.1:8000/ | grep "CLEAN MODERN"` on the server.
 
 ## Architecture you need to know before editing
@@ -142,7 +144,7 @@ DB ids are namespaced by single-char prefix so all DBs can coexist in URL space:
 ### i18n is hybrid (two stores)
 
 1. **Finite dictionaries in `index.html`** (`const dataI18n`, ~line 1720): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
-2. **Per-row `translations` table in each DB**: for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/`. Current counts: spring UG 100156 rows, spring GR 39445 rows, summer UG 10010 rows, fall UG 124734 rows, fall GR 0 rows.
+2. **Per-row `translations` table in each DB**: for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/`. Current counts: spring UG 100156 rows, spring GR 39445 rows, summer UG 10010 rows, fall UG 159138 rows, fall GR 52430 rows.
 
 Both endpoints accept `?lang=xx`; when `lang != 'zh'`, the backend swaps Chinese values for translations from the table when a translation exists and otherwise leaves the original text in place. The list endpoint translates only card-visible fields (`course_name`, `classroom`, `notes`) to keep the query small; the detail endpoint translates everything in `TRANSLATABLE_FIELDS`.
 

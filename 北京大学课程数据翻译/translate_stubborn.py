@@ -160,9 +160,10 @@ if __name__ == "__main__":
     _GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
     _SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
     _FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
+    _FALL_GR_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期研究生课程.db")
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", choices=["gr", "ug", "summer", "fall", "all"], default="all")
+    ap.add_argument("--db", choices=["gr", "ug", "summer", "fall", "fall_gr", "all"], default="all")
     ap.add_argument("--field", choices=["intro", "extra_notes", "syllabus", "evaluation", "reference_book", "all"], default="all")
     ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--limit", type=int, default=0)
@@ -179,6 +180,10 @@ if __name__ == "__main__":
         ("fall", "syllabus", _FALL_DB, "syllabus", "syllabus", "Fall syllabus"),
         ("fall", "evaluation", _FALL_DB, "evaluation", "evaluation", "Fall evaluation"),
         ("fall", "reference_book", _FALL_DB, "reference_book", "reference_book", "Fall reference_book"),
+        ("fall_gr", "intro", _FALL_GR_DB, "intro", "intro_cn", "Fall GR intro"),
+        ("fall_gr", "extra_notes", _FALL_GR_DB, "extra_notes", "extra_notes", "Fall GR extra"),
+        ("fall_gr", "syllabus", _FALL_GR_DB, "syllabus", "syllabus", "Fall GR syllabus"),
+        ("fall_gr", "reference_book", _FALL_GR_DB, "reference_book", "reference_book", "Fall GR reference_book"),
     ]
     selected = [
         task for task in all_tasks

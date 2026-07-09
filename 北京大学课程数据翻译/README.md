@@ -6,8 +6,8 @@
 
 | 数据库 | 课程数 | translations 行数 |
 |---|---:|---:|
-| `数据库/2026秋季学期本科生课程.db` | 3032 | 124734 |
-| `数据库/2026秋季学期研究生课程.db` | 1611 | 0 |
+| `数据库/2026秋季学期本科生课程.db` | 3032 | 159138 |
+| `数据库/2026秋季学期研究生课程.db` | 1611 | 52430 |
 | `数据库/2026春季学期本科生课程.db` | 2465 | 100156 |
 | `数据库/2026春季学期研究生课程.db` | 1379 | 39445 |
 | `数据库/2026暑期本科生课程.db` | 194 | 10010 |
@@ -56,9 +56,9 @@ set -a; source .env; set +a
 
 | 脚本 | 覆盖范围 | 常用命令 |
 |---|---|---|
-| `translate_courses.py` | 春季本科 `intro_cn`、暑期本科 `intro_cn`、秋季本科 `intro_cn`、春季研究生 `intro`（统一存为 `intro_cn`）、春季研究生 `extra_notes` | `python3 北京大学课程数据翻译/translate_courses.py` |
-| `translate_misc.py` | 春季本科、暑期本科、秋季本科及春季研究生的其余短字段与长字段：课程名、备注、PNP、教室、专业、先修、通识系列、教材、参考书、教学大纲、教学评估等 | `python3 北京大学课程数据翻译/translate_misc.py --phase short` / `--phase long` |
-| `translate_stubborn.py` | 单语言兜底补齐：春季研究生 intro/extra、春季本科 intro、暑期 intro/syllabus/evaluation、秋季本科 intro/syllabus/evaluation/reference_book | `python3 北京大学课程数据翻译/translate_stubborn.py` |
+| `translate_courses.py` | 春季本科 `intro_cn`、暑期本科 `intro_cn`、秋季本科 `intro_cn`、春季研究生/秋季研究生 `intro`（统一存为 `intro_cn`）和 `extra_notes` | `python3 北京大学课程数据翻译/translate_courses.py` |
+| `translate_misc.py` | 春季本科、暑期本科、秋季本科、春季研究生和秋季研究生的其余短字段与长字段：课程名、备注、PNP、教室、专业、先修、通识系列、教材、参考书、教学大纲、教学评估等 | `python3 北京大学课程数据翻译/translate_misc.py --phase short` / `--phase long` |
+| `translate_stubborn.py` | 单语言兜底补齐：研究生 intro/extra/syllabus/reference_book、本科 intro/syllabus/evaluation/reference_book | `python3 北京大学课程数据翻译/translate_stubborn.py` |
 
 所有脚本都可断点续跑。已写入的 `(course_id, field, lang)` 会被跳过或覆盖写入，不需要手工清理。
 
@@ -86,9 +86,11 @@ python3 北京大学课程数据翻译/translate_stubborn.py
 python3 北京大学课程数据翻译/translate_courses.py --limit 5
 python3 北京大学课程数据翻译/translate_courses.py --only summer_intro
 python3 北京大学课程数据翻译/translate_courses.py --only fall_intro
+python3 北京大学课程数据翻译/translate_courses.py --only fall_gr_intro
 python3 北京大学课程数据翻译/translate_misc.py --phase short --workers 10
 python3 北京大学课程数据翻译/translate_misc.py --phase long --workers 10
 python3 北京大学课程数据翻译/translate_stubborn.py --db fall --field intro --workers 10
+python3 北京大学课程数据翻译/translate_stubborn.py --db fall_gr --field syllabus --workers 10
 ```
 
 建议并发从 10 到 15 起步。代理偶尔会对 30 以上并发返回 5xx 或 429。
@@ -102,8 +104,10 @@ python3 北京大学课程数据翻译/translate_stubborn.py --db fall --field i
 - 秋季本科：`detail_info.intro_cn` → `translations.field='intro_cn'`
 - 春季研究生：`detail_info.intro` → `translations.field='intro_cn'`
 - 春季研究生：`detail_info.extra_notes` → `translations.field='extra_notes'`
+- 秋季研究生：`detail_info.intro` → `translations.field='intro_cn'`
+- 秋季研究生：`detail_info.extra_notes` → `translations.field='extra_notes'`
 
-本科形态数据库如果 `detail_info.intro_en` 已有英文简介，脚本会直接写入 `lang='en'`，不再调用 API。秋季研究生库目前暂未纳入翻译脚本，前端会显示原始中文，后续扩展脚本后可直接写入其 `translations` 表。
+本科形态数据库如果 `detail_info.intro_en` 已有英文简介，脚本会直接写入 `lang='en'`，不再调用 API。
 
 ### 其他字段
 
@@ -121,7 +125,7 @@ audience, term
 syllabus, evaluation, reference_book
 ```
 
-春季本科、暑期本科和秋季本科 schema 相同；研究生 schema 不同，因此脚本内部分别列任务。
+春季本科、暑期本科和秋季本科 schema 相同；研究生 schema 不同，因此脚本内部分别列任务。秋季研究生比春季研究生多 `syllabus` 字段，翻译脚本已单独纳入。
 
 ## 六、校验
 

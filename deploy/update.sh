@@ -18,6 +18,14 @@ systemctl stop "$SERVICE" || true
 echo "==> [2/6] 拉取最新代码（强制对齐 origin/main）"
 git fetch origin
 git reset --hard origin/main
+if grep -q "filter=lfs" .gitattributes 2>/dev/null; then
+    if ! command -v git-lfs >/dev/null 2>&1; then
+        echo "    ❌ 仓库使用 Git LFS，但服务器未安装 git-lfs"
+        exit 1
+    fi
+    git lfs install --local
+    git lfs pull
+fi
 
 echo "==> [3/6] 检查依赖"
 NEED_REBUILD=0
