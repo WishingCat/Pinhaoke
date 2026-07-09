@@ -5,6 +5,8 @@ __pycache__/
 .auth/
 .playwright-mcp/
 tmp_summer/
+tmp_undergrad_2627_fall/
+tmp_graduate_2627_fall/
 
 # 翻译用的 API 凭据/密钥文件，永远不要提交
 .env

@@ -1,129 +1,132 @@
-# 北大 2026 暑期课程抓取与建库 — 设计
+# 北大 2026 暑期课程抓取与建库 — 当前设计
 
 日期：2026-05-13
-状态：草案 → 待用户确认
+最后同步：2026-07-09
+状态：已完成，本文档按当前仓库状态更新
 
 ## 目标
 
-从 PKU 选课系统 `https://elective.pku.edu.cn/elective2008/edu/pku/stu/elective/controller/courseQuery/getCurriculmByForm.do` 抓取「2026 暑期学期」的全部课程，产出：
+从北京大学选课系统抓取 `25-26学年第3学期` 暑期本科课程，产出并接入拼好课 V2：
 
-1. `Course data/北大暑期课程数据_25-26暑期.json` — 合成 JSON（一个文件，每条记录带「课程类型」字段）
-2. `2026暑期学期课程.db` — 独立 SQLite 库，结构对齐 `2026春季学期本科生课程.db`
+1. `课程数据/北大暑期课程_25-26第3学期.json`
+2. `数据库/2026暑期本科生课程.db`
+3. 数据库内 `translations` 表，经后续翻译流水线补齐 7 语译文
 
-本轮**不**改动 `app.py` 与 `index.html`。前端、API、部署都不动；这一轮的产出是「可验证的数据 + 可重建的库」。
+当前结果：
 
-## 抓取范围
-
-页面提供 10 个 tab，其中 6 个有数据要抓：
-
-| Tab | 抓取 | 备注 |
-|---|---|---|
-| 培养方案 | ✗ | 空 |
-| 专业课 | ✓ | 默认开课单位＝社会学院，需切换到「全部」 |
-| 政治课 | ✗ | 空 |
-| 英语课 | ✓ | |
-| 体育课 | ✓ | |
-| 通识课 | ✓ | 默认开课单位＝社会学院，需切换到「全部」 |
-| 公选课 | ✓ | 首选试跑类型（量小、字段全） |
-| 计算机基础课 | ✗ | 空 |
-| 劳动教育课 | ✓ | |
-| 思政选择性必修课 | ✗ | 空 |
-
-## 架构
-
-```
-                          ┌── tmp_summer/<类型>.json   断点中间产物
-Playwright (有头 Chromium) │
-        │                  ├── Course data/北大暑期课程数据_25-26暑期.json  合成产物
-        ▼                 ▼
-scrape_summer_courses.py ──► build_summer_db.py ──► 2026暑期学期课程.db
-        │
-        └── 复用 .auth/pku_state.json (storage_state)
+```text
+总计 194 条
+专业课 81
+英语课 16
+体育课 6
+通识课 11
+公选课 57
+劳动教育课 23
 ```
 
-### 组件 1：`scrape_summer_courses.py`
+培养方案、政治课、计算机基础课、思政选择性必修课为空。
 
-Playwright 同步 API。流程：
+## 最终方案
 
-1. **会话复用**：若 `.auth/pku_state.json` 存在，启动时传入 `storage_state`，免登录；否则启动空白上下文，跳转登录页等用户手工登录，登录成功后保存 storage state。
-2. **导航**：跳到 `getCurriculmByForm.do`。
-3. **类型循环**（命令行参数 `--types 公选课` 控制，默认只跑公选课；`--types all` 跑全 6 类）：
-   - 切换到目标 tab
-   - 若存在「开课单位」下拉，选「全部」
-   - 提交查询表单
-   - **分页遍历**：抓所有页的结果行 → 解析「基本信息」字段
-   - 对每行：点击课程号链接 → 等待详情面板（或弹窗）出现 → 抓「详细信息」字段 → 关闭面板
-   - 写一份 `tmp_summer/<类型>.json`
-4. **合并**：所有指定类型抓完后，把 `tmp_summer/*.json` 合并写入 `Course data/北大暑期课程数据_25-26暑期.json`。
-5. **断点**：tmp 文件存在则跳过该类型；可用 `--force` 重抓。
+最终没有采用单独启动 Playwright 浏览器的方案，而是使用**当前已登录 Chrome 页面内脚本**。
 
-字段对齐既有本科 JSON：
+原因：
 
-```json
-{
-  "课程类型": "公选课",
-  "基本信息": {
-    "课程号": "...", "班号": "...", "课程名": "...", "课程类别": "...",
-    "学分": "...", "教师": "...", "开课单位": "...", "专业": "...",
-    "年级": "...", "上课时间及教室": "...", "限数已选": "...",
-    "自选PNP": "...", "备注": "..."
-  },
-  "详细信息": {
-    "英文名称": "...", "先修课程": "...", "中文简介": "...",
-    "英文简介": "...", "成绩记载方式": "...", "通识课所属系列": "...",
-    "授课语言": "...", "教材": "...", "参考书": "...",
-    "教学大纲": "...", "教学评估": "..."
-  }
-}
+- 选课网直接从终端或新浏览器请求详情页容易触发 `请不要用刷课机刷课`。
+- 用户要求“直接在现有界面上抓取，不要开新的”。
+- 页面内 `fetch(..., {credentials:'include'})` 能复用当前 Chrome 登录态，并稳定读取列表与课程号详情。
+
+架构：
+
+```text
+当前已登录 Chrome 选课页
+  └─ 注入 pku_inpage_summer_scraper.js
+       ├─ POST getCurriculmByForm.do       # 列表查询
+       ├─ POST queryCurriculum.jsp         # 翻页
+       ├─ GET  goNested.do?course_seq_no=  # 课程号详情
+       └─ POST http://127.0.0.1:8765/done # 回传 JSON 到本机接收器
+
+receive_pku_summer_payload.py
+  ├─ 写 tmp_summer/inpage_payload.json
+  └─ 写 课程数据/北大暑期课程_25-26第3学期.json
+
+build_summer_db.py
+  └─ 写 数据库/2026暑期本科生课程.db
 ```
 
-字段缺失时填空字符串。详情面板上没有的列保持 `""`。
+## 归档文件
 
-### 组件 2：`build_summer_db.py`
+当前实现位于 `北京大学选课网数据抓取/`：
 
-直接照抄 `build_undergrad_db.py` 的 schema（含 `course_type` 字段、`basic_info`/`detail_info`/`courses_view`），把 SOURCES 改成单文件读取，按记录里的「课程类型」入库。复用 `build_common.parse_schedule` / `to_float`。
+| 文件 | 作用 |
+|---|---|
+| `pku_inpage_summer_scraper.js` | 页面内抓取脚本 |
+| `receive_pku_summer_payload.py` | 本机接收器，监听 `127.0.0.1` |
+| `build_summer_db.py` | JSON → SQLite |
+| `README.md` | 完整操作说明 |
 
-DB 路径：`2026暑期学期课程.db`，加入 `.gitignore`（与 `2026春季学期本科生课程.db` 同处理）。
+建库脚本复用 `数据库构建脚本/build_common.py`，不在抓取目录复制公共构建工具。
 
-### 依赖
+## 安全边界
 
-- 新增 `playwright`（仅开发期使用，不进 `requirements.txt`；本地 `pip install playwright && playwright install chromium`）
-- 现有 `build_common.py` 直接复用
+抓取脚本只请求：
 
-### `.gitignore` 增加
+- `getCurriculmByForm.do`
+- `queryCurriculum.jsp`
+- `goNested.do?course_seq_no=...`
 
+严禁点击或请求：
+
+- `加入选课计划`
+- `addToPlan.do`
+
+专业课、通识课、公选课抓取前都提交 `开课单位=ALL`，避免页面默认停留在社会学院。英语课表格比其他类别多 `英语等级` 列，脚本有 `ENGLISH_HEADERS` 专用映射。
+
+## 数据库接入
+
+`app.py` 已支持 `term=spring|summer`：
+
+- `term=spring`：打开本科春季库并 `ATTACH` 研究生库
+- `term=summer`：打开暑期本科库
+
+课程 ID 前缀：
+
+- `u<id>`：春季本科
+- `g<id>`：春季研究生
+- `s<id>`：暑期本科
+
+列表接口会按 `course_code + class_no + teacher` 合并重复挂载课程，`course_type` 与 `category` 返回数组。
+
+## 翻译状态
+
+抓取与建库不调用翻译 API。`build_summer_db.py` 重建后会创建空的 `translations` 表。
+
+当前仓库里的暑期库已通过 `北京大学课程数据翻译/` 流水线补齐译文：
+
+```text
+数据库/2026暑期本科生课程.db translations = 10010
 ```
-2026暑期学期课程.db
-.auth/
-tmp_summer/
+
+重建暑期库前应先备份，或重建后重新跑翻译。
+
+## 验收命令
+
+```bash
+python3 北京大学选课网数据抓取/build_summer_db.py
+
+sqlite3 "数据库/2026暑期本科生课程.db" "
+select course_type,count(*) from basic_info group by course_type order by course_type;
+select 'total', count(*) from basic_info;
+select 'detail', count(*) from detail_info;
+select 'translations', count(*) from translations;
+"
 ```
 
-## 试跑策略
+期望基本数据：
 
-1. 第一步：`python scrape_summer_courses.py --types 公选课`
-   - 我陪你看：登录交接是否顺畅、tab 切换是否到位、「开课单位」是否能正确选「全部」、分页是否抓全、详情面板字段是否对齐。
-   - 输出 `tmp_summer/公选课.json` 后人工抽样几条比对 `Course data/北大公选课数据_25-26第2学期.json` 结构。
-2. 第二步：结构验收通过后，跑剩下 5 类。
-3. 第三步：`python build_summer_db.py`，看课程总数是否合理（人工估算）。
+```text
+total = 194
+detail = 194
+```
 
-## 风险与未知
-
-- **登录方式**：PKU IAAA 登录可能含验证码/扫码。本方案让用户手动完成，不用脚本去碰登录字段。
-- **页面 DOM 未确认**：tab 切换、分页、课程号点击的具体选择器要等启动 Playwright 看到页面后才知道。脚本第一版会用「打开页面后暂停 → 控制台手工确认 DOM → 填回选择器」的方式做，不预先猜。
-- **详情面板形态未知**：可能是新窗口、可能是同页面 div、可能是 iframe。第一类试跑时确认。
-- **频率限制**：暑期课程量比春季少，预计 6 类合计几百门。每请求加 200~500ms 抖动避免被限。
-- **断网/超时**：tmp 文件分类型保存，重跑只补缺。
-
-## 不做（YAGNI）
-
-- 不做 app.py 适配、不动 index.html。
-- 不做翻译（沿用现有的 translate_courses.py 流水线，本轮不触发）。
-- 不做研究生暑期。用户没说要，且页面 URL 是本科系统。
-- 不做 PR/部署。仅本地数据产物。
-
-## 验收标准
-
-- `Course data/北大暑期课程数据_25-26暑期.json` 存在，记录数 ≥ 试跑日页面所显示总数（人工抽样比对）。
-- 每条记录至少有「基本信息.课程号」「基本信息.课程名」非空。
-- `2026暑期学期课程.db` 可被 `sqlite3` 打开，`SELECT COUNT(*) FROM basic_info` 与 JSON 记录数一致。
-- 用 `SELECT * FROM courses_view LIMIT 5` 抽样字段可读。
+如果刚重建，`translations = 0` 是正常现象；当前已翻译版本为 `10010`。

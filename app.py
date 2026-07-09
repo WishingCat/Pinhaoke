@@ -1,17 +1,22 @@
 """Pinhaoke Course Search API.
 
-Reads three standalone SQLite databases (term-switched at request time):
+Reads standalone SQLite databases (term-switched at request time):
   spring →
     - 2026春季学期本科生课程.db  (undergraduate, AS main)
     - 2026春季学期研究生课程.db  (graduate,      AS gr)
   summer →
     - 2026暑期本科生课程.db      (undergraduate, AS main)
+  fall →
+    - 2026秋季学期本科生课程.db  (undergraduate, AS main)
+    - 2026秋季学期研究生课程.db  (graduate,      AS gr)
 
 The DBs share the basic_info columns but have different detail schemas. Cross-DB
 queries use ATTACH + UNION ALL. Each row carries a prefixed string id:
     "u<basic_info.id>"  spring undergrad
     "g<basic_info.id>"  spring graduate
     "s<basic_info.id>"  summer undergrad
+    "a<basic_info.id>"  fall undergrad
+    "r<basic_info.id>"  fall graduate
 
 The prefix alone determines which DB the detail endpoint opens, so callers do
 NOT need to pass ?term= when fetching a specific course.
@@ -29,6 +34,8 @@ DB_DIR = BASE_DIR / "数据库"
 UG_DB = DB_DIR / "2026春季学期本科生课程.db"
 GR_DB = DB_DIR / "2026春季学期研究生课程.db"
 SUMMER_DB = DB_DIR / "2026暑期本科生课程.db"
+FALL_UG_DB = DB_DIR / "2026秋季学期本科生课程.db"
+FALL_GR_DB = DB_DIR / "2026秋季学期研究生课程.db"
 
 # (alias, path, id_prefix)
 TERM_DBS = {
@@ -38,6 +45,10 @@ TERM_DBS = {
     ],
     "summer": [
         ("main", SUMMER_DB, "s"),
+    ],
+    "fall": [
+        ("main", FALL_UG_DB, "a"),
+        ("gr",   FALL_GR_DB, "r"),
     ],
 }
 
@@ -99,10 +110,11 @@ _UG_LIST_SELECT = """
 
 LIST_SELECT_UG = _UG_LIST_SELECT.format(prefix="u")
 LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(prefix="s")
+LIST_SELECT_FALL_UG = _UG_LIST_SELECT.format(prefix="a")
 
-LIST_SELECT_GR = """
+_GR_LIST_SELECT = """
     SELECT
-        'g' || b.id            AS id,
+        '{prefix}' || b.id     AS id,
         '研究生课'             AS course_type,
         b.course_code          AS course_code,
         b.class_no             AS class_no,
@@ -124,15 +136,19 @@ LIST_SELECT_GR = """
         ''                     AS grading,
         ''                     AS language,
         d.audience             AS audience,
-        'g'                    AS _level
-    FROM gr.basic_info b
-    LEFT JOIN gr.detail_info d ON d.course_id = b.id
+        '{prefix}'             AS _level
+    FROM {ns}.basic_info b
+    LEFT JOIN {ns}.detail_info d ON d.course_id = b.id
 """
+
+LIST_SELECT_GR = _GR_LIST_SELECT.format(prefix="g", ns="gr")
+LIST_SELECT_FALL_GR = _GR_LIST_SELECT.format(prefix="r", ns="gr")
 
 # Pre-built UNION expressions for each term.
 TERM_UNION_SQL = {
     "spring": f"({LIST_SELECT_UG} UNION ALL {LIST_SELECT_GR})",
     "summer": f"({LIST_SELECT_SUMMER})",
+    "fall": f"({LIST_SELECT_FALL_UG} UNION ALL {LIST_SELECT_FALL_GR})",
 }
 
 
@@ -140,14 +156,15 @@ TERM_UNION_SQL = {
 
 
 @app.get("/api/filters")
-def get_filters(term: str = Query("spring", description="spring | summer")):
+def get_filters(term: str = Query("fall", description="spring | summer | fall")):
     with get_db(term) as conn:
         c = conn.cursor()
 
         def col(sql: str) -> list:
             return [r[0] for r in c.execute(sql)]
 
-        if term == "spring":
+        has_graduate_db = any(alias == "gr" for alias, _, _ in TERM_DBS[term])
+        if has_graduate_db:
             course_types = col(
                 """SELECT DISTINCT course_type FROM basic_info
                    WHERE course_type != ''
@@ -279,7 +296,7 @@ def list_courses(
     sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
     random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
     lang: str = Query("zh", description="Display language"),
-    term: str = Query("spring", description="spring | summer"),
+    term: str = Query("fall", description="spring | summer | fall"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
@@ -293,15 +310,17 @@ def list_courses(
         # int param is already validated by FastAPI, safe to interpolate.
         # Two large primes mix the seed so even tiny seeds produce well-spread
         # mul/add values, giving genuinely different orderings per seed.
-        # The CASE per id prefix breaks 'u123' / 'g123' / 's123' hash collisions.
+        # The CASE per id prefix breaks 'u123' / 'g123' / 's123' / etc. collisions.
         seed = max(1, int(random_seed))
         mul = ((seed * 1664525) % 999983) or 7
         add = (seed * 1013904223) % 999983
         # After GROUP BY the id column is the representative id (a single
-        # 'u123' / 'g456' / 's789' string), so we reach into it via SUBSTR.
+        # 'u123' / 'g456' / 's789' / etc. string), so we reach into it via SUBSTR.
         order_by = (
             f"((CAST(SUBSTR(id, 2) AS INTEGER) * {mul} "
-            f"+ CASE SUBSTR(id, 1, 1) WHEN 'g' THEN 333331 WHEN 's' THEN 666661 ELSE 0 END "
+            f"+ CASE SUBSTR(id, 1, 1) "
+            f"WHEN 'g' THEN 333331 WHEN 's' THEN 666661 "
+            f"WHEN 'a' THEN 111113 WHEN 'r' THEN 444449 ELSE 0 END "
             f"+ {add}) % 999983)"
         )
     else:
@@ -320,7 +339,7 @@ def list_courses(
             # we additionally float "sociology-adjacent" courses to the very
             # top — the summer audience is primarily 社会学系 / 中国社会科学
             # 调查中心 partner students plus 爱心社, so this surfaces the most
-            # relevant offerings at first scroll. Spring term keeps a flat
+            # relevant offerings at first scroll. Spring/fall keep a flat
             # alphabetical default.
             if term == "summer":
                 sociology_priority = (
@@ -459,13 +478,13 @@ def list_courses(
 
 
 # id prefix → term whose DB set contains that level's courses.
-_PREFIX_TERM = {"u": "spring", "g": "spring", "s": "summer"}
+_PREFIX_TERM = {"u": "spring", "g": "spring", "s": "summer", "a": "fall", "r": "fall"}
 
 
 def _parse_id(course_id: str):
     """Return (term, level, local_id) or (None, None, None) on parse failure.
 
-    level is the single-char id prefix ('u' / 'g' / 's'); term tells get_db()
+    level is the single-char id prefix ('u' / 'g' / 's' / 'a' / 'r'); term tells get_db()
     which DBs to open.
     """
     if not course_id:
@@ -524,14 +543,15 @@ _UG_DETAIL_SELECT = """
 """
 
 _GR_DETAIL_SELECT = """
-    SELECT 'g' || b.id AS id, '研究生课' AS course_type,
+    SELECT '{prefix}' || b.id AS id, '研究生课' AS course_type,
            b.course_code, b.class_no, b.course_name, b.category,
            b.credits, b.teacher, b.department, b.major, b.grade,
            b.schedule, b.classroom,
            b.enrollment, '' AS pnp, b.notes,
            d.english_name,
            d.weekly_hours, d.total_hours, d.term, d.audience,
-           d.intro AS intro_cn, d.extra_notes
+           d.intro AS intro_cn, d.extra_notes,
+           {syllabus_expr} AS syllabus
     FROM gr.basic_info b
     LEFT JOIN gr.detail_info d ON d.course_id = b.id
     WHERE b.id = ?
@@ -546,9 +566,10 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
 
     with get_db(term) as conn:
         cur = conn.cursor()
-        if level == "g":
-            sql = _GR_DETAIL_SELECT
-        else:  # 'u' / 's' share the UG shape; the prefix is the level itself
+        if level in ("g", "r"):
+            syllabus_expr = "d.syllabus" if level == "r" else "''"
+            sql = _GR_DETAIL_SELECT.format(prefix=level, syllabus_expr=syllabus_expr)
+        else:  # 'u' / 's' / 'a' share the UG shape; the prefix is the level itself
             sql = _UG_DETAIL_SELECT.format(prefix=level)
         row = cur.execute(sql, (local_id,)).fetchone()
 
@@ -558,7 +579,7 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
         out = dict(row)
 
         # Replace every translatable field with its translation when present.
-        ns = "gr" if level == "g" else "main"
+        ns = "gr" if level in ("g", "r") else "main"
         _apply_translations(cur, ns, local_id, lang, out)
 
     # Ensure all keys exist for both levels so frontend gating is consistent.

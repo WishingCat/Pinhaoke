@@ -515,7 +515,7 @@ html[data-theme="dark"] .hero h1 {
   margin-top: 13px;
 }
 
-/* Term toggle (春季 / 暑期) — segmented control */
+/* Term toggle (秋季 / 春季 / 暑期) — segmented control */
 .term-toggle {
   position: relative;
   display: inline-flex;
@@ -1687,9 +1687,10 @@ var _hmt = _hmt || [];
   <!-- Hero -->
   <div class="hero">
     <h1 id="title">拼好课</h1>
-    <p class="subtitle" id="subtitle">北京大学2026春季学期课程搜索(每学期更新)</p>
+    <p class="subtitle" id="subtitle">北京大学2026秋季学期课程搜索(每学期更新)</p>
     <div class="term-toggle" role="tablist" aria-label="学期切换">
-      <button type="button" id="termSpringBtn" class="active" data-term="spring" role="tab" aria-selected="true" onclick="setTerm('spring')">2026春季学期</button>
+      <button type="button" id="termFallBtn" class="active" data-term="fall" role="tab" aria-selected="true" onclick="setTerm('fall')">2026秋季学期</button>
+      <button type="button" id="termSpringBtn" data-term="spring" role="tab" aria-selected="false" onclick="setTerm('spring')">2026春季学期</button>
       <button type="button" id="termSummerBtn" data-term="summer" role="tab" aria-selected="false" onclick="setTerm('summer')">2026暑期学期</button>
     </div>
   </div>
@@ -1792,9 +1793,10 @@ const i18n = {
   zh: {
     name: '中文',
     title: '拼好课',
+    subtitleFall: '北京大学2026秋季学期课程搜索(每学期更新)',
     subtitleSpring: '北京大学2026春季学期课程搜索(每学期更新)',
     subtitleSummer: '北京大学2026暑期学期课程搜索(每学期更新)',
-    termSpring: '2026春季学期', termSummer: '2026暑期学期',
+    termFall: '2026秋季学期', termSpring: '2026春季学期', termSummer: '2026暑期学期',
     searchPlaceholder: '输入课程名、教师姓名或教室...',
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
@@ -1830,9 +1832,10 @@ const i18n = {
   en: {
     name: 'English',
     title: 'Pinhaoke',
+    subtitleFall: 'PKU Fall 2026 Course Search (Updated Every Semester)',
     subtitleSpring: 'PKU Spring 2026 Course Search (Updated Every Semester)',
     subtitleSummer: 'PKU Summer 2026 Course Search (Updated Every Semester)',
-    termSpring: '2026 Spring', termSummer: '2026 Summer',
+    termFall: '2026 Fall', termSpring: '2026 Spring', termSummer: '2026 Summer',
     searchPlaceholder: 'Search course name, teacher or classroom...',
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
@@ -1868,9 +1871,10 @@ const i18n = {
   ja: {
     name: '日本語',
     title: '拼好課',
+    subtitleFall: '北京大学2026年秋学期 授業検索（毎学期更新）',
     subtitleSpring: '北京大学2026年春学期 授業検索（毎学期更新）',
     subtitleSummer: '北京大学2026年夏学期 授業検索（毎学期更新）',
-    termSpring: '2026 春学期', termSummer: '2026 夏学期',
+    termFall: '2026 秋学期', termSpring: '2026 春学期', termSummer: '2026 夏学期',
     searchPlaceholder: '授業名、教員名または教室を入力...',
     labelCourseType: '科目種別', labelCategory: 'カテゴリー',
     labelCredits: '単位', labelDepartment: '開講部局',
@@ -1906,9 +1910,10 @@ const i18n = {
   ko: {
     name: '한국어',
     title: '핀하오커',
+    subtitleFall: '베이징대학교 2026 가을학기 강좌 검색 (매 학기 업데이트)',
     subtitleSpring: '베이징대학교 2026 봄학기 강좌 검색 (매 학기 업데이트)',
     subtitleSummer: '베이징대학교 2026 여름학기 강좌 검색 (매 학기 업데이트)',
-    termSpring: '2026 봄학기', termSummer: '2026 여름학기',
+    termFall: '2026 가을학기', termSpring: '2026 봄학기', termSummer: '2026 여름학기',
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
     labelCourseType: '강좌 유형', labelCategory: '카테고리',
     labelCredits: '학점', labelDepartment: '개설 학과',
@@ -1944,9 +1949,10 @@ const i18n = {
   fr: {
     name: 'Fran\u00e7ais',
     title: 'Pinhaoke',
+    subtitleFall: 'Recherche de cours PKU - Automne 2026 (Mise \u00e0 jour chaque semestre)',
     subtitleSpring: 'Recherche de cours PKU - Printemps 2026 (Mise \u00e0 jour chaque semestre)',
     subtitleSummer: 'Recherche de cours PKU - \u00c9t\u00e9 2026 (Mise \u00e0 jour chaque semestre)',
-    termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026',
+    termFall: 'Automne 2026', termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026',
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
     labelCourseType: 'Type de cours', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
@@ -1982,9 +1988,10 @@ const i18n = {
   de: {
     name: 'Deutsch',
     title: 'Pinhaoke',
+    subtitleFall: 'PKU Kurssuche - Herbst 2026 (Jedes Semester aktualisiert)',
     subtitleSpring: 'PKU Kurssuche - Fr\u00fchling 2026 (Jedes Semester aktualisiert)',
     subtitleSummer: 'PKU Kurssuche - Sommer 2026 (Jedes Semester aktualisiert)',
-    termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026',
+    termFall: 'Herbst 2026', termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026',
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
@@ -2020,9 +2027,10 @@ const i18n = {
   es: {
     name: 'Espa\u00f1ol',
     title: 'Pinhaoke',
+    subtitleFall: 'B\u00fasqueda de cursos PKU - Oto\u00f1o 2026 (Actualizado cada semestre)',
     subtitleSpring: 'B\u00fasqueda de cursos PKU - Primavera 2026 (Actualizado cada semestre)',
     subtitleSummer: 'B\u00fasqueda de cursos PKU - Verano 2026 (Actualizado cada semestre)',
-    termSpring: 'Primavera 2026', termSummer: 'Verano 2026',
+    termFall: 'Oto\u00f1o 2026', termSpring: 'Primavera 2026', termSummer: 'Verano 2026',
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
     labelCourseType: 'Tipo de curso', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
@@ -2058,9 +2066,10 @@ const i18n = {
   ru: {
     name: 'Русский',
     title: 'Pinhaoke',
+    subtitleFall: 'Поиск курсов ПКУ - Осень 2026 (Обновляется каждый семестр)',
     subtitleSpring: 'Поиск курсов ПКУ - Весна 2026 (Обновляется каждый семестр)',
     subtitleSummer: 'Поиск курсов ПКУ - Лето 2026 (Обновляется каждый семестр)',
-    termSpring: 'Весна 2026', termSummer: 'Лето 2026',
+    termFall: 'Осень 2026', termSpring: 'Весна 2026', termSummer: 'Лето 2026',
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
@@ -2319,11 +2328,11 @@ let currentLang = (function () {
     return stored === 'zh' || TR_IDX[stored] !== undefined ? stored : 'zh';
   } catch (e) { return 'zh'; }
 })();
-// Always open a fresh tab on the spring term — the page is "the spring term
-// course catalog", and the summer toggle is an opt-in for users who came
-// looking for it. A shared link with ?term=summer overrides this in
-// readURLState(); the previous session's term is never restored.
-let currentTerm = 'spring';
+// Always open a fresh tab on the newest term. Shared links with ?term=spring
+// or ?term=summer override this in readURLState(); the previous session's term
+// is never restored.
+const TERMS = new Set(['fall', 'spring', 'summer']);
+let currentTerm = 'fall';
 let randomSeed = 0;  // re-rolled when user picks sort=random
 
 function newRandomSeed() {
@@ -2335,6 +2344,7 @@ const WEEKDAYS_CN = ['周一', '周二', '周三', '周四', '周五', '周六',
 // Categories that should never appear in the filter dropdown even if the DB
 // has them — keyed by term. Backend / data files are untouched, purely a UI veto.
 const HIDDEN_CATEGORIES = {
+  fall: new Set(),
   spring: new Set(['专业必修']),
   summer: new Set(),
 };
@@ -2374,7 +2384,7 @@ function readURLState() {
   const p = new URLSearchParams(location.search);
   const lang = p.get('lang');
   if (lang && (lang === 'zh' || TR_IDX[lang] !== undefined)) currentLang = lang;
-  if (p.get('term') === 'summer') currentTerm = 'summer';
+  if (TERMS.has(p.get('term'))) currentTerm = p.get('term');
   document.getElementById('searchInput').value = p.get('q') || '';
   document.getElementById('filterClassroom').value = p.get('room') || '';
   csValues.filterCourseType = p.get('type') || '';
@@ -2407,7 +2417,7 @@ function syncURL() {
     p.set('sort', csValues.filterSort);
     if (csValues.filterSort === 'random' && randomSeed) p.set('seed', randomSeed);
   }
-  if (currentTerm !== 'spring') p.set('term', currentTerm);
+  if (currentTerm !== 'fall') p.set('term', currentTerm);
   if (currentLang !== 'zh') p.set('lang', currentLang);
   if (currentModalCourseId) p.set('course', currentModalCourseId);
   const qs = p.toString();
@@ -2449,8 +2459,11 @@ function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
   document.getElementById('brandName').textContent = lang.title;
-  document.getElementById('subtitle').textContent =
-    currentTerm === 'summer' ? lang.subtitleSummer : lang.subtitleSpring;
+  const subtitleKey = currentTerm === 'summer'
+    ? 'subtitleSummer'
+    : (currentTerm === 'spring' ? 'subtitleSpring' : 'subtitleFall');
+  document.getElementById('subtitle').textContent = lang[subtitleKey];
+  document.getElementById('termFallBtn').textContent = lang.termFall;
   document.getElementById('termSpringBtn').textContent = lang.termSpring;
   document.getElementById('termSummerBtn').textContent = lang.termSummer;
   document.getElementById('langLabel').textContent = lang.name;
@@ -2538,7 +2551,7 @@ async function init() {
     renderError();
   }
 
-  // Deep link: ?course=u123 opens the detail modal directly.
+  // Deep link: ?course=a123 or ?course=u123 opens the detail modal directly.
   if (pendingCourse) showDetail(pendingCourse);
 }
 
@@ -2551,7 +2564,7 @@ function refreshTermToggleUI() {
 }
 
 async function setTerm(term) {
-  if (term !== 'spring' && term !== 'summer') return;
+  if (!TERMS.has(term)) return;
   if (term === currentTerm) return;
   currentTerm = term;
   refreshTermToggleUI();

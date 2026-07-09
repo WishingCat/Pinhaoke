@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Translate remaining stubborn (long) rows one language at a time."""
+"""Translate remaining stubborn rows one language at a time."""
+import argparse
 import json
 import os
 import sqlite3
@@ -7,7 +8,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import certifi
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
@@ -15,8 +16,10 @@ SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
     "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
 )
-API_URL = "https://api.qnaigc.com/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash"
+API_URL = os.environ.get("DEEPSEEK_API_URL", "https://api.qnaigc.com/v1/chat/completions")
+MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek/deepseek-v4-flash")
+ENABLE_THINKING = os.environ.get("DEEPSEEK_ENABLE_THINKING")
+THINKING = os.environ.get("DEEPSEEK_THINKING")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -36,15 +39,21 @@ def translate_one(text: str, target: str, retries: int = 3) -> str:
         f"language. Translate institutional names to their official forms.\n\n"
         f"Source (Chinese):\n{text}"
     )
-    body = json.dumps({
+    body_obj = {
         "model": MODEL,
         "messages": [
             {"role": "system", "content": "You are a professional academic translator."},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.1,
-        "enable_thinking": False,
-    }).encode("utf-8")
+    }
+    if ENABLE_THINKING is not None:
+        body_obj["enable_thinking"] = ENABLE_THINKING.lower() in {"1", "true", "yes"}
+    elif "qnaigc.com" in API_URL:
+        body_obj["enable_thinking"] = False
+    if "api.deepseek.com" in API_URL:
+        body_obj["thinking"] = {"type": THINKING or "disabled"}
+    body = json.dumps(body_obj).encode("utf-8")
     req = urllib.request.Request(
         API_URL,
         data=body,
@@ -94,31 +103,52 @@ def write(db_path: str, cid: int, field: str, lang: str, text: str):
     conn.close()
 
 
-def process(db_path, src_field, store_field, label):
+def process(db_path, src_field, store_field, label, workers=10, limit=0):
     missing = gather_missing(db_path, src_field, store_field)
     if not missing:
         print(f"[{label}] all done")
         return 0, 0
-    total = sum(len(m[2]) for m in missing)
-    print(f"[{label}] {len(missing)} rows / {total} (cid,lang) pairs to translate")
+    tasks = []
+    for cid, src, langs in missing:
+        for lang in langs:
+            tasks.append((cid, src, lang))
+    if limit:
+        tasks = tasks[:limit]
+    total = len(tasks)
+    print(f"[{label}] {len(missing)} rows / {sum(len(m[2]) for m in missing)} pending pairs; running {total}")
     ok = 0
     fail = 0
+    t0 = time.time()
 
     def work(item):
-        nonlocal ok, fail
-        cid, src, langs = item
-        for lang in langs:
-            try:
-                t = translate_one(src, lang)
-                write(db_path, cid, store_field, lang, t)
-                ok += 1
-                print(f"  [{label}] cid={cid} {lang}: OK ({len(t)} chars)")
-            except Exception as e:
-                fail += 1
-                print(f"  [{label}] cid={cid} {lang}: FAIL {type(e).__name__}: {str(e)[:120]}")
+        cid, src, lang = item
+        try:
+            text = translate_one(src, lang)
+            write(db_path, cid, store_field, lang, text)
+            return True, cid, lang, len(text), None
+        except Exception as e:
+            return False, cid, lang, 0, f"{type(e).__name__}: {str(e)[:160]}"
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        list(ex.map(work, missing))
+    errors = []
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = [ex.submit(work, task) for task in tasks]
+        for done, fut in enumerate(as_completed(futs), 1):
+            success, cid, lang, chars, err = fut.result()
+            if success:
+                ok += 1
+            else:
+                fail += 1
+                errors.append((cid, lang, err))
+            if done % 50 == 0 or done == total:
+                elapsed = time.time() - t0
+                rate = done / max(elapsed, 0.01)
+                eta = (total - done) / max(rate, 0.01)
+                print(
+                    f"  [{label}] {done}/{total} ok={ok} fail={fail} "
+                    f"elapsed={elapsed:.0f}s rate={rate:.2f}/s eta={eta:.0f}s"
+                )
+    for cid, lang, err in errors[:10]:
+        print(f"    [{label}] cid={cid} {lang}: {err}")
 
     return ok, fail
 
@@ -129,11 +159,36 @@ if __name__ == "__main__":
     _UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
     _GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
     _SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
-    print("== sequential per-lang retranslate ==")
-    o1, f1 = process(_GR_DB, "intro", "intro_cn", "GR intro")
-    o2, f2 = process(_GR_DB, "extra_notes", "extra_notes", "GR extra")
-    o3, f3 = process(_UG_DB, "intro_cn", "intro_cn", "UG intro")
-    o4, f4 = process(_SUMMER_DB, "intro_cn", "intro_cn", "Summer intro")
-    o5, f5 = process(_SUMMER_DB, "syllabus", "syllabus", "Summer syllabus")
-    o6, f6 = process(_SUMMER_DB, "evaluation", "evaluation", "Summer evaluation")
-    print(f"\nTOTAL: OK={o1+o2+o3+o4+o5+o6} FAIL={f1+f2+f3+f4+f5+f6}")
+    _FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--db", choices=["gr", "ug", "summer", "fall", "all"], default="all")
+    ap.add_argument("--field", choices=["intro", "extra_notes", "syllabus", "evaluation", "reference_book", "all"], default="all")
+    ap.add_argument("--workers", type=int, default=10)
+    ap.add_argument("--limit", type=int, default=0)
+    args = ap.parse_args()
+
+    all_tasks = [
+        ("gr", "intro", _GR_DB, "intro", "intro_cn", "GR intro"),
+        ("gr", "extra_notes", _GR_DB, "extra_notes", "extra_notes", "GR extra"),
+        ("ug", "intro", _UG_DB, "intro_cn", "intro_cn", "UG intro"),
+        ("summer", "intro", _SUMMER_DB, "intro_cn", "intro_cn", "Summer intro"),
+        ("summer", "syllabus", _SUMMER_DB, "syllabus", "syllabus", "Summer syllabus"),
+        ("summer", "evaluation", _SUMMER_DB, "evaluation", "evaluation", "Summer evaluation"),
+        ("fall", "intro", _FALL_DB, "intro_cn", "intro_cn", "Fall intro"),
+        ("fall", "syllabus", _FALL_DB, "syllabus", "syllabus", "Fall syllabus"),
+        ("fall", "evaluation", _FALL_DB, "evaluation", "evaluation", "Fall evaluation"),
+        ("fall", "reference_book", _FALL_DB, "reference_book", "reference_book", "Fall reference_book"),
+    ]
+    selected = [
+        task for task in all_tasks
+        if args.db in ("all", task[0]) and args.field in ("all", task[1])
+    ]
+    print("== per-lang retranslate ==")
+    total_ok = 0
+    total_fail = 0
+    for _, _, db_path, src_field, store_field, label in selected:
+        ok, fail = process(db_path, src_field, store_field, label, workers=args.workers, limit=args.limit)
+        total_ok += ok
+        total_fail += fail
+    print(f"\nTOTAL: OK={total_ok} FAIL={total_fail}")

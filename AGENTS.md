@@ -1,0 +1,163 @@
+# AGENTS.md
+
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+## What this is
+
+拼好课 V2 — single-page PKU course search web app. Backend = FastAPI + multiple SQLite DBs attached as one connection. Frontend = a single `index.html` that fetches from `/api/*`. Deployed at `https://www.pinhaoke.love` behind Nginx + systemd on Alibaba Cloud Ubuntu 24.04.
+
+The README is for users; this file is for what isn't obvious from reading individual files.
+
+## Project layout
+
+```
+.
+├── app.py                          # FastAPI backend (the only server-side file)
+├── index.html                      # SPA frontend (no build step)
+├── requirements.txt
+├── Images/                         # served at /Images/ by Nginx in prod (do not rename — public URL)
+├── deploy/                         # nginx.conf · pinhaoke.service · update.sh
+├── 数据库/                          # SQLite files
+│   ├── 2026秋季学期本科生课程.db    # ← attached by app.py as `main` when ?term=fall (default)
+│   ├── 2026秋季学期研究生课程.db    # ← attached by app.py as `gr` when ?term=fall
+│   ├── 2026春季学期本科生课程.db    # ← attached by app.py as `main` when ?term=spring
+│   ├── 2026春季学期研究生课程.db    # ← attached by app.py as `gr` when ?term=spring
+│   └── 2026暑期本科生课程.db        # ← read by app.py as `main` when ?term=summer
+├── 课程数据/                        # source JSONs (also where 数据说明.md lives)
+├── 数据库构建脚本/                  # JSON → SQLite (build_common.py is shared)
+├── 北京大学课程数据翻译/            # DeepSeek 7-lang translation pipeline — see its README
+├── 北京大学选课网数据抓取/          # current-Chrome in-page elective scraper — see its README
+├── 访问统计/                        # site-visit PDFs
+├── 文档/                            # design notes / plans
+└── 归档/                            # pre-V2 monolithic build artefacts (read-only reference)
+```
+
+## Run locally
+
+The repo `venv/` symlinks point at `/opt/pinhaoke/...` (deploy paths) and **don't work on macOS**. Use a scratch venv:
+
+```bash
+python3 -m venv /tmp/pinhaoke-dev
+/tmp/pinhaoke-dev/bin/pip install -r requirements.txt
+/tmp/pinhaoke-dev/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Then open `http://127.0.0.1:8000/` — do NOT double-click `index.html`; the page needs the API. With `--reload` the server picks up `app.py` edits automatically; `index.html` is static so just refresh the browser. **There is no test suite** — verify changes by hitting endpoints manually.
+
+## API surface
+
+`app.py` exposes three JSON endpoints; `index.html` is the only consumer.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/filters` | Returns the dropdown universes: `course_types`, `categories`, `departments`, `credits`, `gradings`, `weekdays`. Accepts `?term=fall\|spring\|summer` (default `fall`). |
+| `GET /api/courses` | Cards list. Query params: `term` (`fall\|spring\|summer`, default `fall`), `q` (LIKEs `course_name / teacher / classroom / course_code / english_name` with `ESCAPE '\\'`), `classroom` (LIKE on classroom column only — composes with `q`), `type`, `category`, `credits`, `department`, `weekday`, `grading`, `sort` (`pinyin\|pinyin_desc\|credits_asc\|credits_desc\|time_asc\|random`), `random_seed` (int, used by `sort=random` to keep paging deterministic — frontend re-rolls on each click of 随机), `lang`, `page` (≥1), `page_size` (1–200, default 50; frontend uses 20). Returns `{total, courses[]}` with each row carrying string `id` like `a123` / `r456` / `u123` / `g456` / `s789`. **`course_type` and `category` are arrays** (merged across PKU's duplicate registrations — see merge section below). |
+| `GET /api/courses/{id}` | Single course detail (full field set). `id` is the prefixed string — the prefix alone determines which DB to read, so **no `?term=` needed**. Accepts `?lang=`. |
+
+`lang` accepts `zh` (default — no translation lookup) or one of `en, ja, ko, fr, de, es, ru` (swaps fields from the relevant DB's `translations` table — see i18n section below).
+
+## Rebuild databases from source JSONs
+
+```bash
+python3 数据库构建脚本/build_undergrad_db.py     # 课程数据/北大本科*_25-26第2学期.json → 数据库/2026春季学期本科生课程.db (~2465 courses)
+python3 数据库构建脚本/build_graduate_db.py      # 课程数据/北大研究生课程_25-26第2学期.json → 数据库/2026春季学期研究生课程.db (~1379 courses)
+python3 北京大学选课网数据抓取/build_summer_db.py # 课程数据/北大暑期课程_25-26第3学期.json   → 数据库/2026暑期本科生课程.db (~194 courses)
+python3 北京大学选课网数据抓取/build_undergrad_2627_fall_db.py # 课程数据/北大本科课程_26-27第1学期.json → 数据库/2026秋季学期本科生课程.db (~3032 courses)
+python3 北京大学选课网数据抓取/build_graduate_2627_fall_db.py  # 课程数据/北大研究生课程_26-27第1学期.json → 数据库/2026秋季学期研究生课程.db (~1611 courses)
+```
+
+`build_common.py` (in `数据库构建脚本/`) holds shared parsing. The scraper-side build scripts import it via `sys.path` injection — there is only one copy of `build_common.py`, do not duplicate. **Rebuilding wipes the `translations` table** — back up the DBs before running, or re-run translation scripts after.
+
+## Translate course content
+
+Pipeline lives in `北京大学课程数据翻译/` — its README has the full story. TL;DR:
+
+```bash
+export DEEPSEEK_API_KEY=sk-...
+python3 北京大学课程数据翻译/translate_courses.py           # intro_cn (spring UG + summer UG + GR) + extra_notes (GR)
+python3 北京大学课程数据翻译/translate_misc.py --phase short
+python3 北京大学课程数据翻译/translate_misc.py --phase long
+python3 北京大学课程数据翻译/translate_stubborn.py          # single-lang-per-call fallback
+```
+
+All resumable (`INSERT OR REPLACE` per `(course_id, field, lang)`). Dedupes by source text in-memory so identical Chinese values hit the API once. Fall data may be partially translated; `app.py` falls back to the original Chinese field whenever a translation row is missing.
+
+## Scrape elective-system courses
+
+Pipeline lives in `北京大学选课网数据抓取/` — its README has the full story. TL;DR: log into elective.pku.edu.cn in the user's already-open Chrome, start the matching `receive_pku_*_payload.py`, paste the in-page JS bookmarklet into the current course-query tab, wait for `[done]`, then run the matching build script. The scraper only fetches list/detail endpoints and must never click or request `加入选课计划` / `addToPlan.do`.
+
+## Deploy
+
+```bash
+ssh root@8.140.215.49
+bash /opt/pinhaoke/deploy/update.sh    # git pull + venv check + systemd reload + smoke test
+```
+
+`deploy/update.sh` is the only sanctioned deploy path. systemd unit `pinhaoke.service` runs `uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2` as `www-data`. Nginx (`deploy/nginx.conf`) proxies `/` to `:8000` and serves `/Images/` directly.
+
+If `index.html` deployment looks reverted to the old glassmorphism design, it's **always browser/CDN cache** — verify with `curl -s http://127.0.0.1:8000/ | grep "CLEAN MODERN"` on the server.
+
+## Architecture you need to know before editing
+
+### Term switch (fall / spring / summer) and DB attach
+
+`get_db(term)` attaches a different DB set per term, governed by `TERM_DBS`:
+- `term="fall"` opens `2026秋季学期本科生课程.db` as `main` and `ATTACH`es `2026秋季学期研究生课程.db` as `gr`. This is the API and frontend default.
+- `term="spring"` opens `2026春季学期本科生课程.db` as `main` and `ATTACH`es `2026春季学期研究生课程.db` as `gr`.
+- `term="summer"` opens `2026暑期本科生课程.db` as `main` only (no `gr`).
+
+`/api/filters` and `/api/courses` accept `?term=`. `/api/courses/{id}` does NOT — the id's single-char prefix (`a`/`r`/`u`/`g`/`s`) is enough to pick the right DB. Adding a new term means: build its `.db` under `数据库/`, add a `LIST_SELECT_*` with a new prefix, register it in `TERM_DBS` + `TERM_UNION_SQL`, and wire the prefix into `_parse_id`.
+
+### Two DBs, one connection (ATTACH) — fall/spring layout
+
+For fall and spring, `get_db()` in `app.py` opens the undergraduate DB as `main` and `ATTACH`es the matching graduate DB as `gr`. All cross-DB queries use `UNION ALL` of undergraduate + graduate SELECTs from one cursor. **Both SELECTs must produce the same column shape** for UNION — if you add a field to UG only, alias `''` (or `0`) on the GR side (or vice-versa).
+
+### List merges PKU duplicate registrations — `course_type` / `category` are arrays
+
+PKU's elective system lists the same physical class under multiple entries — same `course_code` + `class_no` + `teacher`, but a different `category` (e.g. `3S野外综合实习` appears as both `任选、劳动教育课` and `实习、劳动教育课`). Spring UG has 143 such duplicate groups, summer UG has 34. Plus 118 `course_code`s cross-listed UG↔GR (本研合上, e.g. 非线性光学 `00411040`).
+
+`/api/courses` wraps the UNION in a `GROUP BY course_code, class_no, COALESCE(NULLIF(teacher,''), id)` so each `(code, class_no, teacher)` collapses to one row. `course_type` and `category` are `GROUP_CONCAT(DISTINCT)`'d, then Python `split(',')`-ed into **arrays** in the JSON response (`"category": ["任选、劳动教育课", "实习、劳动教育课"]`). Everything else uses `MAX`. The representative `id` is `MIN(id)` — still a single prefixed string, so `/api/courses/{id}` keeps working unchanged.
+
+**Why include `class_no` in the key**: courses like 发展心理学 (`01630060`) run 5 parallel sections under one teacher — without `class_no` they'd be merged into one card instead of five.
+
+**Why UG↔GR cross-listed pairs are NOT merged**: UG uses `class_no='1'/'2'`, GR uses `'00'/'01'` — different namespaces. The 4 rows of 非线性光学 stay as 4 cards distinguished by the `专业课` / `研究生课` type badge, which is the desired UX.
+
+**Frontend contract**: list response is **arrays** for `course_type` and `category`; detail response is **strings** for the same fields. `asArray()` in `index.html` normalises both; always render through `courseTypeBadgesHTML()` / `categoryBadgesHTML()` (not direct `tr('categories', ...)` on the raw value).
+
+### Course IDs are strings, not ints
+
+DB ids are namespaced by single-char prefix so all DBs can coexist in URL space:
+- `a<id>` — fall undergrad (DB attached as `main` when `term=fall`)
+- `r<id>` — fall graduate (DB attached as `gr` when `term=fall`)
+- `u<id>` — spring undergrad (DB attached as `main` when `term=spring`)
+- `g<id>` — spring graduate (DB attached as `gr` when `term=spring`)
+- `s<id>` — summer undergrad (DB attached as `main` when `term=summer`)
+
+`_parse_id` splits the prefix into `(term, level, local_id)`. `_apply_translations` uses `ns = "gr" if level in ("g", "r") else "main"` to pick which attached DB's `translations` table to read.
+
+**Gotcha**: `course.id` is a string like `'u123'` — never interpolate it unquoted into inline JS (`onclick="showDetail(${course.id})"` parses `u123` as a variable). `createCard()` sidesteps this entirely by attaching the click via `card.addEventListener('click', () => showDetail(course.id))`; keep it that way.
+
+**URL state**: the frontend mirrors search/filters/sort/term/lang and the open modal (`?course=a123` / `?course=u123`) into the query string via `history.replaceState` (`syncURL()` / `readURLState()` in `index.html`) so any view is shareable. `term=fall` is omitted from the URL because it is the default. New filters must be wired into both functions plus `chipItems()` (active-filter chips) or they silently drop out of shared links.
+
+### i18n is hybrid (two stores)
+
+1. **Finite dictionaries in `index.html`** (`const dataI18n`, ~line 1720): 8 maps — `departments`, `categories`, `gradings`, `languages`, `audiences`, `notes`, `titles`, `weekdayShort`, `scheduleTerms`. Each value is a 7-tuple `[en, ja, ko, fr, de, es, ru]`. Use `tr('departments', '物理学院')` to look up. Add new short-value translations here when a closed set is known.
+2. **Per-row `translations` table in each DB**: for free text where every course is different. Schema: `(course_id, field, lang, text)` primary key. Loaded by `app.py` `_apply_translations` for fields in `TRANSLATABLE_FIELDS`. Populated by the scripts in `北京大学课程数据翻译/`. Current counts: spring UG 100156 rows, spring GR 39445 rows, summer UG 10010 rows, fall UG 124734 rows, fall GR 0 rows.
+
+Both endpoints accept `?lang=xx`; when `lang != 'zh'`, the backend swaps Chinese values for translations from the table when a translation exists and otherwise leaves the original text in place. The list endpoint translates only card-visible fields (`course_name`, `classroom`, `notes`) to keep the query small; the detail endpoint translates everything in `TRANSLATABLE_FIELDS`.
+
+On the frontend, `setLang()` re-fetches the list AND any open modal so visible content updates immediately.
+
+### Schedule parsing is fragile
+
+Schedule strings look like `1~15周 每周周一10~11节 二教5111~15周 每周周四10~11节 二教511` — slot delimiters are missing and room numbers can merge into the next week range. `build_common.parse_schedule` handles it via regex with a 3-digit cap on room numbers; the JS `trSchedule()` localises the cleaned form. Don't naively split on whitespace.
+
+`build_common.parse_first_period` extracts the smallest `节` start across all slots of one course and stores it in `basic_info.first_period`. The `time_asc` sort uses it via `(first_period IS NULL), first_period, course_name COLLATE NOCASE` so blanks land at the bottom. The default sort (no `sort=` param) is `course_name COLLATE NOCASE, id` with empty names pushed last via `(course_name = '' OR course_name IS NULL)`. If you rebuild a DB, the column is populated by the build scripts; if you change `parse_first_period` logic later, run a one-off `UPDATE basic_info SET first_period = ...` rather than wiping the DB (which would drop `translations`).
+
+### sort=random uses a seeded deterministic shuffle
+
+The frontend re-rolls `randomSeed` whenever the user clicks 随机 and includes it in every subsequent `/api/courses` call so pagination stays stable. The backend builds `((CAST(SUBSTR(id, 2) AS INTEGER) * mul + level_offset + add) % 999983)` where `mul/add` are derived from the seed via two large primes and `level_offset` differs per `a/r/u/g/s` prefix (read off `SUBSTR(id, 1, 1)`) to avoid hash collisions between e.g. `a123`, `u123`, and `g123`. Note the expression has no `t.` prefix — it runs on the outer GROUP BY result where `id` is `MIN(id)` of the merged group. Don't replace this with `ORDER BY RANDOM()` — that breaks pagination because each request gets a fresh order.
+
+### 归档/ folder
+
+Holds the pre-V2 monolithic `courses.db` plus the old `build_db.py` / `build_data.py` / `courses.json` / `courses_data.js`. Kept for reference only — nothing in the live codebase reads from it.

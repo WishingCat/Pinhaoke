@@ -41,13 +41,16 @@ SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
     "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
 )
-API_URL = "https://api.qnaigc.com/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash"
+API_URL = os.environ.get("DEEPSEEK_API_URL", "https://api.qnaigc.com/v1/chat/completions")
+MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek/deepseek-v4-flash")
+ENABLE_THINKING = os.environ.get("DEEPSEEK_ENABLE_THINKING")
+THINKING = os.environ.get("DEEPSEEK_THINKING")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
 SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
+FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -105,6 +108,24 @@ SHORT_JOBS = [
      "General Education core/elective series name", False),
     (SUMMER_DB, "textbook",      "detail_info", "textbook",
      "Textbook citation(s)", False),
+
+    # 26-27 fall undergrad (same schema as spring/summer UG)
+    (FALL_DB, "course_name",   "basic_info",  "course_name",
+     "Chinese university course title", False),
+    (FALL_DB, "notes",         "basic_info",  "notes",
+     "Short course-registration note (may contain abbreviations, room numbers)", False),
+    (FALL_DB, "pnp",           "basic_info",  "pnp",
+     "Whether P/NP grading can be elected", False),
+    (FALL_DB, "classroom",     "basic_info",  "classroom",
+     "Classroom or building+room (e.g. 二教403 = Building 2 Room 403)", False),
+    (FALL_DB, "major",         "basic_info",  "major",
+     "Major / specialization restriction", False),
+    (FALL_DB, "prerequisites", "detail_info", "prerequisites",
+     "Course prerequisites (often a list of other course names)", False),
+    (FALL_DB, "ge_series",     "detail_info", "ge_series",
+     "General Education core/elective series name", False),
+    (FALL_DB, "textbook",      "detail_info", "textbook",
+     "Textbook citation(s)", False),
 ]
 LONG_JOBS = [
     (UG_DB, "syllabus",     "detail_info", "syllabus",
@@ -122,6 +143,14 @@ LONG_JOBS = [
     (SUMMER_DB, "evaluation",   "detail_info", "evaluation",
      "Long-form teacher/student course evaluations (preserve structure)", True),
     (SUMMER_DB, "reference_book","detail_info","reference_book",
+     "Reference book list", True),
+
+    # 26-27 fall undergrad
+    (FALL_DB, "syllabus",     "detail_info", "syllabus",
+     "Long-form syllabus / weekly schedule (preserve newlines and structure)", True),
+    (FALL_DB, "evaluation",   "detail_info", "evaluation",
+     "Long-form teacher/student course evaluations (preserve structure)", True),
+    (FALL_DB, "reference_book","detail_info","reference_book",
      "Reference book list", True),
 ]
 
@@ -168,7 +197,7 @@ def call_api(text: str, langs, hint: str, max_retries: int = 3):
         f"- Use standard academic terminology.\n\n"
         f"Source (Chinese):\n{text}\n\nOutput JSON:"
     )
-    body = json.dumps({
+    body_obj = {
         "model": MODEL,
         "messages": [
             {"role": "system",
@@ -177,8 +206,14 @@ def call_api(text: str, langs, hint: str, max_retries: int = 3):
         ],
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
-        "enable_thinking": False,
-    }, ensure_ascii=False).encode("utf-8")
+    }
+    if ENABLE_THINKING is not None:
+        body_obj["enable_thinking"] = ENABLE_THINKING.lower() in {"1", "true", "yes"}
+    elif "qnaigc.com" in API_URL:
+        body_obj["enable_thinking"] = False
+    if "api.deepseek.com" in API_URL:
+        body_obj["thinking"] = {"type": THINKING or "disabled"}
+    body = json.dumps(body_obj, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         API_URL,
         data=body,
@@ -237,7 +272,7 @@ def fetch_jobs(jobs, allow_non_cn=False):
 
 def reuse_english_for_course_names():
     """Copy english_name into translations as (course_id, 'course_name', 'en')."""
-    for db_path in (UG_DB, GR_DB, SUMMER_DB):
+    for db_path in (UG_DB, GR_DB, SUMMER_DB, FALL_DB):
         conn = sqlite3.connect(db_path)
         rows = conn.execute(
             "SELECT course_id, english_name FROM detail_info "
@@ -274,8 +309,8 @@ def main():
     ap.add_argument("--phase", choices=["short", "long", "all"], default="short")
     ap.add_argument("--workers", type=int, default=15)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--db", choices=["ug", "gr", "summer", "all"], default="all",
-                    help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad). Default: all.")
+    ap.add_argument("--db", choices=["ug", "gr", "summer", "fall", "all"], default="all",
+                    help="Restrict jobs to one DB (ug = spring undergrad, gr = spring graduate, summer = summer undergrad, fall = 26-27 fall undergrad). Default: all.")
     ap.add_argument("--allow-non-cn", action="store_true",
                     help="Also process rows whose source has no Chinese characters "
                          "(e.g. course_name is English-only). Use to translate "
@@ -285,13 +320,15 @@ def main():
     setup_db(UG_DB)
     setup_db(GR_DB)
     setup_db(SUMMER_DB)
+    setup_db(FALL_DB)
     reuse_english_for_course_names()
 
     DB_FILTER = {
         "ug":     {UG_DB},
         "gr":     {GR_DB},
         "summer": {SUMMER_DB},
-        "all":    {UG_DB, GR_DB, SUMMER_DB},
+        "fall":   {FALL_DB},
+        "all":    {UG_DB, GR_DB, SUMMER_DB, FALL_DB},
     }[args.db]
 
     jobs = []

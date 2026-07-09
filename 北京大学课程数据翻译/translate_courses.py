@@ -34,13 +34,16 @@ except ImportError:
 API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
     "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
 )
-API_URL = "https://api.qnaigc.com/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash"
+API_URL = os.environ.get("DEEPSEEK_API_URL", "https://api.qnaigc.com/v1/chat/completions")
+MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek/deepseek-v4-flash")
+ENABLE_THINKING = os.environ.get("DEEPSEEK_ENABLE_THINKING")
+THINKING = os.environ.get("DEEPSEEK_THINKING")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
 GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
 SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
+FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
 
 LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
 LANG_NAMES = {
@@ -160,8 +163,13 @@ def call_api(text: str, langs):
         ],
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
-        "enable_thinking": False,
     }
+    if ENABLE_THINKING is not None:
+        body["enable_thinking"] = ENABLE_THINKING.lower() in {"1", "true", "yes"}
+    elif "qnaigc.com" in API_URL:
+        body["enable_thinking"] = False
+    if "api.deepseek.com" in API_URL:
+        body["thinking"] = {"type": THINKING or "disabled"}
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         API_URL,
@@ -212,7 +220,7 @@ def main():
     ap.add_argument("--workers", type=int, default=10,
                     help="Parallel API workers.")
     ap.add_argument("--only",
-                    choices=["ug_intro", "gr_intro", "gr_extra", "summer_intro"],
+                    choices=["ug_intro", "gr_intro", "gr_extra", "summer_intro", "fall_intro"],
                     help="Restrict to one job for testing.")
     args = ap.parse_args()
 
@@ -220,16 +228,19 @@ def main():
     setup_db(UG_DB)
     setup_db(GR_DB)
     setup_db(SUMMER_DB)
+    setup_db(FALL_DB)
 
     print("== Pending lists ==")
     ug = fetch_pending_undergrad(UG_DB)
     gr_intro = fetch_pending_grad("intro", "intro_cn")
     gr_extra = fetch_pending_grad("extra_notes", "extra_notes")
     summer = fetch_pending_undergrad(SUMMER_DB)
+    fall = fetch_pending_undergrad(FALL_DB)
     print(f"  undergrad intro_cn : {len(ug):4d} rows")
     print(f"  graduate  intro    : {len(gr_intro):4d} rows")
     print(f"  graduate  extra    : {len(gr_extra):4d} rows")
     print(f"  summer    intro_cn : {len(summer):4d} rows")
+    print(f"  fall      intro_cn : {len(fall):4d} rows")
 
     jobs = []
     if args.only in (None, "ug_intro"):
@@ -240,6 +251,8 @@ def main():
         jobs.append((GR_DB, "extra_notes", gr_extra))
     if args.only in (None, "summer_intro"):
         jobs.append((SUMMER_DB, "intro_cn", summer))
+    if args.only in (None, "fall_intro"):
+        jobs.append((FALL_DB, "intro_cn", fall))
 
     all_items = []
     for db, field, items in jobs:
