@@ -2579,19 +2579,26 @@ const filtersByTerm = {}; // term → filters payload; survives the lifetime of 
 let filtersController = null;
 
 async function loadFiltersForCurrentTerm() {
-  if (filtersByTerm[currentTerm]) {
-    cachedFilters = filtersByTerm[currentTerm];
-    populateFilters(cachedFilters);
+  if (filtersController) filtersController.abort();
+  const requestedTerm = currentTerm;
+  const controller = new AbortController();
+  filtersController = controller;
+
+  if (filtersByTerm[requestedTerm]) {
+    if (currentTerm === requestedTerm && filtersController === controller) {
+      cachedFilters = filtersByTerm[requestedTerm];
+      populateFilters(cachedFilters);
+    }
     return;
   }
-  if (filtersController) filtersController.abort();
-  filtersController = new AbortController();
   const resp = await fetch(
-    '/api/filters?term=' + encodeURIComponent(currentTerm),
-    { signal: filtersController.signal }
+    '/api/filters?term=' + encodeURIComponent(requestedTerm),
+    { signal: controller.signal }
   );
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
-  filtersByTerm[currentTerm] = data;
+  if (currentTerm !== requestedTerm || filtersController !== controller) return;
+  filtersByTerm[requestedTerm] = data;
   cachedFilters = data;
   populateFilters(data);
 }
@@ -2700,6 +2707,13 @@ function openCustomSelect(container, preferred = 'active') {
   if (target) requestAnimationFrame(() => target.focus());
 }
 
+function handleCustomSelectFocusOut(container, event) {
+  if (event.relatedTarget && container.contains(event.relatedTarget)) return;
+  requestAnimationFrame(() => {
+    if (!container.contains(document.activeElement)) closeCustomSelect(container);
+  });
+}
+
 function buildCustomSelect(containerId, options, allText, defaultValue) {
   const container = document.getElementById(containerId);
   const filterId = container.dataset.filter;
@@ -2730,6 +2744,11 @@ function buildCustomSelect(containerId, options, allText, defaultValue) {
 
   const trigger = container.querySelector('.custom-select-trigger');
   const searchInput = container.querySelector('.cs-search');
+  if (container._focusOutHandler) {
+    container.removeEventListener('focusout', container._focusOutHandler);
+  }
+  container._focusOutHandler = event => handleCustomSelectFocusOut(container, event);
+  container.addEventListener('focusout', container._focusOutHandler);
 
   function visibleOptions() {
     return [...container.querySelectorAll('.custom-select-option')].filter(option => !option.hidden);
@@ -3417,6 +3436,10 @@ async function copyCourseLink() {
   if (!currentModalCourseId) return;
   syncURL();
   const url = location.href;
+  const modalOverlay = document.getElementById('modalOverlay');
+  const focusBeforeCopy = modalOverlay.contains(document.activeElement)
+    ? document.activeElement
+    : document.getElementById('copyLinkBtn');
   let ok = false;
   try {
     await navigator.clipboard.writeText(url);
@@ -3428,10 +3451,22 @@ async function copyCourseLink() {
       ta.value = url;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      ok = document.execCommand('copy');
-      document.body.removeChild(ta);
+      ta.setAttribute('aria-hidden', 'true');
+      const fallbackHost = modalOverlay.classList.contains('open')
+        ? document.getElementById('modalContent')
+        : document.body;
+      fallbackHost.appendChild(ta);
+      try {
+        ta.select();
+        ok = document.execCommand('copy');
+      } finally {
+        ta.remove();
+        if (focusBeforeCopy && focusBeforeCopy.isConnected) {
+          focusBeforeCopy.focus();
+        } else if (modalOverlay.classList.contains('open')) {
+          document.getElementById('copyLinkBtn')?.focus();
+        }
+      }
     } catch (e2) { ok = false; }
   }
   const btn = document.getElementById('copyLinkBtn');

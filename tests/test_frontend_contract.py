@@ -1,9 +1,13 @@
 import re
+import shutil
+import subprocess
+import textwrap
 import unittest
 from pathlib import Path
 
 
 HTML = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")
+NODE = shutil.which("node")
 
 
 def function_body(name):
@@ -57,7 +61,24 @@ def function_body(name):
     raise AssertionError(f"JavaScript function {name!r} has an unclosed body")
 
 
+def function_source(name):
+    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{", HTML)
+    if not match:
+        raise AssertionError(f"JavaScript function {name!r} is missing")
+    return match.group(0) + function_body(name) + "}"
+
+
 class FrontendContractTests(unittest.TestCase):
+    def run_node(self, script):
+        if not NODE:
+            self.skipTest("node is unavailable; JavaScript behavior contract skipped")
+        result = subprocess.run(
+            [NODE, "-e", textwrap.dedent(script)],
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_load_more_guards_before_next_page_and_commits_after_success(self):
         body = function_body("loadMore")
         guard = "if (isLoading || !hasMore) return"
@@ -78,11 +99,134 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("return false", body)
         self.assertNotIn("currentPage++", body)
 
+    def test_rapid_load_more_calls_execute_one_append_and_one_page_advance(self):
+        source = function_source("loadMore")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentPage = 1;
+            let isLoading = false;
+            let hasMore = true;
+            let appendCalls = 0;
+            let finishAppend;
+            const loadMoreBtn = {{ disabled: false }};
+            const document = {{ getElementById: id => loadMoreBtn }};
+            function fetchCourses(args) {{
+              appendCalls += 1;
+              assert.deepEqual(args, {{ page: 2, append: true }});
+              return new Promise(resolve => {{ finishAppend = resolve; }});
+            }}
+            {source}
+            (async () => {{
+              const calls = [loadMore(), loadMore(), loadMore()];
+              assert.equal(appendCalls, 1);
+              assert.equal(currentPage, 1);
+              assert.equal(loadMoreBtn.disabled, true);
+              finishAppend(true);
+              await Promise.all(calls);
+              assert.equal(currentPage, 2);
+              assert.equal(appendCalls, 1);
+              assert.equal(isLoading, false);
+              assert.equal(loadMoreBtn.disabled, false);
+            }})().catch(error => {{ console.error(error); process.exitCode = 1; }});
+            """
+        )
+
+    def test_delayed_filter_response_cannot_overwrite_active_term_state(self):
+        source = function_source("loadFiltersForCurrentTerm")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentTerm = 'spring';
+            let cachedFilters = null;
+            let filtersController = null;
+            const filtersByTerm = {{}};
+            const pending = {{}};
+            const populated = [];
+            function populateFilters(data) {{ populated.push(data.term); }}
+            function fetch(url, options) {{
+              const term = new URL(url, 'http://local').searchParams.get('term');
+              return new Promise(resolve => {{
+                pending[term] = data => resolve({{ ok: true, json: async () => data }});
+              }});
+            }}
+            {source}
+            (async () => {{
+              const spring = loadFiltersForCurrentTerm();
+              currentTerm = 'fall';
+              const fall = loadFiltersForCurrentTerm();
+              pending.fall({{ term: 'fall' }});
+              await fall;
+              pending.spring({{ term: 'spring' }});
+              await spring;
+              assert.deepEqual(Object.keys(filtersByTerm), ['fall']);
+              assert.equal(filtersByTerm.fall.term, 'fall');
+              assert.equal(cachedFilters.term, 'fall');
+              assert.deepEqual(populated, ['fall']);
+            }})().catch(error => {{ console.error(error); process.exitCode = 1; }});
+            """
+        )
+
+    def test_filter_loader_has_request_owned_term_and_controller_contract(self):
+        body = function_body("loadFiltersForCurrentTerm")
+        self.assertIn("const requestedTerm = currentTerm", body)
+        self.assertIn("const controller = new AbortController()", body)
+        self.assertIn("filtersController === controller", body)
+        self.assertIn("currentTerm === requestedTerm", body)
+
     def test_copy_syncs_and_uses_complete_location(self):
         body = function_body("copyCourseLink")
         self.assertIn("syncURL()", body)
         self.assertIn("location.href", body)
         self.assertNotIn("location.origin + location.pathname", body)
+
+    def test_clipboard_fallback_stays_in_modal_and_restores_modal_focus(self):
+        body = function_body("copyCourseLink")
+        self.assertIn("fallbackHost", body)
+        self.assertIn("modalOverlay", body)
+        self.assertIn("focusBeforeCopy", body)
+        self.assertIn("fallbackHost.appendChild(ta)", body)
+        self.assertIn("focusBeforeCopy.focus()", body)
+
+    def test_sync_url_executes_complete_state_and_omits_default_fall(self):
+        source = function_source("syncURL")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            const values = {{ searchInput: 'optics', filterClassroom: '二教511' }};
+            const document = {{
+              getElementById: id => ({{ value: values[id] || '' }})
+            }};
+            const csValues = {{
+              filterCourseType: '专业课',
+              filterCategory: '任选',
+              filterCredits: '2',
+              filterDepartment: '物理学院',
+              filterWeekday: '周一',
+              filterGrading: '百分制',
+              filterSort: 'random',
+            }};
+            let randomSeed = 731;
+            let currentTerm = 'spring';
+            let currentLang = 'en';
+            let currentModalCourseId = 'u42';
+            const location = {{ pathname: '/courses' }};
+            let replaced = '';
+            const history = {{ replaceState: (_state, _title, url) => {{ replaced = url; }} }};
+            {source}
+            syncURL();
+            let params = new URL(replaced, 'http://local').searchParams;
+            assert.deepEqual(Object.fromEntries(params), {{
+              q: 'optics', room: '二教511', type: '专业课', cat: '任选', credits: '2',
+              dept: '物理学院', day: '周一', grading: '百分制', sort: 'random',
+              seed: '731', term: 'spring', lang: 'en', course: 'u42'
+            }});
+            currentTerm = 'fall';
+            syncURL();
+            params = new URL(replaced, 'http://local').searchParams;
+            assert.equal(params.has('term'), false);
+            """
+        )
 
     def test_sort_copy_no_longer_claims_pinyin(self):
         self.assertIn("sortNameAsc", HTML)
@@ -119,6 +263,42 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("Home", builder)
         self.assertIn("End", builder)
         self.assertIn("Escape", builder)
+        self.assertIn("focusout", builder)
+
+    def test_custom_select_focus_leave_closes_but_internal_focus_does_not(self):
+        if not NODE:
+            self.skipTest("node is unavailable; JavaScript behavior contract skipped")
+        source = function_source("handleCustomSelectFocusOut")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            const internal = {{ name: 'internal' }};
+            const external = {{ name: 'external' }};
+            const trigger = {{ expanded: 'true', setAttribute: (_key, value) => {{ trigger.expanded = value; }} }};
+            const container = {{
+              contains: element => element === internal,
+              querySelector: () => trigger,
+              classList: {{ remove: () => {{}} }},
+            }};
+            const document = {{ activeElement: internal }};
+            const requestAnimationFrame = callback => callback();
+            let closes = 0;
+            function closeCustomSelect(target, restoreFocus) {{
+              closes += 1;
+              assert.equal(target, container);
+              assert.equal(Boolean(restoreFocus), false);
+              trigger.setAttribute('aria-expanded', 'false');
+            }}
+            {source}
+            handleCustomSelectFocusOut(container, {{ relatedTarget: internal }});
+            assert.equal(closes, 0);
+            assert.equal(trigger.expanded, 'true');
+            document.activeElement = external;
+            handleCustomSelectFocusOut(container, {{ relatedTarget: external }});
+            assert.equal(closes, 1);
+            assert.equal(trigger.expanded, 'false');
+            """
+        )
 
     def test_modal_has_dialog_semantics_and_focus_management(self):
         self.assertIn('role="dialog"', HTML)
