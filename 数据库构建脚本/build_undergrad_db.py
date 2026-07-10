@@ -6,11 +6,30 @@ Schema:
     detail_info  one row per basic_info.id, joined 1:1
     courses_view convenience view joining both
 """
-import json
-import sqlite3
 from pathlib import Path
 
-from build_common import parse_schedule, parse_first_period, to_float
+if __package__:
+    from .build_atomic import (
+        atomic_database,
+        deduplicate_rows,
+        load_course_rows,
+        optional_text,
+        required_text,
+        strict_credit,
+        validate_built_database,
+    )
+    from .build_common import parse_first_period, parse_schedule
+else:
+    from build_atomic import (
+        atomic_database,
+        deduplicate_rows,
+        load_course_rows,
+        optional_text,
+        required_text,
+        strict_credit,
+        validate_built_database,
+    )
+    from build_common import parse_first_period, parse_schedule
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db"
@@ -60,6 +79,14 @@ CREATE TABLE detail_info (
     evaluation      TEXT                  -- 教学评估
 );
 
+CREATE TABLE translations (
+    course_id INTEGER NOT NULL,
+    field     TEXT NOT NULL,
+    lang      TEXT NOT NULL,
+    text      TEXT NOT NULL,
+    PRIMARY KEY (course_id, field, lang)
+);
+
 CREATE INDEX idx_basic_course_type  ON basic_info(course_type);
 CREATE INDEX idx_basic_course_code  ON basic_info(course_code);
 CREATE INDEX idx_basic_course_name  ON basic_info(course_name);
@@ -67,6 +94,7 @@ CREATE INDEX idx_basic_department   ON basic_info(department);
 CREATE INDEX idx_basic_category     ON basic_info(category);
 CREATE INDEX idx_basic_credits      ON basic_info(credits);
 CREATE INDEX idx_basic_first_period ON basic_info(first_period);
+CREATE INDEX idx_trans_cid_field    ON translations(course_id, field);
 
 CREATE VIEW courses_view AS
 SELECT
@@ -81,92 +109,97 @@ LEFT JOIN detail_info d ON d.course_id = b.id;
 """
 
 
-def build():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    c = conn.cursor()
-    c.executescript(SCHEMA)
+def _prepare_rows(sources):
+    candidates = []
+    for source, configured_course_type in sources:
+        source = Path(source)
+        if not isinstance(configured_course_type, str) or not configured_course_type.strip():
+            raise ValueError(f"{source}: configured course type cannot be blank")
+        course_type = configured_course_type.strip()
+        for row in load_course_rows(source):
+            bi = row.basic
+            di = row.detail
+            course_code = required_text(bi, "课程号", row.context)
+            class_no = optional_text(bi, "班号", row.context, strip=True) or ""
+            raw_sched = optional_text(bi, "上课时间及教室", row.context)
+            schedule_input = raw_sched or ""
+            schedule, classroom, weekdays = parse_schedule(schedule_input)
+            first_period = parse_first_period(schedule_input)
 
+            basic_values = (
+                course_type,
+                course_code,
+                class_no,
+                optional_text(bi, "课程名", row.context),
+                optional_text(bi, "课程类别", row.context),
+                strict_credit(bi, row.context),
+                optional_text(bi, "教师", row.context),
+                optional_text(bi, "开课单位", row.context),
+                optional_text(bi, "专业", row.context),
+                optional_text(bi, "年级", row.context),
+                schedule,
+                classroom,
+                raw_sched,
+                weekdays,
+                first_period,
+                optional_text(bi, "限数已选", row.context),
+                optional_text(bi, "自选PNP", row.context),
+                optional_text(bi, "备注", row.context),
+            )
+            detail_values = (
+                optional_text(di, "英文名称", row.context),
+                optional_text(di, "先修课程", row.context),
+                optional_text(di, "中文简介", row.context),
+                optional_text(di, "英文简介", row.context),
+                optional_text(di, "成绩记载方式", row.context),
+                optional_text(di, "通识课所属系列", row.context),
+                optional_text(di, "授课语言", row.context),
+                optional_text(di, "教材", row.context),
+                optional_text(di, "参考书", row.context),
+                optional_text(di, "教学大纲", row.context),
+                optional_text(di, "教学评估", row.context),
+            )
+            key = (course_type, course_code, class_no)
+            candidates.append(
+                (key, (basic_values, detail_values), (basic_values, detail_values), row.context)
+            )
+    return deduplicate_rows(candidates)
+
+
+def build(sources=None, target=DB_PATH):
+    source_specs = SOURCES if sources is None else sources
+    prepared_rows, duplicate_rows = _prepare_rows(source_specs)
+    target = Path(target)
     counts = {}
-    total = 0
-    for path, course_type in SOURCES:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
 
-        n_added = 0
-        seen = set()
-        for item in data:
-            bi = item.get("基本信息", {}) or {}
-            di = item.get("详细信息", {}) or {}
-            course_code = bi.get("课程号", "").strip()
-            class_no = bi.get("班号", "").strip()
-            if not course_code:
-                continue
-            key = (course_code, class_no)
-            if key in seen:
-                continue
-            seen.add(key)
-
-            raw_sched = bi.get("上课时间及教室", "")
-            schedule, classroom, weekdays = parse_schedule(raw_sched)
-            first_period = parse_first_period(raw_sched)
-
-            c.execute(
+    with atomic_database(target, SCHEMA) as conn:
+        cursor = conn.cursor()
+        for basic_values, detail_values in prepared_rows:
+            cursor.execute(
                 """INSERT INTO basic_info
                    (course_type, course_code, class_no, course_name, category, credits, teacher,
                     department, major, grade, schedule, classroom, schedule_raw,
                     weekdays, first_period, enrollment, pnp, notes)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    course_type, course_code, class_no,
-                    bi.get("课程名", ""),
-                    bi.get("课程类别", ""),
-                    to_float(bi.get("学分", "0")),
-                    bi.get("教师", ""),
-                    bi.get("开课单位", ""),
-                    bi.get("专业", ""),
-                    bi.get("年级", ""),
-                    schedule, classroom, raw_sched, weekdays,
-                    first_period,
-                    bi.get("限数已选", ""),
-                    bi.get("自选PNP", ""),
-                    bi.get("备注", ""),
-                ),
+                basic_values,
             )
-            course_id = c.lastrowid
-            c.execute(
+            course_id = cursor.lastrowid
+            cursor.execute(
                 """INSERT INTO detail_info
                    (course_id, english_name, prerequisites, intro_cn, intro_en, grading,
                     ge_series, language, textbook, reference_book, syllabus, evaluation)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    course_id,
-                    di.get("英文名称", ""),
-                    di.get("先修课程", ""),
-                    di.get("中文简介", ""),
-                    di.get("英文简介", ""),
-                    di.get("成绩记载方式", ""),
-                    di.get("通识课所属系列", ""),
-                    di.get("授课语言", ""),
-                    di.get("教材", ""),
-                    di.get("参考书", ""),
-                    di.get("教学大纲", ""),
-                    di.get("教学评估", ""),
-                ),
+                (course_id, *detail_values),
             )
-            n_added += 1
-        counts[course_type] = n_added
-        total += n_added
+            course_type = basic_values[0]
+            counts[course_type] = counts.get(course_type, 0) + 1
+        validate_built_database(conn, expected_rows=len(prepared_rows))
 
-    conn.commit()
-    print(f"Database built: {DB_PATH}")
+    print(f"Database built: {target}")
     for k, v in counts.items():
         print(f"  {k:6s}: {v}")
-    print(f"  total : {total}")
-    conn.close()
+    print(f"  total : {len(prepared_rows)}")
+    print(f"  skipped exact duplicates: {duplicate_rows}")
 
 
 if __name__ == "__main__":
