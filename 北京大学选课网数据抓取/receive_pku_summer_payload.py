@@ -6,9 +6,21 @@ import argparse
 from pathlib import Path
 
 try:
-    from .receiver_common import ReceiverConfig, run_receiver
+    from .receiver_common import (
+        UNDERGRAD_BASIC_FIELDS,
+        UNDERGRAD_COURSE_TYPES,
+        UNDERGRAD_DETAIL_FIELDS,
+        ReceiverConfig,
+        run_receiver,
+    )
 except ImportError:  # Direct execution adds this script directory to sys.path.
-    from receiver_common import ReceiverConfig, run_receiver
+    from receiver_common import (
+        UNDERGRAD_BASIC_FIELDS,
+        UNDERGRAD_COURSE_TYPES,
+        UNDERGRAD_DETAIL_FIELDS,
+        ReceiverConfig,
+        run_receiver,
+    )
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -23,6 +35,13 @@ CONFIG = ReceiverConfig(
     final_output=FINAL_OUT,
     term="25-26学年第3学期",
     label="PKU summer-course receiver",
+    level="undergraduate",
+    course_types=UNDERGRAD_COURSE_TYPES,
+    stats_bucket=None,
+    basic_fields=UNDERGRAD_BASIC_FIELDS,
+    optional_basic_fields=("英语等级",),
+    detail_fields=UNDERGRAD_DETAIL_FIELDS,
+    unique_key_fields=("课程类型", "课程号", "班号"),
 )
 
 
