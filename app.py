@@ -55,20 +55,57 @@ TERM_DBS = {
 app = FastAPI(title="Pinhaoke")
 
 
+def _readonly_uri(path: Path) -> str:
+    return f"file:{path.resolve().as_posix()}?mode=ro"
+
+
 @contextmanager
-def get_db(term: str = "spring"):
+def get_db(term: str = "fall"):
     config = TERM_DBS.get(term)
     if config is None:
         raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
-    main_path = config[0][1]
-    conn = sqlite3.connect(str(main_path))
-    conn.row_factory = sqlite3.Row
-    for alias, path, _ in config[1:]:
-        conn.execute(f"ATTACH DATABASE '{path}' AS {alias}")
+    conn = None
     try:
+        conn = sqlite3.connect(_readonly_uri(config[0][1]), uri=True)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only = ON")
+        for alias, path, _ in config[1:]:
+            conn.execute(f"ATTACH DATABASE ? AS {alias}", (_readonly_uri(path),))
         yield conn
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
+
+
+def check_database_health() -> dict:
+    databases = []
+    for term, entries in TERM_DBS.items():
+        for alias, path, prefix in entries:
+            conn = sqlite3.connect(_readonly_uri(path), uri=True)
+            try:
+                tables = {
+                    row[0]
+                    for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                }
+                basic = conn.execute("SELECT COUNT(*) FROM basic_info").fetchone()[0]
+                detail = conn.execute("SELECT COUNT(*) FROM detail_info").fetchone()[0]
+                integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+            finally:
+                conn.close()
+            if not {"basic_info", "detail_info", "translations"}.issubset(tables) or basic != detail or integrity != "ok":
+                raise RuntimeError(f"Unhealthy database: {path.name}")
+            databases.append(
+                {
+                    "term": term,
+                    "level": alias,
+                    "prefix": prefix,
+                    "file": path.name,
+                    "integrity": integrity,
+                    "basic": basic,
+                    "detail": detail,
+                }
+            )
+    return {"status": "ok", "databases": databases}
 
 
 # ---- shared SELECT fragments --------------------------------------------------
@@ -595,9 +632,18 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
 
 # Static files ------------------------------------------------------------------
 
-app.mount("/Images", StaticFiles(directory="Images"), name="images")
+@app.get("/api/health")
+def get_health():
+    try:
+        payload = check_database_health()
+    except (RuntimeError, sqlite3.Error):
+        return JSONResponse({"status": "error"}, status_code=503, headers={"Cache-Control": "no-store"})
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
+
+
+app.mount("/Images", StaticFiles(directory=str(BASE_DIR / "Images")), name="images")
 
 
 @app.get("/")
 def root():
-    return FileResponse("index.html")
+    return FileResponse(BASE_DIR / "index.html")
