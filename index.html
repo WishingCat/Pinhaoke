@@ -10,11 +10,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/Images/favicon-192.png">
 <link rel="apple-touch-icon" href="/Images/apple-touch-icon.png">
 <script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://cdn.jsdelivr.net/npm/harmonyos-sans-font@0.2.1/css/harmonyos-sans-sc.css" rel="stylesheet"></noscript>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <style>
@@ -42,8 +39,8 @@ h1, h2, h3 { font-weight: inherit; font-size: inherit; }
   /* ink scale */
   --ink:          #101217;
   --ink-2:        #3F444D;
-  --ink-3:        #6F747E;
-  --ink-4:        #A4A9B2;
+  --ink-3:        #5D636D;
+  --ink-4:        #686E78;
 
   /* borders */
   --border:       #E4E6EA;
@@ -51,8 +48,8 @@ h1, h2, h3 { font-weight: inherit; font-size: inherit; }
   --border-soft:  #EFF0F2;
 
   /* single bold accent — 与 Pin logo 同源的青绿色系 */
-  --accent:       #0F8A7D;
-  --accent-deep:  #0C6F65;
+  --accent:       #08766B;
+  --accent-deep:  #075F57;
   --accent-soft:  #C9EEE7;
   --accent-mist:  #E8F7F3;
 
@@ -61,15 +58,15 @@ h1, h2, h3 { font-weight: inherit; font-size: inherit; }
   --c-elective-soft:   #EEF2FF;
   --c-elective-border: rgba(79, 70, 229, 0.22);
 
-  --c-general:         #059669;
+  --c-general:         #047857;
   --c-general-soft:    #ECFDF5;
   --c-general-border:  rgba(5, 150, 105, 0.24);
 
-  --c-major:           #D97706;
+  --c-major:           #985400;
   --c-major-soft:      #FFFBEB;
   --c-major-border:    rgba(217, 119, 6, 0.28);
 
-  --c-grad:            #E11D48;
+  --c-grad:            #BE123C;
   --c-grad-soft:       #FFF1F2;
   --c-grad-border:     rgba(225, 29, 72, 0.24);
 
@@ -86,7 +83,7 @@ h1, h2, h3 { font-weight: inherit; font-size: inherit; }
   --shadow-xl: 0 24px 48px rgba(16, 18, 23, 0.18);
 
   /* fonts */
-  --f-sans: 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --f-sans: 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
   color-scheme: light;
@@ -197,6 +194,7 @@ html[data-theme="dark"] body::before {
 /* ===== Container ===== */
 .container {
   max-width: 1120px;
+  min-width: 0;
   margin: 0 auto;
   padding: 0 28px 80px;
   position: relative;
@@ -228,6 +226,7 @@ html[data-theme="dark"] body::before {
 
 .topbar-inner {
   max-width: 1120px;
+  min-width: 0;
   margin: 0 auto;
   padding: 0 28px;
   height: 58px;
@@ -255,12 +254,13 @@ html[data-theme="dark"] body::before {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
 .topbar-actions {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
@@ -494,9 +494,9 @@ html[data-theme="dark"] .hero::before {
 
 .hero h1 {
   position: relative;
-  font-size: clamp(2.3rem, 5vw, 3.3rem);
+  font-size: 3.3rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.15;
   background-image: linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%);
   -webkit-background-clip: text;
@@ -519,6 +519,9 @@ html[data-theme="dark"] .hero h1 {
 .term-toggle {
   position: relative;
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
   margin-top: 20px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -541,7 +544,7 @@ html[data-theme="dark"] .hero h1 {
 .term-toggle button:hover { color: var(--ink); }
 
 .term-toggle button.active {
-  background: linear-gradient(135deg, #2FBE9E, #167B72);
+  background: linear-gradient(135deg, #08766B, #075F57);
   color: #fff;
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(22, 123, 114, 0.35);
@@ -750,7 +753,7 @@ html[data-theme="dark"] .filters::before {
 .filter-group input::placeholder { color: var(--ink-4); }
 
 /* ===== custom select ===== */
-.custom-select { position: relative; }
+.custom-select { position: relative; min-width: 0; max-width: 100%; }
 
 .custom-select-trigger {
   cursor: pointer;
@@ -827,8 +830,15 @@ html[data-theme="dark"] .filters::before {
   font-weight: 600;
 }
 
+.custom-select-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-mist);
+  color: var(--accent-deep);
+}
+
 /* compact variant (sort control in toolbar) */
-.cs-compact { min-width: 150px; }
+.cs-compact { min-width: min(150px, 100%); max-width: 100%; }
 .cs-compact .custom-select-trigger { padding: 7px 30px 7px 12px; font-size: 0.84rem; background-color: var(--surface); }
 .cs-compact .custom-select-dropdown { left: auto; right: 0; min-width: 170px; }
 
@@ -897,6 +907,9 @@ html[data-theme="dark"] .filters::before {
 
 .toolbar-right {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 10px;
   margin-left: auto;
@@ -1034,7 +1047,8 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
   font-weight: 600;
   color: var(--ink);
   line-height: 1.4;
-  letter-spacing: -0.005em;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
 }
 
 .card-code {
@@ -1181,6 +1195,7 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 
 .modal-content {
   width: 100%;
+  min-width: 0;
   max-width: 780px;
   max-height: 88vh;
   overflow-y: auto;
@@ -1216,7 +1231,8 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
   font-weight: 700;
   color: var(--ink);
   line-height: 1.35;
-  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
 }
 
 .modal-head-actions {
@@ -1330,6 +1346,7 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
   color: var(--ink);
   white-space: pre-line;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 /* single-value sections (english name / GE series / notes …) align with title text */
@@ -1416,6 +1433,14 @@ html[data-theme="dark"] .load-more:hover {
 }
 
 .load-more:active { transform: scale(0.98); }
+.load-more:disabled { cursor: wait; opacity: 0.65; }
+
+.load-more-error {
+  margin: 18px auto 0;
+  color: var(--ink-3);
+  text-align: center;
+  font-size: 0.85rem;
+}
 
 #scrollSentinel { height: 1px; }
 
@@ -1599,6 +1624,33 @@ html[data-theme="dark"] .site-footer::after {
   }
 }
 
+@media (max-width: 390px) {
+  .container { padding-left: 12px; padding-right: 12px; }
+  .topbar-inner { padding-left: 12px; padding-right: 12px; gap: 8px; }
+  .term-toggle { width: 100%; border-radius: var(--r); }
+  .term-toggle button { flex: 1 1 30%; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: normal; overflow-wrap: anywhere; }
+  .toolbar-right { width: 100%; margin-left: 0; }
+  .cs-compact { flex: 1 1 150px; }
+  .clear-btn { flex: 0 1 auto; }
+  .modal-head { gap: 8px; }
+  .modal-head-actions { gap: 5px; }
+}
+
+@media (max-width: 320px) {
+  .topbar-actions { gap: 4px; }
+  .brand-name { font-size: 0.9rem; }
+  .brand-mark { width: 27px; height: 27px; }
+  .icon-btn { width: 29px; height: 29px; }
+  .top-btn { padding-left: 7px; padding-right: 7px; }
+  .hero { padding-left: 0; padding-right: 0; }
+  .term-toggle button { flex-basis: 100%; }
+  .search-box { padding-left: 12px; padding-right: 12px; }
+  .course-card { padding: 14px; }
+  .modal-overlay { padding: 6px; }
+  .modal-head { padding: 14px 12px 10px; }
+  .modal-body { padding: 12px 12px 20px; }
+}
+
 /* 超窄屏（老款/小屏手机）：语言按钮只留地球图标，副标题缩小到单行 */
 @media (max-width: 400px) {
   #langLabel { display: none; }
@@ -1607,7 +1659,9 @@ html[data-theme="dark"] .site-footer::after {
 
 </style>
 <script>
-var _hmt = _hmt || [];
+window._hmt = window._hmt || [];
+window._hmt.push(['_setAutoPageview', false]);
+window._hmt.push(['_trackPageview', location.pathname]);
 (function() {
   var hm = document.createElement("script");
   hm.src = "https://hm.baidu.com/hm.js?3b902dfbe438e02e03c13b123148caa6";
@@ -1783,8 +1837,8 @@ var _hmt = _hmt || [];
 </button>
 
 <!-- Detail Modal -->
-<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal-content" id="modalContent" role="dialog" aria-modal="true"></div>
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" onclick="if(event.target===this)closeModal()">
+  <div class="modal-content" id="modalContent" tabindex="-1"></div>
 </div>
 
 <script>
@@ -1801,16 +1855,16 @@ const i18n = {
     labelCourseType: '课程类型', labelCategory: '课程类别',
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
-    sortDefault: '默认', sortPinyin: '课程名 A→Z', sortPinyinDesc: '课程名 Z→A', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortTimeAsc: '上课时间 早→晚', sortRandom: '随机',
+    sortDefault: '默认', sortNameAsc: '课程名正序', sortNameDesc: '课程名倒序', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortTimeAsc: '上课时间 早→晚', sortRandom: '随机',
     labelWeekday: '上课时间', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
-    filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制',
+    filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制', closeModal: '关闭课程详情',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
     all: '全部',
-    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课', '英语课': '英语课', '体育课': '体育课', '劳动教育课': '劳动教育课', '政治课': '政治课', '计算机基础课': '计算机基础课' },
+    courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课', '英语课': '英语课', '体育课': '体育课', '劳动教育课': '劳动教育课', '政治课': '政治课', '计算机基础课': '计算机基础课', '思政选择性必修课': '思政选择性必修课' },
     weekdays: ['周一','周二','周三','周四','周五','周六','周日'],
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
@@ -1820,14 +1874,14 @@ const i18n = {
     modalLoading: '加载中...',
     modalBasicInfo: '基本信息', modalDetailInfo: '详细信息',
     modalEnglishName: '英文名称', modalPrerequisites: '先修课程',
-    modalIntroCn: '中文简介', modalIntroEn: '英文简介',
+    modalIntroCn: '中文简介', modalIntroEn: '英文简介', modalIntroTranslated: '翻译简介',
     modalGrading: '成绩记载方式', modalLanguage: '授课语言',
     modalGeSeries: '通识课系列', modalSyllabus: '教学大纲',
     modalEvaluation: '教学评估', modalCourseCode: '课程号',
     modalClassNo: '班号', modalMajor: '专业限制', modalGrade: '年级限制',
     modalTerm: '开课学期', modalAudience: '修读对象',
     modalWeeklyHours: '周学时', modalTotalHours: '总学时',
-    modalExtraNotes: '详情备注',
+    modalExtraNotes: '详情备注', modalTextbook: '教材', modalReferenceBook: '参考书',
   },
   en: {
     name: 'English',
@@ -1840,16 +1894,16 @@ const i18n = {
     labelCourseType: 'Course Type', labelCategory: 'Category',
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
-    sortDefault: 'Default', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortTimeAsc: 'Earliest first', sortRandom: 'Random',
+    sortDefault: 'Default', sortNameAsc: 'Course name ascending', sortNameDesc: 'Course name descending', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortTimeAsc: 'Earliest first', sortRandom: 'Random',
     labelWeekday: 'Schedule', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
-    filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied',
+    filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied', closeModal: 'Close course details',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
     all: 'All',
-    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate', '英语课': 'English', '体育课': 'PE', '劳动教育课': 'Labor Ed', '政治课': 'Politics', '计算机基础课': 'CS Basics' },
+    courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate', '英语课': 'English', '体育课': 'PE', '劳动教育课': 'Labor Ed', '政治课': 'Politics', '计算机基础课': 'CS Basics', '思政选择性必修课': 'Civic selective requirement' },
     weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
@@ -1859,14 +1913,14 @@ const i18n = {
     modalLoading: 'Loading...',
     modalBasicInfo: 'Basic Info', modalDetailInfo: 'Details',
     modalEnglishName: 'English Name', modalPrerequisites: 'Prerequisites',
-    modalIntroCn: 'Description (CN)', modalIntroEn: 'Description (EN)',
+    modalIntroCn: 'Chinese Introduction', modalIntroEn: 'English Introduction', modalIntroTranslated: 'Translated Introduction',
     modalGrading: 'Grading', modalLanguage: 'Language',
     modalGeSeries: 'GE Series', modalSyllabus: 'Syllabus',
     modalEvaluation: 'Evaluation', modalCourseCode: 'Course Code',
     modalClassNo: 'Class No.', modalMajor: 'Major Restriction', modalGrade: 'Grade Restriction',
     modalTerm: 'Term', modalAudience: 'Audience',
     modalWeeklyHours: 'Hours / Week', modalTotalHours: 'Total Hours',
-    modalExtraNotes: 'Additional Notes',
+    modalExtraNotes: 'Additional Notes', modalTextbook: 'Textbook', modalReferenceBook: 'Reference Books',
   },
   ja: {
     name: '日本語',
@@ -1879,16 +1933,16 @@ const i18n = {
     labelCourseType: '科目種別', labelCategory: 'カテゴリー',
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
-    sortDefault: 'デフォルト', sortPinyin: '名前 A→Z', sortPinyinDesc: '名前 Z→A', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortTimeAsc: '早い時間順', sortRandom: 'ランダム',
+    sortDefault: 'デフォルト', sortNameAsc: '科目名の昇順', sortNameDesc: '科目名の降順', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortTimeAsc: '早い時間順', sortRandom: 'ランダム',
     labelWeekday: '曜日', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
-    filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました',
+    filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました', closeModal: '授業詳細を閉じる',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
     all: 'すべて',
-    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院', '英语课': '英語', '体育课': '体育', '劳动教育课': '勤労教育', '政治课': '政治', '计算机基础课': '情報基礎' },
+    courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院', '英语课': '英語', '体育课': '体育', '劳动教育课': '勤労教育', '政治课': '政治', '计算机基础课': '情報基礎', '思政选择性必修课': '思想政治選択必修' },
     weekdays: ['月','火','水','木','金','土','日'],
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
@@ -1898,14 +1952,14 @@ const i18n = {
     modalLoading: '読み込み中...',
     modalBasicInfo: '基本情報', modalDetailInfo: '詳細情報',
     modalEnglishName: '英語名', modalPrerequisites: '前提科目',
-    modalIntroCn: '説明（中国語）', modalIntroEn: '説明（英語）',
+    modalIntroCn: '中国語概要', modalIntroEn: '英語概要', modalIntroTranslated: '翻訳概要',
     modalGrading: '成績評価', modalLanguage: '使用言語',
     modalGeSeries: '一般教養系列', modalSyllabus: 'シラバス',
     modalEvaluation: '授業評価', modalCourseCode: '科目番号',
     modalClassNo: 'クラス', modalMajor: '専攻制限', modalGrade: '学年制限',
     modalTerm: '開講学期', modalAudience: '対象',
     modalWeeklyHours: '週時間', modalTotalHours: '総時間',
-    modalExtraNotes: '備考',
+    modalExtraNotes: '備考', modalTextbook: '教科書', modalReferenceBook: '参考文献',
   },
   ko: {
     name: '한국어',
@@ -1918,16 +1972,16 @@ const i18n = {
     labelCourseType: '강좌 유형', labelCategory: '카테고리',
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
-    sortDefault: '기본', sortPinyin: '이름 A→Z', sortPinyinDesc: '이름 Z→A', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortTimeAsc: '이른 시간순', sortRandom: '무작위',
+    sortDefault: '기본', sortNameAsc: '강좌명 오름차순', sortNameDesc: '강좌명 내림차순', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortTimeAsc: '이른 시간순', sortRandom: '무작위',
     labelWeekday: '요일', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
-    filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨',
+    filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨', closeModal: '강좌 상세 닫기',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
     all: '전체',
-    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원', '英语课': '영어', '体育课': '체육', '劳动教育课': '노동교육', '政治课': '정치', '计算机基础课': '컴퓨터기초' },
+    courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원', '英语课': '영어', '体育课': '체육', '劳动教育课': '노동교육', '政治课': '정치', '计算机基础课': '컴퓨터기초', '思政选择性必修课': '사상정치 선택필수' },
     weekdays: ['월','화','수','목','금','토','일'],
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
@@ -1937,14 +1991,14 @@ const i18n = {
     modalLoading: '로딩 중...',
     modalBasicInfo: '기본 정보', modalDetailInfo: '상세 정보',
     modalEnglishName: '영문명', modalPrerequisites: '선수과목',
-    modalIntroCn: '설명(중국어)', modalIntroEn: '설명(영어)',
+    modalIntroCn: '중국어 소개', modalIntroEn: '영어 소개', modalIntroTranslated: '번역 소개',
     modalGrading: '성적 방식', modalLanguage: '수업 언어',
     modalGeSeries: '교양 계열', modalSyllabus: '강의계획서',
     modalEvaluation: '강의 평가', modalCourseCode: '과목 번호',
     modalClassNo: '분반', modalMajor: '전공 제한', modalGrade: '학년 제한',
     modalTerm: '개강 학기', modalAudience: '수강 대상',
     modalWeeklyHours: '주당 시수', modalTotalHours: '총 시수',
-    modalExtraNotes: '추가 비고',
+    modalExtraNotes: '추가 비고', modalTextbook: '교재', modalReferenceBook: '참고문헌',
   },
   fr: {
     name: 'Fran\u00e7ais',
@@ -1957,16 +2011,16 @@ const i18n = {
     labelCourseType: 'Type de cours', labelCategory: 'Cat\u00e9gorie',
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
-    sortDefault: 'Par d\u00e9faut', sortPinyin: 'Nom (A→Z)', sortPinyinDesc: 'Nom (Z→A)', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortTimeAsc: 'T\u00f4t \u2192 tard', sortRandom: 'Al\u00e9atoire',
+    sortDefault: 'Par d\u00e9faut', sortNameAsc: 'Nom du cours croissant', sortNameDesc: 'Nom du cours d\u00e9croissant', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortTimeAsc: 'T\u00f4t \u2192 tard', sortRandom: 'Al\u00e9atoire',
     labelWeekday: 'Jour', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
-    filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9',
+    filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9', closeModal: 'Fermer les d\u00e9tails du cours',
     loadingText: 'Chargement des donn\u00e9es...',
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
     all: 'Tous',
-    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master', '英语课': 'Anglais', '体育课': 'Sport', '劳动教育课': '\u00c9d. du travail', '政治课': 'Politique', '计算机基础课': 'Info. base' },
+    courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master', '英语课': 'Anglais', '体育课': 'Sport', '劳动教育课': '\u00c9d. du travail', '政治课': 'Politique', '计算机基础课': 'Info. base', '思政选择性必修课': 'Option civique obligatoire' },
     weekdays: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
     fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
@@ -1976,14 +2030,14 @@ const i18n = {
     modalLoading: 'Chargement...',
     modalBasicInfo: 'Info de base', modalDetailInfo: 'D\u00e9tails',
     modalEnglishName: 'Nom anglais', modalPrerequisites: 'Pr\u00e9requis',
-    modalIntroCn: 'Description (CN)', modalIntroEn: 'Description (EN)',
+    modalIntroCn: 'Pr\u00e9sentation chinoise', modalIntroEn: 'Pr\u00e9sentation anglaise', modalIntroTranslated: 'Pr\u00e9sentation traduite',
     modalGrading: 'Notation', modalLanguage: 'Langue',
     modalGeSeries: 'S\u00e9rie', modalSyllabus: 'Programme',
     modalEvaluation: '\u00c9valuation', modalCourseCode: 'Code',
     modalClassNo: 'Classe', modalMajor: 'Sp\u00e9cialit\u00e9', modalGrade: 'Ann\u00e9e',
     modalTerm: 'Semestre', modalAudience: 'Public',
     modalWeeklyHours: 'h/sem', modalTotalHours: 'Heures totales',
-    modalExtraNotes: 'Notes',
+    modalExtraNotes: 'Notes', modalTextbook: 'Manuel', modalReferenceBook: 'Ouvrages de r\u00e9f\u00e9rence',
   },
   de: {
     name: 'Deutsch',
@@ -1996,16 +2050,16 @@ const i18n = {
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
-    sortDefault: 'Standard', sortPinyin: 'Name (A→Z)', sortPinyinDesc: 'Name (Z→A)', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortTimeAsc: 'Fr\u00fch \u2192 sp\u00e4t', sortRandom: 'Zuf\u00e4llig',
+    sortDefault: 'Standard', sortNameAsc: 'Kursname aufsteigend', sortNameDesc: 'Kursname absteigend', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortTimeAsc: 'Fr\u00fch \u2192 sp\u00e4t', sortRandom: 'Zuf\u00e4llig',
     labelWeekday: 'Wochentag', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
-    filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert',
+    filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert', closeModal: 'Kursdetails schlie\u00dfen',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
     all: 'Alle',
-    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master', '英语课': 'Englisch', '体育课': 'Sport', '劳动教育课': 'Arbeitserzieh.', '政治课': 'Politik', '计算机基础课': 'Info. Grdl.' },
+    courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master', '英语课': 'Englisch', '体育课': 'Sport', '劳动教育课': 'Arbeitserzieh.', '政治课': 'Politik', '计算机基础课': 'Info. Grdl.', '思政选择性必修课': 'Politisches Wahlpflichtfach' },
     weekdays: ['Mo','Di','Mi','Do','Fr','Sa','So'],
     fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
@@ -2015,14 +2069,14 @@ const i18n = {
     modalLoading: 'Laden...',
     modalBasicInfo: 'Grundinfo', modalDetailInfo: 'Details',
     modalEnglishName: 'Englischer Name', modalPrerequisites: 'Voraussetzungen',
-    modalIntroCn: 'Beschreibung (CN)', modalIntroEn: 'Beschreibung (EN)',
+    modalIntroCn: 'Chinesische Einf\u00fchrung', modalIntroEn: 'Englische Einf\u00fchrung', modalIntroTranslated: '\u00dcbersetzte Einf\u00fchrung',
     modalGrading: 'Bewertung', modalLanguage: 'Sprache',
     modalGeSeries: 'Serie', modalSyllabus: 'Lehrplan',
     modalEvaluation: 'Bewertung', modalCourseCode: 'Kurscode',
     modalClassNo: 'Klasse', modalMajor: 'Fachbeschr\u00e4nkung', modalGrade: 'Jahrgang',
     modalTerm: 'Semester', modalAudience: 'Zielgruppe',
     modalWeeklyHours: 'SWS', modalTotalHours: 'Gesamtstunden',
-    modalExtraNotes: 'Zusatz',
+    modalExtraNotes: 'Zusatz', modalTextbook: 'Lehrbuch', modalReferenceBook: 'Literatur',
   },
   es: {
     name: 'Espa\u00f1ol',
@@ -2035,16 +2089,16 @@ const i18n = {
     labelCourseType: 'Tipo de curso', labelCategory: 'Categor\u00eda',
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
-    sortDefault: 'Por defecto', sortPinyin: 'Nombre (A→Z)', sortPinyinDesc: 'Nombre (Z→A)', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortTimeAsc: 'Temprano \u2192 tarde', sortRandom: 'Aleatorio',
+    sortDefault: 'Por defecto', sortNameAsc: 'Nombre del curso ascendente', sortNameDesc: 'Nombre del curso descendente', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortTimeAsc: 'Temprano \u2192 tarde', sortRandom: 'Aleatorio',
     labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
-    filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado',
+    filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado', closeModal: 'Cerrar detalles del curso',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
     all: 'Todos',
-    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado', '英语课': 'Ingl\u00e9s', '体育课': 'EF', '劳动教育课': 'Ed. laboral', '政治课': 'Pol\u00edtica', '计算机基础课': 'Info. b\u00e1sica' },
+    courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado', '英语课': 'Ingl\u00e9s', '体育课': 'EF', '劳动教育课': 'Ed. laboral', '政治课': 'Pol\u00edtica', '计算机基础课': 'Info. b\u00e1sica', '思政选择性必修课': 'Optativa c\u00edvica obligatoria' },
     weekdays: ['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'],
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
@@ -2054,14 +2108,14 @@ const i18n = {
     modalLoading: 'Cargando...',
     modalBasicInfo: 'Info b\u00e1sica', modalDetailInfo: 'Detalles',
     modalEnglishName: 'Nombre en ingl\u00e9s', modalPrerequisites: 'Prerrequisitos',
-    modalIntroCn: 'Descripci\u00f3n (CN)', modalIntroEn: 'Descripci\u00f3n (EN)',
+    modalIntroCn: 'Introducci\u00f3n en chino', modalIntroEn: 'Introducci\u00f3n en ingl\u00e9s', modalIntroTranslated: 'Introducci\u00f3n traducida',
     modalGrading: 'Calificaci\u00f3n', modalLanguage: 'Idioma',
     modalGeSeries: 'Serie', modalSyllabus: 'Programa',
     modalEvaluation: 'Evaluaci\u00f3n', modalCourseCode: 'C\u00f3digo',
     modalClassNo: 'Clase', modalMajor: 'Especialidad', modalGrade: 'A\u00f1o',
     modalTerm: 'Semestre', modalAudience: 'Destinatarios',
     modalWeeklyHours: 'h/sem', modalTotalHours: 'Horas totales',
-    modalExtraNotes: 'Notas adicionales',
+    modalExtraNotes: 'Notas adicionales', modalTextbook: 'Libro de texto', modalReferenceBook: 'Bibliograf\u00eda',
   },
   ru: {
     name: 'Русский',
@@ -2074,16 +2128,16 @@ const i18n = {
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
-    sortDefault: 'По умолчанию', sortPinyin: 'Имя А→Я', sortPinyinDesc: 'Имя Я→А', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortTimeAsc: 'С раннего', sortRandom: 'Случайно',
+    sortDefault: 'По умолчанию', sortNameAsc: 'Название курса по возрастанию', sortNameDesc: 'Название курса по убыванию', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortTimeAsc: 'С раннего', sortRandom: 'Случайно',
     labelWeekday: 'День', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
-    filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано',
+    filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано', closeModal: 'Закрыть сведения о курсе',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
     all: 'Все',
-    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура', '英语课': 'Английский', '体育课': 'Физкультура', '劳动教育课': 'Труд. восп.', '政治课': 'Политика', '计算机基础课': 'Информатика' },
+    courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура', '英语课': 'Английский', '体育课': 'Физкультура', '劳动教育课': 'Труд. восп.', '政治课': 'Политика', '计算机基础课': 'Информатика', '思政选择性必修课': 'Обязательный электив по политике' },
     weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
@@ -2093,14 +2147,14 @@ const i18n = {
     modalLoading: 'Загрузка...',
     modalBasicInfo: 'Основная информация', modalDetailInfo: 'Подробности',
     modalEnglishName: 'Название (англ.)', modalPrerequisites: 'Пререквизиты',
-    modalIntroCn: 'Описание (кит.)', modalIntroEn: 'Описание (англ.)',
+    modalIntroCn: 'Введение на китайском', modalIntroEn: 'Введение на английском', modalIntroTranslated: 'Переведённое введение',
     modalGrading: 'Оценивание', modalLanguage: 'Язык',
     modalGeSeries: 'Серия', modalSyllabus: 'Программа',
     modalEvaluation: 'Оценка', modalCourseCode: 'Код курса',
     modalClassNo: 'Группа', modalMajor: 'Специальность', modalGrade: 'Курс',
     modalTerm: 'Семестр', modalAudience: 'Целевая аудитория',
     modalWeeklyHours: 'Часов/нед', modalTotalHours: 'Всего часов',
-    modalExtraNotes: 'Доп. примечания',
+    modalExtraNotes: 'Доп. примечания', modalTextbook: 'Учебник', modalReferenceBook: 'Литература',
   },
 };
 
@@ -2165,6 +2219,9 @@ const dataI18n = {
     '建筑与景观设计学院': ['School of Architecture and Landscape','建築・景観設計学院','건축조경설계대학','École d’Architecture et Paysage','Schule für Architektur und Landschaftsgestaltung','Escuela de Arquitectura y Paisaje','Школа архитектуры и ландшафта'],
     '人工智能研究院': ['Institute for Artificial Intelligence','人工知能研究院','인공지능연구원','Institut d’Intelligence Artificielle','Institut für Künstliche Intelligenz','Instituto de Inteligencia Artificial','Институт искусственного интеллекта'],
     '学生工作部人民武装部': ['Student Affairs Office','学生支援部','학생사업부','Bureau des Affaires Étudiantes','Studentenbüro','Oficina de Asuntos Estudiantiles','Отдел студенческих дел'],
+    '中国社会科学调查中心': ['China Social Science Survey Center','中国社会科学調査センター','중국사회과학조사센터','Centre chinois d’enquête en sciences sociales','Chinesisches Zentrum für sozialwissenschaftliche Umfragen','Centro Chino de Encuestas de Ciencias Sociales','Китайский центр социальных исследований'],
+    '南南合作与发展学院': ['Institute of South-South Cooperation and Development','南南協力・開発学院','남남협력개발대학원','Institut de coopération Sud-Sud et de développement','Institut für Süd-Süd-Kooperation und Entwicklung','Instituto de Cooperación Sur-Sur y Desarrollo','Институт сотрудничества Юг-Юг и развития'],
+    '英语语言文学系': ['Department of English Language and Literature','英語言語文学科','영어영문학과','Département de langue et littérature anglaises','Institut für Englische Sprache und Literatur','Departamento de Lengua y Literatura Inglesas','Кафедра английского языка и литературы'],
   },
 
   categories: {
@@ -2189,6 +2246,16 @@ const dataI18n = {
     '通识课(通选课II)、思政选择性必修': ['General Ed (II) / Civic Required','一般教養(選択II)・思政選択必修','교양(II)/사상정치필수','Formation Générale (II) / Civique','Allgemeinbildung (II) / Politische Bildung','Educación General (II) / Cívica','Общеобразовательный (II) / Идеологический'],
     '通识课(通选课III)、思政选择性必修': ['General Ed (III) / Civic Required','一般教養(選択III)・思政選択必修','교양(III)/사상정치필수','Formation Générale (III) / Civique','Allgemeinbildung (III) / Politische Bildung','Educación General (III) / Cívica','Общеобразовательный (III) / Идеологический'],
     '通识课(通选课II)、劳动教育课': ['General Ed (II) / Labor Education','一般教養(選択II)・労働教育','교양(II)/노동교육','Formation Générale (II) / Éducation au Travail','Allgemeinbildung (II) / Arbeitserziehung','Educación General (II) / Educación Laboral','Общеобразовательный (II) / Трудовое воспитание'],
+    '专业必修、劳动教育课': ['Major Required / Labor Education','専攻必修・労働教育','전공필수/노동교육','Spécialité obligatoire / Éducation au travail','Hauptfach-Pflicht / Arbeitserziehung','Especialidad obligatoria / Educación laboral','Обязательный по специальности / Трудовое воспитание'],
+    '专业必修、思政选择性必修': ['Major Required / Civic Required','専攻必修・思政選択必修','전공필수/사상정치선택필수','Spécialité obligatoire / Civique','Hauptfach-Pflicht / Politische Bildung','Especialidad obligatoria / Cívica','Обязательный по специальности / Идеологический'],
+    '全校必修': ['University-wide Required','全学必修','전교필수','Obligatoire universitaire','Universitätsweit verpflichtend','Obligatoria universitaria','Общеуниверситетский обязательный'],
+    '实习、劳动教育课': ['Practicum / Labor Education','実習・労働教育','실습/노동교육','Stage / Éducation au travail','Praktikum / Arbeitserziehung','Prácticas / Educación laboral','Практика / Трудовое воспитание'],
+    '通识课(通识核心课II)、思政选择性必修': ['General Ed (Core II) / Civic Required','一般教養(コアII)・思政選択必修','교양(핵심II)/사상정치필수','Formation générale (Noyau II) / Civique','Allgemeinbildung (Kern II) / Politische Bildung','Educación general (Núcleo II) / Cívica','Общеобразовательный (Базовый II) / Идеологический'],
+    '通识课(通识核心课IV)、劳动教育课': ['General Ed (Core IV) / Labor Education','一般教養(コアIV)・労働教育','교양(핵심IV)/노동교육','Formation générale (Noyau IV) / Éducation au travail','Allgemeinbildung (Kern IV) / Arbeitserziehung','Educación general (Núcleo IV) / Educación laboral','Общеобразовательный (Базовый IV) / Трудовое воспитание'],
+    '通识课(通选课IV)、劳动教育课': ['General Ed (Elective IV) / Labor Education','一般教養(選択IV)・労働教育','교양(선택IV)/노동교육','Formation générale (Optionnel IV) / Éducation au travail','Allgemeinbildung (Wahl IV) / Arbeitserziehung','Educación general (Electivo IV) / Educación laboral','Общеобразовательный (Выборный IV) / Трудовое воспитание'],
+    '通选课': ['General Elective','一般選択科目','일반선택과목','Cours général au choix','Allgemeines Wahlfach','Optativa general','Общий курс по выбору'],
+    '通选课、思政选择性必修': ['General Elective / Civic Required','一般選択・思政選択必修','일반선택/사상정치선택필수','Cours général au choix / Civique','Allgemeines Wahlfach / Politische Bildung','Optativa general / Cívica','Общий курс по выбору / Идеологический'],
+    '限选、劳动教育课': ['Restricted Elective / Labor Education','制限選択・労働教育','제한선택/노동교육','Choix restreint / Éducation au travail','Eingeschränkte Wahl / Arbeitserziehung','Optativa restringida / Educación laboral','Ограниченный по выбору / Трудовое воспитание'],
   },
 
   gradings: {
@@ -2299,19 +2366,30 @@ function trTeacher(s) {
 
 // Localize schedule: "1~15周 每周周二3~5节"
 function trSchedule(s) {
-  if (!s || currentLang === 'zh') return s;
+  if (!s) return s;
+  // The source occasionally joins a three-digit room number directly to the
+  // next week range. Add boundaries around known schedule tokens only; leave
+  // every unknown character untouched.
+  let translated = String(s)
+    .replace(/([^\s\d~]+\d{3})(?=\d{1,2}~\d{1,2}周)/g, '$1 ')
+    .replace(/周(?=每周|单周|双周|周[一二三四五六日])/g, '周 ')
+    .replace(/(每周|单周|双周)(?=周[一二三四五六日])/g, '$1 ')
+    .replace(/(周[一二三四五六日])(?=\d{1,2}(?:~\d{1,2})?节)/g, '$1 ')
+    .replace(/节(?=\S)/g, '节 ');
+  if (currentLang === 'zh') return translated;
   const t = dataI18n.scheduleTerms;
   const wd = dataI18n.weekdayShort;
   const i = TR_IDX[currentLang];
-  if (i === undefined) return s;
-  return s
-    .replace(/(\d+)~(\d+)周/g, (_, a, b) => t.weeks[i] + ' ' + a + '-' + b)
+  if (i === undefined) return translated;
+  translated = translated
+    .replace(/(^|\s)(\d{1,2})~(\d{1,2})周/g, (_, lead, a, b) => lead + t.weeks[i] + ' ' + a + '-' + b)
     .replace(/每周/g, t.every[i] + ' ')
     .replace(/单周/g, t.odd[i] + ' ')
     .replace(/双周/g, t.even[i] + ' ')
     .replace(/周([一二三四五六日])/g, (_, d) => wd[d] ? wd[d][i] : '周' + d)
-    .replace(/(\d+)~(\d+)节/g, (_, a, b) => t.period[i] + ' ' + a + '-' + b)
-    .replace(/(\d+)节/g, (_, a) => t.period[i] + ' ' + a);
+    .replace(/(\d{1,2})~(\d{1,2})节/g, (_, a, b) => t.period[i] + ' ' + a + '-' + b)
+    .replace(/(\d{1,2})节/g, (_, a) => t.period[i] + ' ' + a);
+  return translated;
 }
 
 // Course name: prefer english_name for EN
@@ -2492,6 +2570,8 @@ let currentPage = 1;
 const PAGE_SIZE = 20;
 let fetchController = null;
 let isFetching = false;
+let isLoading = false;
+let hasMore = false;
 
 /* ===== Filters loading ===== */
 let cachedFilters = null;
@@ -2529,8 +2609,7 @@ async function init() {
   // "load more" button stays as a fallback for browsers without IO.
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !isFetching &&
-          currentCourses.length > 0 && currentCourses.length < totalCount) {
+      if (entries[0].isIntersecting && !isFetching && !isLoading && hasMore) {
         loadMore();
       }
     }, { rootMargin: '600px 0px' }).observe(document.getElementById('scrollSentinel'));
@@ -2566,7 +2645,9 @@ function refreshTermToggleUI() {
 async function setTerm(term) {
   if (!TERMS.has(term)) return;
   if (term === currentTerm) return;
+  if (fetchController) fetchController.abort();
   currentTerm = term;
+  hasMore = false;
   refreshTermToggleUI();
 
   // Filter universes differ between terms — wipe selected filter values and
@@ -2593,7 +2674,33 @@ async function setTerm(term) {
 /* ===== Custom select component ===== */
 const csValues = {}; // track selected values: { filterId: value }
 
-function initCustomSelect(containerId, options, allText, defaultValue) {
+function closeCustomSelect(container, restoreFocus = false) {
+  if (!container) return;
+  container.classList.remove('open');
+  const trigger = container.querySelector('.custom-select-trigger');
+  if (trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger.focus();
+  }
+}
+
+function openCustomSelect(container, preferred = 'active') {
+  closeAllSelects(container);
+  const searchInput = container.querySelector('.cs-search');
+  if (searchInput) searchInput.value = '';
+  container.querySelectorAll('.custom-select-option').forEach(option => { option.hidden = false; });
+  container.classList.add('open');
+  const trigger = container.querySelector('.custom-select-trigger');
+  trigger.setAttribute('aria-expanded', 'true');
+  const options = [...container.querySelectorAll('.custom-select-option')].filter(option => !option.hidden);
+  const active = container.querySelector('.custom-select-option.active');
+  const target = preferred === 'first'
+    ? options[0]
+    : (preferred === 'last' ? options[options.length - 1] : (active && !active.hidden ? active : options[0]));
+  if (target) requestAnimationFrame(() => target.focus());
+}
+
+function buildCustomSelect(containerId, options, allText, defaultValue) {
   const container = document.getElementById(containerId);
   const filterId = container.dataset.filter;
   csValues[filterId] = defaultValue || '';
@@ -2603,17 +2710,20 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
   // shared link) still shows as the trigger text so the user sees what's applied.
   const triggerText = defaultOpt ? defaultOpt.label : (defaultValue || allText);
   const searchable = options.length > 12;
+  const label = container.closest('.filter-group')?.querySelector('label') || document.getElementById('labelSort');
+  const labelId = label ? label.id : '';
+  const listboxId = containerId + 'Listbox';
 
-  let html = `<div class="custom-select-trigger" tabindex="0" role="button">${esc(triggerText)}</div>`;
+  let html = `<div class="custom-select-trigger" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="${listboxId}" aria-labelledby="${esc(labelId)}">${esc(triggerText)}</div>`;
   html += `<div class="custom-select-dropdown">`;
   if (searchable) {
-    html += `<div class="cs-search-wrap"><input type="text" class="cs-search" placeholder="${esc(i18n[currentLang].selectSearch)}"></div>`;
+    html += `<div class="cs-search-wrap"><input type="text" class="cs-search" aria-label="${esc(i18n[currentLang].selectSearch)}" placeholder="${esc(i18n[currentLang].selectSearch)}"></div>`;
   }
-  html += `<div class="cs-options">`;
-  html += `<div class="custom-select-option${!defaultValue ? ' active' : ''}" data-value="">${esc(allText)}</div>`;
+  html += `<div class="cs-options" id="${listboxId}" role="listbox" aria-labelledby="${esc(labelId)}">`;
+  html += `<div class="custom-select-option${!defaultValue ? ' active' : ''}" data-value="" role="option" tabindex="-1" aria-selected="${!defaultValue ? 'true' : 'false'}">${esc(allText)}</div>`;
   for (const opt of options) {
     const isActive = defaultValue === opt.value ? ' active' : '';
-    html += `<div class="custom-select-option${isActive}" data-value="${esc(opt.value)}">${esc(opt.label)}</div>`;
+    html += `<div class="custom-select-option${isActive}" data-value="${esc(opt.value)}" role="option" tabindex="-1" aria-selected="${isActive ? 'true' : 'false'}">${esc(opt.label)}</div>`;
   }
   html += `</div></div>`;
   container.innerHTML = html;
@@ -2621,20 +2731,51 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
   const trigger = container.querySelector('.custom-select-trigger');
   const searchInput = container.querySelector('.cs-search');
 
-  function openSelect() {
-    closeAllSelects(container);
-    const opening = !container.classList.contains('open');
-    container.classList.toggle('open');
-    if (opening && searchInput) {
-      searchInput.value = '';
-      container.querySelectorAll('.custom-select-option').forEach(o => { o.style.display = ''; });
-      setTimeout(() => searchInput.focus(), 0);
-    }
+  function visibleOptions() {
+    return [...container.querySelectorAll('.custom-select-option')].filter(option => !option.hidden);
   }
 
-  trigger.addEventListener('click', e => { e.stopPropagation(); openSelect(); });
+  function chooseOption(option) {
+    csValues[filterId] = option.dataset.value;
+    trigger.textContent = option.textContent;
+    container.querySelectorAll('.custom-select-option').forEach(item => {
+      const selected = item === option;
+      item.classList.toggle('active', selected);
+      item.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+    closeCustomSelect(container, true);
+    if (filterId === 'filterSort' && option.dataset.value === 'random') {
+      randomSeed = newRandomSeed();
+    }
+    applyFilters();
+  }
+
+  function moveOption(current, direction) {
+    const available = visibleOptions();
+    const index = available.indexOf(current);
+    const next = Math.min(available.length - 1, Math.max(0, index + direction));
+    if (available[next]) available[next].focus();
+  }
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    if (container.classList.contains('open')) closeCustomSelect(container, true);
+    else openCustomSelect(container);
+  });
   trigger.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSelect(); }
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      openCustomSelect(container);
+    } else if (e.key === 'ArrowUp' || e.key === 'End') {
+      e.preventDefault();
+      openCustomSelect(container, 'last');
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      openCustomSelect(container, 'first');
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeCustomSelect(container, true);
+    }
   });
 
   if (searchInput) {
@@ -2642,71 +2783,93 @@ function initCustomSelect(containerId, options, allText, defaultValue) {
     searchInput.addEventListener('input', () => {
       const kw = searchInput.value.trim().toLowerCase();
       container.querySelectorAll('.custom-select-option').forEach(o => {
-        o.style.display = !kw || o.textContent.toLowerCase().includes(kw) ? '' : 'none';
+        o.hidden = Boolean(kw && !o.textContent.toLowerCase().includes(kw));
       });
+    });
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCustomSelect(container, true);
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const available = visibleOptions();
+        const target = e.key === 'ArrowDown' ? available[0] : available[available.length - 1];
+        if (target) target.focus();
+      }
     });
   }
 
   container.querySelectorAll('.custom-select-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      csValues[filterId] = opt.dataset.value;
-      trigger.textContent = opt.textContent;
-      container.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
-      container.classList.remove('open');
-      // Re-roll the random seed every time the user (re)picks 随机 so the same
-      // option gives a fresh shuffle; the seed then stays stable for paging.
-      if (filterId === 'filterSort' && opt.dataset.value === 'random') {
-        randomSeed = newRandomSeed();
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      chooseOption(opt);
+    });
+    opt.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveOption(opt, 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveOption(opt, -1);
+      } else if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+        const available = visibleOptions();
+        const target = e.key === 'Home' ? available[0] : available[available.length - 1];
+        if (target) target.focus();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        chooseOption(opt);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCustomSelect(container, true);
       }
-      applyFilters();
     });
   });
 }
 
 function closeAllSelects(except) {
   document.querySelectorAll('.custom-select.open').forEach(cs => {
-    if (cs !== except) cs.classList.remove('open');
+    if (cs !== except) closeCustomSelect(cs);
   });
 }
 
 function populateFilters(filters) {
   const lang = i18n[currentLang];
 
-  initCustomSelect('csCourseType',
+  buildCustomSelect('csCourseType',
     filters.course_types.map(ct => ({ value: ct, label: lang.courseTypes[ct] || ct })),
     lang.all, csValues.filterCourseType);
 
   const hidden = HIDDEN_CATEGORIES[currentTerm] || new Set();
-  initCustomSelect('csCategory',
+  buildCustomSelect('csCategory',
     filters.categories.filter(c => !hidden.has(c)).map(c => ({ value: c, label: tr('categories', c) })),
     lang.all, csValues.filterCategory);
 
-  initCustomSelect('csCredits',
+  buildCustomSelect('csCredits',
     filters.credits.filter(c => c !== 0).map(c => ({
       value: String(c),
       label: fmtCredits(c)
     })),
     lang.all, csValues.filterCredits);
 
-  initCustomSelect('csDepartment',
+  buildCustomSelect('csDepartment',
     filters.departments.map(d => ({ value: d, label: tr('departments', d) })),
     lang.all, csValues.filterDepartment);
 
-  initCustomSelect('csSort', [
-    { value: 'pinyin',       label: lang.sortPinyin },
-    { value: 'pinyin_desc',  label: lang.sortPinyinDesc },
+  buildCustomSelect('csSort', [
+    { value: 'name_asc',     label: lang.sortNameAsc },
+    { value: 'name_desc',    label: lang.sortNameDesc },
     { value: 'credits_asc',  label: lang.sortCreditsAsc },
     { value: 'credits_desc', label: lang.sortCreditsDesc },
     { value: 'time_asc',     label: lang.sortTimeAsc },
     { value: 'random',       label: lang.sortRandom },
   ], lang.sortDefault, csValues.filterSort);
 
-  initCustomSelect('csGrading',
+  buildCustomSelect('csGrading',
     filters.gradings.map(g => ({ value: g, label: tr('gradings', g) })),
     lang.all, csValues.filterGrading);
 
-  initCustomSelect('csWeekday',
+  buildCustomSelect('csWeekday',
     WEEKDAYS_CN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
     lang.all, csValues.filterWeekday);
 }
@@ -2782,15 +2945,17 @@ function clearSearch() {
 
 function applyFilters() {
   currentPage = 1;
+  hasMore = false;
   renderChips();
-  fetchCourses();
+  fetchCourses({ page: 1, append: false });
 }
 
-async function fetchCourses() {
+async function fetchCourses({ page = 1, append = false } = {}) {
   if (fetchController) fetchController.abort();
   const ctrl = new AbortController();
   fetchController = ctrl;
   isFetching = true;
+  clearLoadMoreError();
 
   const params = new URLSearchParams();
   const q = document.getElementById('searchInput').value.trim();
@@ -2810,30 +2975,34 @@ async function fetchCourses() {
   if (sort === 'random' && randomSeed) params.set('random_seed', randomSeed);
   params.set('lang', currentLang);
   params.set('term', currentTerm);
-  params.set('page', currentPage);
+  params.set('page', page);
   params.set('page_size', PAGE_SIZE);
 
-  if (currentPage === 1) renderSkeletons();
+  if (!append) renderSkeletons();
   syncURL();
 
   try {
     const resp = await fetch('/api/courses?' + params.toString(), { signal: ctrl.signal });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
+    if (fetchController !== ctrl) return false;
     totalCount = data.total;
 
-    if (currentPage === 1) {
-      currentCourses = data.courses;
-      renderCards();
-    } else {
+    if (append) {
       currentCourses = currentCourses.concat(data.courses);
       appendCards(data.courses);
+    } else {
+      currentCourses = data.courses;
+      renderCards();
     }
+    hasMore = currentCourses.length < totalCount;
+    updateLoadMoreState();
+    return true;
   } catch (e) {
-    if (e.name !== 'AbortError') {
-      console.error(e);
-      if (currentPage === 1) renderError();
-    }
+    if (e.name === 'AbortError') return false;
+    console.error(e);
+    if (fetchController === ctrl) renderError(append);
+    return false;
   } finally {
     // Only the latest in-flight request may clear the flag — an aborted older
     // request's finally must not unlock auto-load while the new one runs.
@@ -2858,7 +3027,20 @@ function renderSkeletons() {
   document.getElementById('loadMoreBtn').style.display = 'none';
 }
 
-function renderError() {
+function clearLoadMoreError() {
+  document.getElementById('loadMoreError')?.remove();
+}
+
+function renderError(append = false) {
+  if (append) {
+    const error = document.createElement('div');
+    error.id = 'loadMoreError';
+    error.className = 'load-more-error';
+    error.setAttribute('role', 'status');
+    error.textContent = 'Failed to load data / 数据加载失败';
+    document.getElementById('scrollSentinel').insertAdjacentElement('afterend', error);
+    return;
+  }
   document.getElementById('resultsContainer').innerHTML =
     `<div class="state-msg">${ICONS.empty}<span>Failed to load data / 数据加载失败</span></div>`;
   document.getElementById('loadMoreBtn').style.display = 'none';
@@ -2889,14 +3071,28 @@ function appendCards(newCourses) {
   }
   container.appendChild(fragment);
 
-  document.getElementById('loadMoreBtn').style.display =
-    currentCourses.length < totalCount ? 'block' : 'none';
   updateResultsCount();
 }
 
-function loadMore() {
-  currentPage++;
-  fetchCourses();
+function updateLoadMoreState() {
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  loadMoreBtn.style.display = hasMore ? 'block' : 'none';
+  loadMoreBtn.disabled = isLoading || !hasMore;
+}
+
+async function loadMore() {
+  if (isLoading || !hasMore) return;
+  const nextPage = currentPage + 1;
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  isLoading = true;
+  loadMoreBtn.disabled = true;
+  try {
+    const appended = await fetchCourses({ page: nextPage, append: true });
+    if (appended) currentPage = nextPage;
+  } finally {
+    isLoading = false;
+    loadMoreBtn.disabled = !hasMore;
+  }
 }
 
 function updateResultsCount() {
@@ -3000,7 +3196,10 @@ function createCard(course) {
     <span class="card-arrow" aria-hidden="true">${esc(lang.detailBtn)} &rarr;</span>`;
 
   card.innerHTML = html;
-  card.addEventListener('click', () => showDetail(course.id));
+  card.addEventListener('click', () => {
+    card.focus();
+    showDetail(course.id);
+  });
   card.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDetail(course.id); }
   });
@@ -3010,6 +3209,46 @@ function createCard(course) {
 /* ===== Detail modal ===== */
 let currentModalCourseId = null;
 let detailController = null;
+let modalReturnFocus = null;
+
+function setModalBackgroundInert(inert) {
+  const background = [
+    document.querySelector('.topbar'),
+    document.querySelector('.container'),
+    document.getElementById('backTop'),
+  ].filter(Boolean);
+  background.forEach(element => {
+    if (inert) element.inert = true;
+    else element.inert = false;
+  });
+}
+
+function focusModalClose() {
+  const closeButton = document.querySelector('#modalOverlay .modal-close');
+  if (closeButton) requestAnimationFrame(() => closeButton.focus());
+}
+
+function trapModalFocus(event) {
+  if (event.key !== 'Tab') return;
+  const courseModal = document.getElementById('modalOverlay');
+  const focusable = [...courseModal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.getAttribute('aria-hidden') !== 'true');
+  if (!focusable.length) {
+    event.preventDefault();
+    document.getElementById('modalContent').focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !courseModal.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !courseModal.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 async function showDetail(courseId) {
   const lang = i18n[currentLang];
@@ -3021,11 +3260,22 @@ async function showDetail(courseId) {
   if (detailController) detailController.abort();
   detailController = new AbortController();
 
+  const opening = !overlay.classList.contains('open');
+  if (opening) {
+    modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setModalBackgroundInert(true);
+  }
   currentModalCourseId = courseId;
-  content.innerHTML = `<div class="modal-loading"><div class="spinner"></div><span>${esc(lang.modalLoading)}</span></div>`;
+  content.innerHTML = `
+    <div class="modal-head">
+      <span class="modal-title" id="modalTitle">${esc(lang.modalLoading)}</span>
+      <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
+    </div>
+    <div class="modal-loading"><div class="spinner"></div><span>${esc(lang.modalLoading)}</span></div>`;
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   syncURL();
+  focusModalClose();
 
   try {
     const resp = await fetch(
@@ -3042,10 +3292,10 @@ async function showDetail(courseId) {
 
     let html = `
       <div class="modal-head">
-        <span class="modal-title">${esc(trCourseName(c))}</span>
+        <span class="modal-title" id="modalTitle">${esc(trCourseName(c))}</span>
         <div class="modal-head-actions">
-          <button class="modal-action" id="copyLinkBtn" onclick="copyCourseLink()">${ICONS.link}<span>${esc(lang.copyLink)}</span></button>
-          <button class="modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+          <button class="modal-action" id="copyLinkBtn" onclick="copyCourseLink()" aria-label="${esc(lang.copyLink)}">${ICONS.link}<span>${esc(lang.copyLink)}</span></button>
+          <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
         </div>
       </div>
       <div class="modal-body">
@@ -3125,12 +3375,15 @@ async function showDetail(courseId) {
     html += `<div class="modal-section">
       <div class="modal-section-title">${esc(lang.modalDetailInfo)}</div>`;
 
+    const introCnLabel = currentLang === 'zh' ? lang.modalIntroCn : lang.modalIntroTranslated;
     const introOrder = currentLang === 'en'
-      ? [[lang.modalIntroEn, c.intro_en], [lang.modalIntroCn, c.intro_cn]]
-      : [[lang.modalIntroCn, c.intro_cn], [lang.modalIntroEn, c.intro_en]];
+      ? [[lang.modalIntroEn, c.intro_en], [introCnLabel, c.intro_cn]]
+      : [[introCnLabel, c.intro_cn], [lang.modalIntroEn, c.intro_en]];
 
     const longFields = [
       ...introOrder,
+      [lang.modalTextbook, c.textbook],
+      [lang.modalReferenceBook, c.reference_book],
       [lang.modalSyllabus, c.syllabus],
       [lang.modalEvaluation, c.evaluation],
       [lang.modalExtraNotes, c.extra_notes],
@@ -3148,16 +3401,22 @@ async function showDetail(courseId) {
 
     content.innerHTML = html;
     content.scrollTop = 0;
+    if (!overlay.contains(document.activeElement)) focusModalClose();
   } catch (e) {
     if (e.name === 'AbortError') return;
-    content.innerHTML = '<div class="modal-loading">Failed to load details</div>';
+    content.innerHTML = `
+      <div class="modal-head">
+        <span class="modal-title" id="modalTitle">Failed to load details</span>
+        <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
+      </div>`;
+    focusModalClose();
   }
 }
 
 async function copyCourseLink() {
   if (!currentModalCourseId) return;
-  const url = location.origin + location.pathname +
-    '?course=' + encodeURIComponent(currentModalCourseId);
+  syncURL();
+  const url = location.href;
   let ok = false;
   try {
     await navigator.clipboard.writeText(url);
@@ -3185,10 +3444,18 @@ async function copyCourseLink() {
 }
 
 function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
+  const overlay = document.getElementById('modalOverlay');
+  if (!overlay.classList.contains('open')) return;
+  if (detailController) detailController.abort();
+  detailController = null;
+  overlay.classList.remove('open');
   document.body.style.overflow = '';
+  setModalBackgroundInert(false);
   currentModalCourseId = null;
   syncURL();
+  const returnTarget = modalReturnFocus;
+  modalReturnFocus = null;
+  if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => returnTarget.focus());
 }
 
 /* ===== Misc ===== */
@@ -3217,8 +3484,15 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeModal();
+  const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
+  if (modalOpen) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    } else {
+      trapModalFocus(e);
+    }
+  } else if (e.key === 'Escape') {
     closeAllSelects();
     closeLangDropdown();
   }
