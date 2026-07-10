@@ -2583,28 +2583,40 @@ async function loadFiltersForCurrentTerm() {
   const requestedTerm = currentTerm;
   const controller = new AbortController();
   filtersController = controller;
+  const ownsRequest = () => (
+    currentTerm === requestedTerm && filtersController === controller
+  );
 
-  if (filtersByTerm[requestedTerm]) {
-    if (currentTerm === requestedTerm && filtersController === controller) {
+  try {
+    if (filtersByTerm[requestedTerm]) {
+      if (!ownsRequest()) return false;
       cachedFilters = filtersByTerm[requestedTerm];
       populateFilters(cachedFilters);
+      if (!ownsRequest()) return false;
+      return true;
     }
-    return;
+    const resp = await fetch(
+      '/api/filters?term=' + encodeURIComponent(requestedTerm),
+      { signal: controller.signal }
+    );
+    if (!ownsRequest()) return false;
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!ownsRequest()) return false;
+    filtersByTerm[requestedTerm] = data;
+    cachedFilters = data;
+    populateFilters(data);
+    if (!ownsRequest()) return false;
+    return true;
+  } catch (error) {
+    if (error.name === 'AbortError' || !ownsRequest()) return false;
+    throw error;
   }
-  const resp = await fetch(
-    '/api/filters?term=' + encodeURIComponent(requestedTerm),
-    { signal: controller.signal }
-  );
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
-  if (currentTerm !== requestedTerm || filtersController !== controller) return;
-  filtersByTerm[requestedTerm] = data;
-  cachedFilters = data;
-  populateFilters(data);
 }
 
 async function init() {
   const pendingCourse = readURLState();
+  const requestedTerm = currentTerm;
   refreshTermToggleUI();
   refreshLangSelectorUI();
   applyI18n();
@@ -2629,16 +2641,20 @@ async function init() {
   applyThemeMeta();
 
   try {
-    await loadFiltersForCurrentTerm();
+    const filtersLoaded = await loadFiltersForCurrentTerm();
+    if (!filtersLoaded || currentTerm !== requestedTerm) return false;
     renderChips();
-    await fetchCourses();
+    const coursesLoaded = await fetchCourses();
+    if (!coursesLoaded || currentTerm !== requestedTerm) return false;
   } catch (e) {
-    if (e.name === 'AbortError') return;
+    if (e.name === 'AbortError' || currentTerm !== requestedTerm) return false;
     renderError();
+    return false;
   }
 
   // Deep link: ?course=a123 or ?course=u123 opens the detail modal directly.
-  if (pendingCourse) showDetail(pendingCourse);
+  if (pendingCourse && currentTerm === requestedTerm) showDetail(pendingCourse);
+  return true;
 }
 
 function refreshTermToggleUI() {
@@ -2650,10 +2666,11 @@ function refreshTermToggleUI() {
 }
 
 async function setTerm(term) {
-  if (!TERMS.has(term)) return;
-  if (term === currentTerm) return;
+  if (!TERMS.has(term)) return false;
+  if (term === currentTerm) return false;
   if (fetchController) fetchController.abort();
-  currentTerm = term;
+  const requestedTerm = term;
+  currentTerm = requestedTerm;
   hasMore = false;
   refreshTermToggleUI();
 
@@ -2669,12 +2686,15 @@ async function setTerm(term) {
   if (currentModalCourseId) closeModal();
 
   try {
-    await loadFiltersForCurrentTerm();
+    const filtersLoaded = await loadFiltersForCurrentTerm();
+    if (!filtersLoaded || currentTerm !== requestedTerm) return false;
     applyI18n();
-    await fetchCourses();
+    const coursesLoaded = await fetchCourses();
+    return Boolean(coursesLoaded && currentTerm === requestedTerm);
   } catch (e) {
-    if (e.name === 'AbortError') return;
+    if (e.name === 'AbortError' || currentTerm !== requestedTerm) return false;
     console.error(e);
+    return false;
   }
 }
 

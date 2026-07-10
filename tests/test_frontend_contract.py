@@ -156,9 +156,11 @@ class FrontendContractTests(unittest.TestCase):
               currentTerm = 'fall';
               const fall = loadFiltersForCurrentTerm();
               pending.fall({{ term: 'fall' }});
-              await fall;
+              const fallResult = await fall;
               pending.spring({{ term: 'spring' }});
-              await spring;
+              const springResult = await spring;
+              assert.equal(fallResult, true);
+              assert.equal(springResult, false);
               assert.deepEqual(Object.keys(filtersByTerm), ['fall']);
               assert.equal(filtersByTerm.fall.term, 'fall');
               assert.equal(cachedFilters.term, 'fall');
@@ -173,6 +175,132 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("const controller = new AbortController()", body)
         self.assertIn("filtersController === controller", body)
         self.assertIn("currentTerm === requestedTerm", body)
+        self.assertIn("return true", body)
+        self.assertIn("return false", body)
+
+    def test_stale_filter_http_and_json_failures_resolve_false(self):
+        source = function_source("loadFiltersForCurrentTerm")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentTerm = 'spring';
+            let cachedFilters = null;
+            let filtersController = null;
+            const filtersByTerm = {{}};
+            let scenario = 'http';
+            let resolveSpringHttp;
+            let rejectSpringJson;
+            let markJsonStarted;
+            const jsonStarted = new Promise(resolve => {{ markJsonStarted = resolve; }});
+            function populateFilters(data) {{ cachedFilters = data; }}
+            function fetch(url) {{
+              const term = new URL(url, 'http://local').searchParams.get('term');
+              if (term === 'fall') return Promise.resolve({{ ok: true, json: async () => ({{ term: 'fall' }}) }});
+              if (scenario === 'http') {{
+                return new Promise(resolve => {{ resolveSpringHttp = resolve; }});
+              }}
+              return Promise.resolve({{
+                ok: true,
+                json: () => {{
+                  markJsonStarted();
+                  return new Promise((_resolve, reject) => {{ rejectSpringJson = reject; }});
+                }}
+              }});
+            }}
+            {source}
+            (async () => {{
+              const staleHttp = loadFiltersForCurrentTerm();
+              currentTerm = 'fall';
+              const activeFall = loadFiltersForCurrentTerm();
+              assert.equal(await activeFall, true);
+              resolveSpringHttp({{ ok: false, status: 503, json: async () => {{ throw new Error('unused'); }} }});
+              assert.equal(await staleHttp, false);
+
+              for (const key of Object.keys(filtersByTerm)) delete filtersByTerm[key];
+              filtersController = null;
+              cachedFilters = null;
+              scenario = 'json';
+              currentTerm = 'spring';
+              const staleJson = loadFiltersForCurrentTerm();
+              await jsonStarted;
+              currentTerm = 'fall';
+              assert.equal(await loadFiltersForCurrentTerm(), true);
+              rejectSpringJson(new Error('bad stale json'));
+              assert.equal(await staleJson, false);
+              assert.equal(cachedFilters.term, 'fall');
+              assert.deepEqual(Object.keys(filtersByTerm), ['fall']);
+            }})().catch(error => {{ console.error(error); process.exitCode = 1; }});
+            """
+        )
+
+    def test_stale_init_and_set_term_callers_stop_all_continuations(self):
+        init_source = function_source("init")
+        set_term_source = function_source("setTerm")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentTerm = 'fall';
+            let currentModalCourseId = null;
+            let fetchController = null;
+            let isFetching = false;
+            let isLoading = false;
+            let hasMore = false;
+            let currentPage = 1;
+            const TERMS = new Set(['fall', 'spring', 'summer']);
+            const csValues = {{}};
+            const counts = {{ fetch: 0, error: 0, chips: 0, i18n: 0, detail: 0 }};
+            let finishSetTermLoad;
+            let loaderMode = 'init';
+            const classList = {{ toggle() {{}}, add() {{}}, remove() {{}} }};
+            const element = {{ value: '', classList, observe() {{}} }};
+            const document = {{ getElementById: () => element, querySelectorAll: () => [] }};
+            const window = {{ addEventListener() {{}} }};
+            function readURLState() {{ return 'a1'; }}
+            function refreshTermToggleUI() {{}}
+            function refreshLangSelectorUI() {{}}
+            function applyI18n() {{ counts.i18n += 1; }}
+            function updateResultsCount() {{}}
+            function renderSkeletons() {{}}
+            function applyThemeMeta() {{}}
+            function renderChips() {{ counts.chips += 1; }}
+            function renderError() {{ counts.error += 1; }}
+            function showDetail() {{ counts.detail += 1; }}
+            function closeModal() {{}}
+            function fetchCourses() {{
+              counts.fetch += 1;
+              if (fetchController) fetchController.abort();
+              return Promise.resolve(true);
+            }}
+            function loadMore() {{}}
+            function loadFiltersForCurrentTerm() {{
+              if (loaderMode === 'init') return Promise.resolve(false);
+              return new Promise(resolve => {{ finishSetTermLoad = resolve; }});
+            }}
+            {init_source}
+            {set_term_source}
+            (async () => {{
+              await init();
+              assert.deepEqual(counts, {{ fetch: 0, error: 0, chips: 0, i18n: 1, detail: 0 }});
+
+              loaderMode = 'setTerm';
+              const staleSetTerm = setTerm('spring');
+              currentTerm = 'fall';
+              fetchController = {{ abort: () => {{ throw new Error('stale caller aborted active list'); }} }};
+              finishSetTermLoad(false);
+              assert.equal(await staleSetTerm, false);
+              assert.equal(counts.fetch, 0);
+              assert.equal(counts.error, 0);
+              assert.equal(counts.i18n, 1);
+            }})().catch(error => {{ console.error(error); process.exitCode = 1; }});
+            """
+        )
+
+    def test_init_and_set_term_structurally_gate_filter_ownership(self):
+        for name in ("init", "setTerm"):
+            with self.subTest(function=name):
+                body = function_body(name)
+                self.assertIn("const filtersLoaded = await loadFiltersForCurrentTerm()", body)
+                self.assertIn("if (!filtersLoaded", body)
 
     def test_copy_syncs_and_uses_complete_location(self):
         body = function_body("copyCourseLink")
