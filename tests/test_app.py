@@ -587,6 +587,9 @@ class ValidationAndDetailTests(unittest.TestCase):
             ("credits", "abc"),
             ("credits", "NaN"),
             ("credits", "Infinity"),
+            ("credits", True),
+            ("credits", False),
+            ("credits", []),
             ("weekday", "%"),
             ("lang", "xx"),
             ("sort", "drop"),
@@ -640,16 +643,16 @@ class ValidationAndDetailTests(unittest.TestCase):
         self.assertEqual(detail["textbook"], "")
         self.assertEqual(detail["reference_book"], row["reference_book"])
 
-    def test_translated_book_field_replaces_source_text(self):
+    def assert_translated_book_field_replaces_source_text(self, field):
         with app.get_db("fall") as conn:
             row = conn.execute(
                 """
-                SELECT b.id, t.field, t.text, d.textbook, d.reference_book
+                SELECT b.id, t.text
                 FROM translations t
                 JOIN basic_info b ON b.id = t.course_id
                 JOIN detail_info d ON d.course_id = b.id
                 WHERE t.lang = 'en'
-                  AND t.field IN ('textbook', 'reference_book')
+                  AND t.field = ?
                   AND TRIM(t.text) != ''
                   AND t.text != CASE t.field
                       WHEN 'textbook' THEN COALESCE(d.textbook, '')
@@ -657,12 +660,19 @@ class ValidationAndDetailTests(unittest.TestCase):
                   END
                 ORDER BY b.id, t.field
                 LIMIT 1
-                """
+                """,
+                (field,),
             ).fetchone()
 
         self.assertIsNotNone(row)
         detail = app.get_course_detail(f"a{row['id']}", lang="en")
-        self.assertEqual(detail[row["field"]], row["text"])
+        self.assertEqual(detail[field], row["text"])
+
+    def test_translated_textbook_replaces_source_text(self):
+        self.assert_translated_book_field_replaces_source_text("textbook")
+
+    def test_translated_reference_book_replaces_source_text(self):
+        self.assert_translated_book_field_replaces_source_text("reference_book")
 
     def test_blank_translation_does_not_replace_original(self):
         out = {"course_name": "Original name"}

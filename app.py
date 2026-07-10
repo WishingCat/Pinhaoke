@@ -421,13 +421,10 @@ def _build_source_where(filters: dict[str, object]) -> tuple[str, list[object]]:
     if category:
         conds.append("s.category = ?")
         params.append(category)
-    credits_ = str(filters.get("credits") or "")
-    if credits_:
-        try:
-            conds.append("s.credits = ?")
-            params.append(float(credits_))
-        except ValueError:
-            pass
+    credits = filters.get("credits")
+    if credits not in (None, ""):
+        conds.append("s.credits = ?")
+        params.append(credits)
     department = str(filters.get("department") or "")
     if department:
         conds.append("s.department = ?")
@@ -728,6 +725,8 @@ def _validate_list_params(
         or not 1 <= page_size <= 200
     ):
         raise HTTPException(status_code=422, detail="Invalid course query parameter")
+    if not isinstance(credits, str):
+        raise HTTPException(status_code=422, detail="Invalid credits")
     if not credits:
         return None
     try:
@@ -760,13 +759,13 @@ def list_courses(
     page: int = Query(1, ge=1, le=10000),
     page_size: int = Query(50, ge=1, le=200),
 ):
-    _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
+    credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
 
     filters = {
         "q": q,
         "type": type,
         "category": category,
-        "credits": credits,
+        "credits": credits_value,
         "department": department,
         "weekday": weekday,
         "grading": grading,
