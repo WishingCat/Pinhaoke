@@ -151,14 +151,32 @@ SPRING_GR_DETAIL_COLUMNS = (
     "reference_book", "intro", "extra_notes",
 )
 FALL_GR_DETAIL_COLUMNS = (*SPRING_GR_DETAIL_COLUMNS, "syllabus")
+UG_VISIBLE_BASIC_COLUMNS = (
+    "course_name", "credits", "department", "major", "grade", "schedule",
+    "classroom", "enrollment", "pnp", "notes",
+)
+GR_VISIBLE_BASIC_COLUMNS = tuple(
+    column for column in UG_VISIBLE_BASIC_COLUMNS if column != "pnp"
+)
 
 
-def _detail_score_sql(columns: tuple[str, ...]) -> str:
-    return " + ".join(
-        f"CASE WHEN d.{column} IS NOT NULL "
-        f"AND TRIM(CAST(d.{column} AS TEXT)) != '' THEN 1 ELSE 0 END"
+def _nonblank_score_sql(alias: str, columns: tuple[str, ...]) -> list[str]:
+    return [
+        f"CASE WHEN {alias}.{column} IS NOT NULL "
+        f"AND TRIM(CAST({alias}.{column} AS TEXT)) != '' THEN 1 ELSE 0 END"
         for column in columns
-    )
+    ]
+
+
+def _completeness_score_sql(
+    basic_columns: tuple[str, ...],
+    detail_columns: tuple[str, ...],
+) -> str:
+    terms = [
+        *_nonblank_score_sql("b", basic_columns),
+        *_nonblank_score_sql("d", detail_columns),
+    ]
+    return " + ".join(terms)
 
 
 _UG_LIST_SELECT = """
@@ -186,15 +204,27 @@ _UG_LIST_SELECT = """
         d.language             AS language,
         ''                     AS audience,
         '{prefix}'             AS _level,
-        ({detail_score})       AS detail_score
+        ({completeness_score}) AS completeness_score
     FROM basic_info b
     LEFT JOIN detail_info d ON d.course_id = b.id
 """
 
-_UG_DETAIL_SCORE_SQL = _detail_score_sql(UG_DETAIL_COLUMNS)
-LIST_SELECT_UG = _UG_LIST_SELECT.format(prefix="u", detail_score=_UG_DETAIL_SCORE_SQL)
-LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(prefix="s", detail_score=_UG_DETAIL_SCORE_SQL)
-LIST_SELECT_FALL_UG = _UG_LIST_SELECT.format(prefix="a", detail_score=_UG_DETAIL_SCORE_SQL)
+_UG_COMPLETENESS_SCORE_SQL = _completeness_score_sql(
+    UG_VISIBLE_BASIC_COLUMNS,
+    UG_DETAIL_COLUMNS,
+)
+LIST_SELECT_UG = _UG_LIST_SELECT.format(
+    prefix="u",
+    completeness_score=_UG_COMPLETENESS_SCORE_SQL,
+)
+LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(
+    prefix="s",
+    completeness_score=_UG_COMPLETENESS_SCORE_SQL,
+)
+LIST_SELECT_FALL_UG = _UG_LIST_SELECT.format(
+    prefix="a",
+    completeness_score=_UG_COMPLETENESS_SCORE_SQL,
+)
 
 _GR_LIST_SELECT = """
     SELECT
@@ -221,7 +251,7 @@ _GR_LIST_SELECT = """
         ''                     AS language,
         d.audience             AS audience,
         '{prefix}'             AS _level,
-        ({detail_score})       AS detail_score
+        ({completeness_score}) AS completeness_score
     FROM {ns}.basic_info b
     LEFT JOIN {ns}.detail_info d ON d.course_id = b.id
 """
@@ -229,12 +259,18 @@ _GR_LIST_SELECT = """
 LIST_SELECT_GR = _GR_LIST_SELECT.format(
     prefix="g",
     ns="gr",
-    detail_score=_detail_score_sql(SPRING_GR_DETAIL_COLUMNS),
+    completeness_score=_completeness_score_sql(
+        GR_VISIBLE_BASIC_COLUMNS,
+        SPRING_GR_DETAIL_COLUMNS,
+    ),
 )
 LIST_SELECT_FALL_GR = _GR_LIST_SELECT.format(
     prefix="r",
     ns="gr",
-    detail_score=_detail_score_sql(FALL_GR_DETAIL_COLUMNS),
+    completeness_score=_completeness_score_sql(
+        GR_VISIBLE_BASIC_COLUMNS,
+        FALL_GR_DETAIL_COLUMNS,
+    ),
 )
 
 # Pre-built UNION expressions for each term.
@@ -389,6 +425,16 @@ def _build_source_where(filters: dict[str, object]) -> tuple[str, list[object]]:
     return where, params
 
 
+def _group_key_sql(alias: str) -> str:
+    whitespace = "CHAR(9) || CHAR(10) || CHAR(11) || CHAR(12) || CHAR(13) || ' '"
+    return (
+        f"{alias}._level || CHAR(31) || {alias}.course_code || CHAR(31) || "
+        f"{alias}.class_no || CHAR(31) || "
+        f"CASE WHEN TRIM(COALESCE({alias}.teacher, ''), {whitespace}) = '' "
+        f"THEN {alias}.id ELSE {alias}.teacher END"
+    )
+
+
 def _translated_source_select(base_select: str, ns: str, lang: str) -> tuple[str, list[object]]:
     if lang == "zh":
         display_columns = """
@@ -420,8 +466,7 @@ def _translated_source_select(base_select: str, ns: str, lang: str) -> tuple[str
     sql = f"""
         SELECT t.*,
                {display_columns},
-               t._level || CHAR(31) || t.course_code || CHAR(31) || t.class_no || CHAR(31) ||
-                 CASE WHEN COALESCE(t.teacher, '') = '' THEN t.id ELSE t.teacher END AS group_key
+               {_group_key_sql("t")} AS group_key
         FROM ({base_select}) AS t
         {joins}
     """
@@ -449,52 +494,61 @@ def _build_course_query(
     return source_sql, [*source_params, *filter_params], matching_where
 
 
-def _preferred_text(column: str, alias: str | None = None) -> str:
-    alias = alias or column
-    return f"""
-        COALESCE(
-            MAX(CASE WHEN r.representative_rank = 1
-                      AND TRIM(COALESCE(r.{column}, '')) != '' THEN r.{column} END),
-            MAX(CASE WHEN TRIM(COALESCE(r.{column}, '')) != '' THEN r.{column} END),
-            MAX(CASE WHEN r.representative_rank = 1 THEN r.{column} END),
-            MAX(r.{column})
-        ) AS {alias}
-    """
+_FALLBACK_TEXT_COLUMNS = (
+    ("display_course_name", "course_name"),
+    ("course_name", "original_course_name"),
+    ("department", "department"),
+    ("major", "major"),
+    ("grade", "grade"),
+    ("schedule", "schedule"),
+    ("display_classroom", "classroom"),
+    ("weekdays", "weekdays"),
+    ("enrollment", "enrollment"),
+    ("pnp", "pnp"),
+    ("display_notes", "notes"),
+    ("english_name", "english_name"),
+    ("grading", "grading"),
+    ("language", "language"),
+    ("audience", "audience"),
+)
+_FALLBACK_VALUE_COLUMNS = ("credits", "first_period")
+_CARD_FALLBACK_TEXT_COLUMNS = (
+    "display_course_name", "department", "major", "grade", "schedule",
+    "display_classroom", "enrollment", "pnp", "display_notes", "english_name",
+    "language", "audience",
+)
+_CARD_FALLBACK_VALUE_COLUMNS = ("credits",)
 
 
-def _preferred_value(column: str) -> str:
-    return f"""
-        COALESCE(
-            MAX(CASE WHEN r.representative_rank = 1 THEN r.{column} END),
-            MAX(r.{column})
-        ) AS {column}
-    """
+def _fallback_fill_count_sql(representative: str, candidate: str) -> str:
+    text_terms = [
+        f"CASE WHEN TRIM(COALESCE({representative}.{column}, '')) = '' "
+        f"AND TRIM(COALESCE({candidate}.{column}, '')) != '' THEN 1 ELSE 0 END"
+        for column in _CARD_FALLBACK_TEXT_COLUMNS
+    ]
+    value_terms = [
+        f"CASE WHEN {representative}.{column} IS NULL "
+        f"AND {candidate}.{column} IS NOT NULL THEN 1 ELSE 0 END"
+        for column in _CARD_FALLBACK_VALUE_COLUMNS
+    ]
+    return " + ".join((*text_terms, *value_terms))
 
 
-def _grouped_course_ctes(source_sql: str, matching_where: str) -> str:
-    text_columns = (
-        _preferred_text("course_code"),
-        _preferred_text("class_no"),
-        _preferred_text("display_course_name", "course_name"),
-        _preferred_text("course_name", "original_course_name"),
-        _preferred_text("teacher"),
-        _preferred_text("department"),
-        _preferred_text("major"),
-        _preferred_text("grade"),
-        _preferred_text("schedule"),
-        _preferred_text("display_classroom", "classroom"),
-        _preferred_text("weekdays"),
-        _preferred_text("enrollment"),
-        _preferred_text("pnp"),
-        _preferred_text("display_notes", "notes"),
-        _preferred_text("english_name"),
-        _preferred_text("grading"),
-        _preferred_text("language"),
-        _preferred_text("audience"),
+def _coherent_text(column: str, alias: str) -> str:
+    return (
+        f"CASE WHEN TRIM(COALESCE(representative.{column}, '')) != '' "
+        f"THEN representative.{column} ELSE fallback.{column} END AS {alias}"
     )
-    value_columns = (_preferred_value("credits"), _preferred_value("first_period"))
-    scalar_columns = ",\n".join((*text_columns, *value_columns))
 
+
+def _coherent_value(column: str) -> str:
+    return (
+        f"CASE WHEN representative.{column} IS NOT NULL "
+        f"THEN representative.{column} ELSE fallback.{column} END AS {column}"
+    )
+
+
+def _matching_group_ctes(source_sql: str, matching_where: str) -> str:
     return f"""
         WITH source AS (
             {source_sql}
@@ -502,16 +556,53 @@ def _grouped_course_ctes(source_sql: str, matching_where: str) -> str:
             SELECT DISTINCT s.group_key
             FROM source AS s
             {matching_where}
-        ), ranked AS (
+        )
+    """
+
+
+def _count_course_sql(source_sql: str, matching_where: str) -> str:
+    matching_group_ctes = _matching_group_ctes(source_sql, matching_where)
+    return f"{matching_group_ctes} SELECT COUNT(*) FROM matching_groups"
+
+
+def _grouped_course_ctes(source_sql: str, matching_where: str) -> str:
+    text_columns = tuple(
+        _coherent_text(column, alias)
+        for column, alias in _FALLBACK_TEXT_COLUMNS
+    )
+    value_columns = tuple(
+        _coherent_value(column) for column in _FALLBACK_VALUE_COLUMNS
+    )
+    scalar_columns = ",\n".join((*text_columns, *value_columns))
+    fill_count = _fallback_fill_count_sql("representative", "candidate")
+
+    matching_group_ctes = _matching_group_ctes(source_sql, matching_where)
+    return f"""
+        {matching_group_ctes}, ranked AS (
             SELECT s.*,
                    ROW_NUMBER() OVER (
                        PARTITION BY s.group_key
-                       ORDER BY s.detail_score DESC,
+                       ORDER BY s.completeness_score DESC,
                                 CAST(SUBSTR(s.id, 2) AS INTEGER),
                                 s.id
                    ) AS representative_rank
             FROM source AS s
             JOIN matching_groups USING (group_key)
+        ), fallback_candidates AS (
+            SELECT candidate.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY candidate.group_key
+                       ORDER BY ({fill_count}) DESC,
+                                candidate.completeness_score DESC,
+                                CAST(SUBSTR(candidate.id, 2) AS INTEGER),
+                                candidate.id
+                   ) AS fallback_rank
+            FROM ranked AS candidate
+            JOIN ranked AS representative
+              ON representative.group_key = candidate.group_key
+             AND representative.representative_rank = 1
+            WHERE candidate.id != representative.id
+              AND ({fill_count}) > 0
         ), badge_values AS (
             SELECT DISTINCT group_key, 'course_type' AS badge_kind, course_type AS badge_value
             FROM ranked
@@ -535,20 +626,27 @@ def _grouped_course_ctes(source_sql: str, matching_where: str) -> str:
             FROM badge_sequences
             GROUP BY group_key
         ), grouped AS (
-            SELECT MAX(CASE WHEN r.representative_rank = 1 THEN r.id END) AS id,
-                   MAX(b.course_type) AS course_type,
-                   MAX(b.category) AS category,
+            SELECT representative.id AS id,
+                   fallback.id AS fallback_id,
+                   badges.course_type AS course_type,
+                   badges.category AS category,
+                   representative.course_code AS course_code,
+                   representative.class_no AS class_no,
+                   representative.teacher AS teacher,
                    {scalar_columns}
-            FROM ranked AS r
-            LEFT JOIN badges AS b USING (group_key)
-            GROUP BY r.group_key
+            FROM ranked AS representative
+            LEFT JOIN fallback_candidates AS fallback
+              ON fallback.group_key = representative.group_key
+             AND fallback.fallback_rank = 1
+            LEFT JOIN badges USING (group_key)
+            WHERE representative.representative_rank = 1
         )
     """
 
 
 def _course_order_by(sort: str, term: str, random_seed: int) -> str:
     if sort == "random":
-        seed = max(1, int(random_seed))
+        seed = int(random_seed)
         mul = ((seed * 1664525) % 999983) or 7
         add = (seed * 1013904223) % 999983
         return (
@@ -618,7 +716,7 @@ def list_courses(
     order_by = _course_order_by(sort, term, random_seed)
     offset = (page - 1) * page_size
 
-    count_sql = f"{ctes} SELECT COUNT(*) FROM grouped"
+    count_sql = _count_course_sql(source_sql, matching_where)
     list_sql = f"{ctes} SELECT * FROM grouped ORDER BY {order_by} LIMIT ? OFFSET ?"
 
     with get_db(term) as conn:

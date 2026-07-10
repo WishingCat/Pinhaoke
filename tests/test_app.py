@@ -161,20 +161,6 @@ class DatabaseConnectionTests(unittest.TestCase):
 
 
 class CourseListTests(unittest.TestCase):
-    UG_DETAIL_COLUMNS = (
-        "english_name",
-        "prerequisites",
-        "intro_cn",
-        "intro_en",
-        "grading",
-        "ge_series",
-        "language",
-        "textbook",
-        "reference_book",
-        "syllabus",
-        "evaluation",
-    )
-
     def call(self, **overrides):
         args = dict(
             q="",
@@ -224,13 +210,6 @@ class CourseListTests(unittest.TestCase):
             and course["teacher"] == teacher
         )
 
-    def detail_score_sql(self):
-        return " + ".join(
-            f"CASE WHEN d.{column} IS NOT NULL "
-            f"AND TRIM(CAST(d.{column} AS TEXT)) != '' THEN 1 ELSE 0 END"
-            for column in self.UG_DETAIL_COLUMNS
-        )
-
     def test_card_totals_keep_undergrad_and_graduate_separate(self):
         self.assertEqual(self.call(term="fall", page_size=1)["total"], 4421)
         self.assertEqual(self.call(term="spring", page_size=1)["total"], 3701)
@@ -262,12 +241,10 @@ class CourseListTests(unittest.TestCase):
             self.assertEqual(same["category"], card["category"])
 
     def test_representative_uses_long_detail_fields(self):
-        score_sql = self.detail_score_sql()
         with app.get_db("spring") as conn:
             rows = conn.execute(
-                f"""
-                SELECT b.id, b.course_code, b.class_no, b.teacher,
-                       d.evaluation, ({score_sql}) AS detail_score
+                """
+                SELECT b.id, d.evaluation
                 FROM basic_info b
                 JOIN detail_info d ON d.course_id = b.id
                 WHERE b.course_code = '00137975'
@@ -276,20 +253,13 @@ class CourseListTests(unittest.TestCase):
                 """
             ).fetchall()
 
-        expected = min(rows, key=lambda row: (-row["detail_score"], row["id"]))
-        smallest_id = min(rows, key=lambda row: row["id"])
-        self.assertNotEqual(expected["id"], smallest_id["id"])
-        self.assertTrue(expected["evaluation"].strip())
-        self.assertFalse((smallest_id["evaluation"] or "").strip())
+        evaluation_by_id = {row["id"]: row["evaluation"] for row in rows}
+        self.assertFalse((evaluation_by_id[288] or "").strip())
+        self.assertTrue(evaluation_by_id[860].strip())
 
-        courses = self.all_courses(term="spring", q=expected["course_code"])
-        card = self.find_card(
-            courses,
-            expected["course_code"],
-            expected["class_no"],
-            expected["teacher"],
-        )
-        self.assertEqual(card["id"], f"u{expected['id']}")
+        courses = self.all_courses(term="spring", q="00137975")
+        card = self.find_card(courses, "00137975", "1", "王杰(教授)")
+        self.assertEqual(card["id"], "u860")
 
     def test_type_filter_preserves_representative_id_and_all_badges(self):
         courses = self.all_courses(term="spring", q="00137975")
@@ -302,34 +272,88 @@ class CourseListTests(unittest.TestCase):
             self.assertEqual(same["id"], card["id"])
             self.assertEqual(same["course_type"], card["course_type"])
 
-    def test_representative_scalar_fields_fall_back_to_a_nonblank_sibling(self):
-        score_sql = self.detail_score_sql()
-        with app.get_db("spring") as conn:
-            rows = conn.execute(
-                f"""
-                SELECT b.id, b.course_code, b.class_no, b.teacher, b.major,
-                       ({score_sql}) AS detail_score
-                FROM basic_info b
-                JOIN detail_info d ON d.course_id = b.id
-                WHERE b.course_code = '00430109'
-                  AND b.class_no = '1'
-                  AND b.teacher = '穆良柱(教授)'
-                """
-            ).fetchall()
+    def test_representative_counts_visible_basic_fields(self):
+        courses = self.all_courses(term="spring", q="00430109")
+        card = self.find_card(courses, "00430109", "1", "穆良柱(教授)")
+        self.assertEqual(card["id"], "u2426")
+        self.assertEqual(card["major"], "物理学类")
 
-        representative = min(rows, key=lambda row: (-row["detail_score"], row["id"]))
-        sibling_major = next(row["major"] for row in rows if (row["major"] or "").strip())
-        self.assertFalse((representative["major"] or "").strip())
-
-        courses = self.all_courses(term="spring", q=representative["course_code"])
-        card = self.find_card(
-            courses,
-            representative["course_code"],
-            representative["class_no"],
-            representative["teacher"],
+    def test_scalar_fallback_uses_one_coherent_source_row(self):
+        columns = (
+            "id", "course_type", "course_code", "class_no", "course_name",
+            "category", "credits", "teacher", "department", "major", "grade",
+            "schedule", "classroom", "weekdays", "first_period", "enrollment",
+            "pnp", "notes", "english_name", "grading", "language", "audience",
+            "_level", "detail_score", "completeness_score", "display_course_name",
+            "display_classroom", "display_notes", "group_key",
         )
-        self.assertEqual(card["id"], f"u{representative['id']}")
-        self.assertEqual(card["major"], sibling_major)
+        base = {
+            "course_type": "专业课",
+            "course_code": "SYN001",
+            "class_no": "1",
+            "course_name": "Representative Name",
+            "category": "任选",
+            "credits": 2.0,
+            "teacher": "Test Teacher",
+            "department": "Representative Department",
+            "major": "",
+            "grade": "",
+            "schedule": "Representative Schedule",
+            "classroom": "R101",
+            "weekdays": "周一",
+            "first_period": 1,
+            "enrollment": "10 / 0",
+            "pnp": "可申请",
+            "notes": "Representative Notes",
+            "english_name": "Representative English Name",
+            "grading": "百分制",
+            "language": "中文",
+            "audience": "",
+            "_level": "x",
+            "display_course_name": "Representative Name",
+            "display_classroom": "R101",
+            "display_notes": "Representative Notes",
+            "group_key": "synthetic-group",
+        }
+        fixtures = [
+            {**base, "id": "x1", "detail_score": 10, "completeness_score": 10},
+            {
+                **base,
+                "id": "x2",
+                "department": "Sibling Department A",
+                "major": "Alpha major",
+                "grade": "Z grade",
+                "detail_score": 8,
+                "completeness_score": 8,
+            },
+            {
+                **base,
+                "id": "x3",
+                "department": "Sibling Department B",
+                "major": "Zulu major",
+                "grade": "A grade",
+                "detail_score": 7,
+                "completeness_score": 7,
+            },
+        ]
+        row_placeholder = "(" + ",".join("?" for _ in columns) + ")"
+        source_sql = (
+            f"WITH fixture({','.join(columns)}) AS "
+            f"(VALUES {','.join(row_placeholder for _ in fixtures)}) SELECT * FROM fixture"
+        )
+        params = [fixture[column] for fixture in fixtures for column in columns]
+        sql = f"{app._grouped_course_ctes(source_sql, '')} SELECT * FROM grouped"
+
+        with sqlite3.connect(":memory:") as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(sql, params).fetchone()
+
+        self.assertEqual(row["id"], "x1")
+        self.assertEqual(row["course_name"], "Representative Name")
+        self.assertEqual(row["department"], "Representative Department")
+        self.assertEqual(row["major"], "Alpha major")
+        self.assertEqual(row["grade"], "Z grade")
+        self.assertEqual(row["fallback_id"], "x2")
 
     def test_badge_arrays_have_deterministic_order(self):
         courses = self.all_courses(term="fall", q="00137975")
@@ -387,6 +411,55 @@ class CourseListTests(unittest.TestCase):
         self.assertIsNotNone(card)
         self.assertEqual(card["classroom"], translated_classroom)
 
+    def test_translated_graduate_course_name_is_searchable(self):
+        with app.get_db("spring") as conn:
+            row = conn.execute(
+                """
+                SELECT b.id, t.text
+                FROM gr.basic_info b
+                JOIN gr.detail_info d ON d.course_id = b.id
+                JOIN gr.translations t
+                  ON t.course_id = b.id AND t.lang = 'ja' AND t.field = 'course_name'
+                WHERE TRIM(t.text) != ''
+                  AND t.text NOT IN (b.course_name, COALESCE(d.english_name, ''))
+                ORDER BY b.id
+                LIMIT 1
+                """
+            ).fetchone()
+
+        sample_id, translated_name = row
+        result = self.all_courses(term="spring", lang="ja", q=translated_name)
+        card = next((course for course in result if course["id"] == f"g{sample_id}"), None)
+        self.assertIsNotNone(card)
+        self.assertEqual(card["course_name"], translated_name)
+
+    def test_cross_level_same_key_collision_returns_two_cards(self):
+        with app.get_db("fall") as conn:
+            row = conn.execute(
+                """
+                SELECT a.course_code, a.class_no, a.teacher, a.id, r.id
+                FROM basic_info a
+                JOIN gr.basic_info r
+                  ON r.course_code = a.course_code
+                 AND r.class_no = a.class_no
+                 AND r.teacher = a.teacher
+                WHERE TRIM(COALESCE(a.teacher, '')) != ''
+                ORDER BY a.course_code, a.class_no, a.teacher
+                LIMIT 1
+                """
+            ).fetchone()
+
+        course_code, class_no, teacher, undergrad_id, graduate_id = row
+        courses = self.all_courses(term="fall", q=course_code)
+        matching = {
+            course["id"]
+            for course in courses
+            if course["course_code"] == course_code
+            and course["class_no"] == class_no
+            and course["teacher"] == teacher
+        }
+        self.assertEqual(matching, {f"a{undergrad_id}", f"r{graduate_id}"})
+
     def test_name_sorts_use_display_name_and_legacy_aliases(self):
         ascending = self.all_courses(term="fall", lang="en", q="of", sort="name_asc")
         descending = self.all_courses(term="fall", lang="en", q="of", sort="name_desc")
@@ -414,3 +487,70 @@ class CourseListTests(unittest.TestCase):
         self.assertNotEqual(first, different_seed)
         self.assertEqual(len(first), total)
         self.assertEqual(len(set(first)), total)
+
+    def test_random_signed_seeds_are_stable_and_pairwise_distinct(self):
+        orders = {}
+        for seed in (0, 1, -1):
+            total, first = self.all_ids("summer", sort="random", random_seed=seed, page_size=37)
+            _, second = self.all_ids("summer", sort="random", random_seed=seed, page_size=37)
+            self.assertEqual(first, second)
+            self.assertEqual(len(first), total)
+            self.assertEqual(len(set(first)), total)
+            orders[seed] = tuple(first)
+
+        self.assertEqual(len(set(orders.values())), 3)
+
+    def test_whitespace_only_teachers_get_id_specific_group_keys(self):
+        group_key_sql = getattr(app, "_group_key_sql", None)
+        self.assertIsNotNone(group_key_sql)
+        if group_key_sql is None:
+            return
+
+        with sqlite3.connect(":memory:") as conn:
+            rows = conn.execute(
+                f"""
+                WITH sample(_level, course_code, class_no, teacher, id) AS (
+                    VALUES ('x', 'C1', '1', '   ', 'x1'),
+                           ('x', 'C1', '1', '\t', 'x2'),
+                           ('x', 'C1', '1', 'Teacher', 'x3')
+                )
+                SELECT id, {group_key_sql('sample')} AS group_key
+                FROM sample
+                ORDER BY id
+                """
+            ).fetchall()
+
+        keys = {row[0]: row[1] for row in rows}
+        self.assertNotEqual(keys["x1"], keys["x2"])
+        self.assertTrue(keys["x1"].endswith("x1"))
+        self.assertTrue(keys["x2"].endswith("x2"))
+        self.assertTrue(keys["x3"].endswith("Teacher"))
+
+    def test_count_query_stops_after_matching_group_keys(self):
+        count_course_sql = getattr(app, "_count_course_sql", None)
+        self.assertIsNotNone(count_course_sql)
+        if count_course_sql is None:
+            return
+
+        filters = {
+            "q": "",
+            "type": "",
+            "category": "",
+            "credits": "",
+            "department": "",
+            "weekday": "",
+            "grading": "",
+            "classroom": "",
+        }
+        source_sql, params, matching_where = app._build_course_query("fall", "zh", filters)
+        count_sql = count_course_sql(source_sql, matching_where)
+        self.assertNotIn("ROW_NUMBER", count_sql)
+        self.assertNotIn("badge_values", count_sql)
+        self.assertNotIn("fallback_candidates", count_sql)
+
+        with app.get_db("fall") as conn:
+            total = conn.execute(count_sql, params).fetchone()[0]
+            plan = conn.execute(f"EXPLAIN QUERY PLAN {count_sql}", params).fetchall()
+        self.assertEqual(total, 4421)
+        plan_details = [step["detail"] for step in plan]
+        self.assertFalse(any("ranked" in detail or "badges" in detail for detail in plan_details))
