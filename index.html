@@ -2991,8 +2991,14 @@ function applyFilters() {
 
 async function fetchCourses({ page = 1, append = false } = {}) {
   if (fetchController) fetchController.abort();
+  const requestedTerm = currentTerm;
   const ctrl = new AbortController();
   fetchController = ctrl;
+  const ownsRequest = () => (
+    fetchController === ctrl &&
+    !ctrl.signal.aborted &&
+    currentTerm === requestedTerm
+  );
   isFetching = true;
   clearLoadMoreError();
 
@@ -3013,7 +3019,7 @@ async function fetchCourses({ page = 1, append = false } = {}) {
   if (sort) params.set('sort', sort);
   if (sort === 'random' && randomSeed) params.set('random_seed', randomSeed);
   params.set('lang', currentLang);
-  params.set('term', currentTerm);
+  params.set('term', requestedTerm);
   params.set('page', page);
   params.set('page_size', PAGE_SIZE);
 
@@ -3022,9 +3028,10 @@ async function fetchCourses({ page = 1, append = false } = {}) {
 
   try {
     const resp = await fetch('/api/courses?' + params.toString(), { signal: ctrl.signal });
+    if (!ownsRequest()) return false;
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    if (fetchController !== ctrl) return false;
+    if (!ownsRequest()) return false;
     totalCount = data.total;
 
     if (append) {
@@ -3038,9 +3045,9 @@ async function fetchCourses({ page = 1, append = false } = {}) {
     updateLoadMoreState();
     return true;
   } catch (e) {
-    if (e.name === 'AbortError') return false;
+    if (e.name === 'AbortError' || !ownsRequest()) return false;
     console.error(e);
-    if (fetchController === ctrl) renderError(append);
+    renderError(append);
     return false;
   } finally {
     // Only the latest in-flight request may clear the flag — an aborted older

@@ -99,6 +99,161 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("return false", body)
         self.assertNotIn("currentPage++", body)
 
+    def test_fetch_courses_owns_its_term_controller_and_request_params(self):
+        body = function_body("fetchCourses")
+        self.assertIn("const requestedTerm = currentTerm", body)
+        self.assertIn("params.set('term', requestedTerm)", body)
+        self.assertIn("fetchController === ctrl", body)
+        self.assertIn("ctrl.signal.aborted", body)
+        self.assertIn("currentTerm === requestedTerm", body)
+
+    def test_stale_course_success_cannot_commit_or_append(self):
+        source = function_source("fetchCourses")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentTerm = 'spring';
+            let currentLang = 'zh';
+            let fetchController = null;
+            let isFetching = false;
+            let currentCourses = [{{ id: 'keep' }}];
+            let totalCount = 1;
+            let hasMore = true;
+            let currentPage = 4;
+            let randomSeed = 17;
+            const PAGE_SIZE = 20;
+            const csValues = {{}};
+            const inputs = {{
+              searchInput: {{ value: '' }},
+              filterClassroom: {{ value: '' }},
+            }};
+            const document = {{ getElementById: id => inputs[id] }};
+            let requestedUrl = '';
+            let releaseFetch;
+            let renderCardsCalls = 0;
+            let appendCardsCalls = 0;
+            let updateCalls = 0;
+            let renderErrorCalls = 0;
+            function fetch(url) {{
+              requestedUrl = url;
+              return new Promise(resolve => {{ releaseFetch = resolve; }});
+            }}
+            function clearLoadMoreError() {{}}
+            function renderSkeletons() {{}}
+            function syncURL() {{}}
+            function renderCards() {{ renderCardsCalls += 1; }}
+            function appendCards() {{ appendCardsCalls += 1; }}
+            function updateLoadMoreState() {{ updateCalls += 1; }}
+            function renderError() {{ renderErrorCalls += 1; }}
+            {source}
+            (async () => {{
+              const stale = fetchCourses({{ page: 5, append: true }});
+              const oldController = fetchController;
+              currentTerm = 'fall';
+              oldController.abort();
+              assert.equal(fetchController, oldController);
+              releaseFetch({{
+                ok: true,
+                json: async () => ({{ total: 99, courses: [{{ id: 'old' }}] }}),
+              }});
+              assert.equal(await stale, false);
+              assert.equal(new URL(requestedUrl, 'http://local').searchParams.get('term'), 'spring');
+              assert.deepEqual(currentCourses, [{{ id: 'keep' }}]);
+              assert.equal(totalCount, 1);
+              assert.equal(hasMore, true);
+              assert.equal(currentPage, 4);
+              assert.equal(renderCardsCalls, 0);
+              assert.equal(appendCardsCalls, 0);
+              assert.equal(updateCalls, 0);
+              assert.equal(renderErrorCalls, 0);
+            }})().catch(error => {{ globalThis.console.error(error); process.exitCode = 1; }});
+            """
+        )
+
+    def test_stale_course_http_and_json_errors_are_suppressed(self):
+        source = function_source("fetchCourses")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            const realConsole = globalThis.console;
+            let loggedErrors = 0;
+            const console = {{ error() {{ loggedErrors += 1; }} }};
+            let currentTerm = 'spring';
+            let currentLang = 'zh';
+            let fetchController = null;
+            let isFetching = false;
+            let currentCourses = [{{ id: 'keep' }}];
+            let totalCount = 1;
+            let hasMore = true;
+            let randomSeed = 17;
+            const PAGE_SIZE = 20;
+            const csValues = {{}};
+            const inputs = {{
+              searchInput: {{ value: '' }},
+              filterClassroom: {{ value: '' }},
+            }};
+            const document = {{ getElementById: id => inputs[id] }};
+            let scenario = 'http';
+            let releaseHttp;
+            let rejectJson;
+            let markJsonStarted;
+            const jsonStarted = new Promise(resolve => {{ markJsonStarted = resolve; }});
+            let renderCardsCalls = 0;
+            let appendCardsCalls = 0;
+            let updateCalls = 0;
+            let renderErrorCalls = 0;
+            function fetch() {{
+              if (scenario === 'http') {{
+                return new Promise(resolve => {{ releaseHttp = resolve; }});
+              }}
+              return Promise.resolve({{
+                ok: true,
+                json: () => {{
+                  markJsonStarted();
+                  return new Promise((_resolve, reject) => {{ rejectJson = reject; }});
+                }},
+              }});
+            }}
+            function clearLoadMoreError() {{}}
+            function renderSkeletons() {{}}
+            function syncURL() {{}}
+            function renderCards() {{ renderCardsCalls += 1; }}
+            function appendCards() {{ appendCardsCalls += 1; }}
+            function updateLoadMoreState() {{ updateCalls += 1; }}
+            function renderError() {{ renderErrorCalls += 1; }}
+            {source}
+            (async () => {{
+              const staleHttp = fetchCourses();
+              const httpController = fetchController;
+              currentTerm = 'fall';
+              httpController.abort();
+              assert.equal(fetchController, httpController);
+              releaseHttp({{ ok: false, status: 503 }});
+              assert.equal(await staleHttp, false);
+
+              scenario = 'json';
+              currentTerm = 'spring';
+              const staleJson = fetchCourses();
+              await jsonStarted;
+              const jsonController = fetchController;
+              currentTerm = 'fall';
+              jsonController.abort();
+              assert.equal(fetchController, jsonController);
+              rejectJson(new Error('stale JSON failure'));
+              assert.equal(await staleJson, false);
+
+              assert.deepEqual(currentCourses, [{{ id: 'keep' }}]);
+              assert.equal(totalCount, 1);
+              assert.equal(hasMore, true);
+              assert.equal(renderCardsCalls, 0);
+              assert.equal(appendCardsCalls, 0);
+              assert.equal(updateCalls, 0);
+              assert.equal(renderErrorCalls, 0);
+              assert.equal(loggedErrors, 0);
+            }})().catch(error => {{ realConsole.error(error); process.exitCode = 1; }});
+            """
+        )
+
     def test_rapid_load_more_calls_execute_one_append_and_one_page_advance(self):
         source = function_source("loadMore")
         self.run_node(
