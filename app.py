@@ -141,6 +141,26 @@ def get_cached_database_health() -> dict:
 # Spring UG and summer UG share the exact same schema and live in `main` when
 # their term is active — only the id prefix differs ('u' vs 's'), so both list
 # SELECTs come from this one template.
+UG_DETAIL_COLUMNS = (
+    "english_name", "prerequisites", "intro_cn", "intro_en", "grading",
+    "ge_series", "language", "textbook", "reference_book", "syllabus",
+    "evaluation",
+)
+SPRING_GR_DETAIL_COLUMNS = (
+    "english_name", "weekly_hours", "total_hours", "term", "audience",
+    "reference_book", "intro", "extra_notes",
+)
+FALL_GR_DETAIL_COLUMNS = (*SPRING_GR_DETAIL_COLUMNS, "syllabus")
+
+
+def _detail_score_sql(columns: tuple[str, ...]) -> str:
+    return " + ".join(
+        f"CASE WHEN d.{column} IS NOT NULL "
+        f"AND TRIM(CAST(d.{column} AS TEXT)) != '' THEN 1 ELSE 0 END"
+        for column in columns
+    )
+
+
 _UG_LIST_SELECT = """
     SELECT
         '{prefix}' || b.id     AS id,
@@ -165,14 +185,16 @@ _UG_LIST_SELECT = """
         d.grading              AS grading,
         d.language             AS language,
         ''                     AS audience,
-        '{prefix}'             AS _level
+        '{prefix}'             AS _level,
+        ({detail_score})       AS detail_score
     FROM basic_info b
     LEFT JOIN detail_info d ON d.course_id = b.id
 """
 
-LIST_SELECT_UG = _UG_LIST_SELECT.format(prefix="u")
-LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(prefix="s")
-LIST_SELECT_FALL_UG = _UG_LIST_SELECT.format(prefix="a")
+_UG_DETAIL_SCORE_SQL = _detail_score_sql(UG_DETAIL_COLUMNS)
+LIST_SELECT_UG = _UG_LIST_SELECT.format(prefix="u", detail_score=_UG_DETAIL_SCORE_SQL)
+LIST_SELECT_SUMMER = _UG_LIST_SELECT.format(prefix="s", detail_score=_UG_DETAIL_SCORE_SQL)
+LIST_SELECT_FALL_UG = _UG_LIST_SELECT.format(prefix="a", detail_score=_UG_DETAIL_SCORE_SQL)
 
 _GR_LIST_SELECT = """
     SELECT
@@ -198,19 +220,34 @@ _GR_LIST_SELECT = """
         ''                     AS grading,
         ''                     AS language,
         d.audience             AS audience,
-        '{prefix}'             AS _level
+        '{prefix}'             AS _level,
+        ({detail_score})       AS detail_score
     FROM {ns}.basic_info b
     LEFT JOIN {ns}.detail_info d ON d.course_id = b.id
 """
 
-LIST_SELECT_GR = _GR_LIST_SELECT.format(prefix="g", ns="gr")
-LIST_SELECT_FALL_GR = _GR_LIST_SELECT.format(prefix="r", ns="gr")
+LIST_SELECT_GR = _GR_LIST_SELECT.format(
+    prefix="g",
+    ns="gr",
+    detail_score=_detail_score_sql(SPRING_GR_DETAIL_COLUMNS),
+)
+LIST_SELECT_FALL_GR = _GR_LIST_SELECT.format(
+    prefix="r",
+    ns="gr",
+    detail_score=_detail_score_sql(FALL_GR_DETAIL_COLUMNS),
+)
 
 # Pre-built UNION expressions for each term.
 TERM_UNION_SQL = {
     "spring": f"({LIST_SELECT_UG} UNION ALL {LIST_SELECT_GR})",
     "summer": f"({LIST_SELECT_SUMMER})",
     "fall": f"({LIST_SELECT_FALL_UG} UNION ALL {LIST_SELECT_FALL_GR})",
+}
+
+TERM_LIST_SELECTS = {
+    "spring": (("main", LIST_SELECT_UG), ("gr", LIST_SELECT_GR)),
+    "summer": (("main", LIST_SELECT_SUMMER),),
+    "fall": (("main", LIST_SELECT_FALL_UG), ("gr", LIST_SELECT_FALL_GR)),
 }
 
 
@@ -296,53 +333,254 @@ def _like(s: str) -> str:
     return "%" + s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-def _build_where(
-    q: str, type_: str, category: str, credits_: str,
-    department: str, weekday: str, grading: str, classroom: str,
-):
-    """Build (where_clause, params) used inside the inner subquery alias `t`."""
+def _build_source_where(filters: dict[str, object]) -> tuple[str, list[object]]:
+    """Build the source-row predicate used only to identify matching groups."""
     conds = []
-    params = []
+    params: list[object] = []
+    q = str(filters.get("q") or "")
     if q:
         like = _like(q)
         conds.append(
-            "(t.course_name LIKE ? ESCAPE '\\' "
-            "OR t.teacher LIKE ? ESCAPE '\\' "
-            "OR t.classroom LIKE ? ESCAPE '\\' "
-            "OR t.course_code LIKE ? ESCAPE '\\' "
-            "OR t.english_name LIKE ? ESCAPE '\\')"
+            "(s.course_name LIKE ? ESCAPE '\\' "
+            "OR s.display_course_name LIKE ? ESCAPE '\\' "
+            "OR s.english_name LIKE ? ESCAPE '\\' "
+            "OR s.teacher LIKE ? ESCAPE '\\' "
+            "OR s.classroom LIKE ? ESCAPE '\\' "
+            "OR s.display_classroom LIKE ? ESCAPE '\\' "
+            "OR s.course_code LIKE ? ESCAPE '\\')"
         )
-        params.extend([like] * 5)
+        params.extend([like] * 7)
+    classroom = str(filters.get("classroom") or "")
     if classroom:
-        # Dedicated classroom filter: matches ONLY the classroom column, so it
-        # composes with q (the old frontend joined both into one q string,
-        # which produced a single "%q classroom%" LIKE that matched nothing).
-        conds.append("t.classroom LIKE ? ESCAPE '\\'")
-        params.append(_like(classroom))
+        like = _like(classroom)
+        conds.append(
+            "(s.classroom LIKE ? ESCAPE '\\' "
+            "OR s.display_classroom LIKE ? ESCAPE '\\')"
+        )
+        params.extend([like, like])
+    type_ = str(filters.get("type") or "")
     if type_:
-        conds.append("t.course_type = ?")
+        conds.append("s.course_type = ?")
         params.append(type_)
+    category = str(filters.get("category") or "")
     if category:
-        conds.append("t.category = ?")
+        conds.append("s.category = ?")
         params.append(category)
+    credits_ = str(filters.get("credits") or "")
     if credits_:
         try:
-            conds.append("t.credits = ?")
+            conds.append("s.credits = ?")
             params.append(float(credits_))
         except ValueError:
             pass
+    department = str(filters.get("department") or "")
     if department:
-        conds.append("t.department = ?")
+        conds.append("s.department = ?")
         params.append(department)
+    weekday = str(filters.get("weekday") or "")
     if weekday:
-        conds.append("t.weekdays LIKE ?")
+        conds.append("s.weekdays LIKE ?")
         params.append(f"%{weekday}%")
+    grading = str(filters.get("grading") or "")
     if grading:
-        # grading is only present on undergrad; this naturally excludes grad rows.
-        conds.append("t.grading = ?")
+        conds.append("s.grading = ?")
         params.append(grading)
     where = (" WHERE " + " AND ".join(conds)) if conds else ""
     return where, params
+
+
+def _translated_source_select(base_select: str, ns: str, lang: str) -> tuple[str, list[object]]:
+    if lang == "zh":
+        display_columns = """
+            t.course_name AS display_course_name,
+            t.classroom AS display_classroom,
+            t.notes AS display_notes
+        """
+        joins = ""
+        params: list[object] = []
+    else:
+        display_columns = """
+            COALESCE(NULLIF(TRIM(name_tr.text), ''), t.course_name) AS display_course_name,
+            COALESCE(NULLIF(TRIM(room_tr.text), ''), t.classroom) AS display_classroom,
+            COALESCE(NULLIF(TRIM(notes_tr.text), ''), t.notes) AS display_notes
+        """
+        joins = f"""
+            LEFT JOIN {ns}.translations AS name_tr
+              ON name_tr.course_id = CAST(SUBSTR(t.id, 2) AS INTEGER)
+             AND name_tr.field = 'course_name' AND name_tr.lang = ?
+            LEFT JOIN {ns}.translations AS room_tr
+              ON room_tr.course_id = CAST(SUBSTR(t.id, 2) AS INTEGER)
+             AND room_tr.field = 'classroom' AND room_tr.lang = ?
+            LEFT JOIN {ns}.translations AS notes_tr
+              ON notes_tr.course_id = CAST(SUBSTR(t.id, 2) AS INTEGER)
+             AND notes_tr.field = 'notes' AND notes_tr.lang = ?
+        """
+        params = [lang, lang, lang]
+
+    sql = f"""
+        SELECT t.*,
+               {display_columns},
+               t._level || CHAR(31) || t.course_code || CHAR(31) || t.class_no || CHAR(31) ||
+                 CASE WHEN COALESCE(t.teacher, '') = '' THEN t.id ELSE t.teacher END AS group_key
+        FROM ({base_select}) AS t
+        {joins}
+    """
+    return sql, params
+
+
+def _build_course_query(
+    term: str,
+    lang: str,
+    filters: dict[str, object],
+) -> tuple[str, list[object], str]:
+    """Return source-row SQL, ordered parameters, and matching-group predicate."""
+    if lang == "zh":
+        source_sql, source_params = _translated_source_select(TERM_UNION_SQL[term], "main", lang)
+    else:
+        selects = []
+        source_params = []
+        for ns, base_select in TERM_LIST_SELECTS[term]:
+            select_sql, select_params = _translated_source_select(base_select, ns, lang)
+            selects.append(select_sql)
+            source_params.extend(select_params)
+        source_sql = " UNION ALL ".join(selects)
+
+    matching_where, filter_params = _build_source_where(filters)
+    return source_sql, [*source_params, *filter_params], matching_where
+
+
+def _preferred_text(column: str, alias: str | None = None) -> str:
+    alias = alias or column
+    return f"""
+        COALESCE(
+            MAX(CASE WHEN r.representative_rank = 1
+                      AND TRIM(COALESCE(r.{column}, '')) != '' THEN r.{column} END),
+            MAX(CASE WHEN TRIM(COALESCE(r.{column}, '')) != '' THEN r.{column} END),
+            MAX(CASE WHEN r.representative_rank = 1 THEN r.{column} END),
+            MAX(r.{column})
+        ) AS {alias}
+    """
+
+
+def _preferred_value(column: str) -> str:
+    return f"""
+        COALESCE(
+            MAX(CASE WHEN r.representative_rank = 1 THEN r.{column} END),
+            MAX(r.{column})
+        ) AS {column}
+    """
+
+
+def _grouped_course_ctes(source_sql: str, matching_where: str) -> str:
+    text_columns = (
+        _preferred_text("course_code"),
+        _preferred_text("class_no"),
+        _preferred_text("display_course_name", "course_name"),
+        _preferred_text("course_name", "original_course_name"),
+        _preferred_text("teacher"),
+        _preferred_text("department"),
+        _preferred_text("major"),
+        _preferred_text("grade"),
+        _preferred_text("schedule"),
+        _preferred_text("display_classroom", "classroom"),
+        _preferred_text("weekdays"),
+        _preferred_text("enrollment"),
+        _preferred_text("pnp"),
+        _preferred_text("display_notes", "notes"),
+        _preferred_text("english_name"),
+        _preferred_text("grading"),
+        _preferred_text("language"),
+        _preferred_text("audience"),
+    )
+    value_columns = (_preferred_value("credits"), _preferred_value("first_period"))
+    scalar_columns = ",\n".join((*text_columns, *value_columns))
+
+    return f"""
+        WITH source AS (
+            {source_sql}
+        ), matching_groups AS (
+            SELECT DISTINCT s.group_key
+            FROM source AS s
+            {matching_where}
+        ), ranked AS (
+            SELECT s.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY s.group_key
+                       ORDER BY s.detail_score DESC,
+                                CAST(SUBSTR(s.id, 2) AS INTEGER),
+                                s.id
+                   ) AS representative_rank
+            FROM source AS s
+            JOIN matching_groups USING (group_key)
+        ), badge_values AS (
+            SELECT DISTINCT group_key, 'course_type' AS badge_kind, course_type AS badge_value
+            FROM ranked
+            WHERE TRIM(COALESCE(course_type, '')) != ''
+            UNION ALL
+            SELECT DISTINCT group_key, 'category' AS badge_kind, category AS badge_value
+            FROM ranked
+            WHERE TRIM(COALESCE(category, '')) != ''
+        ), badge_sequences AS (
+            SELECT group_key, badge_kind,
+                   GROUP_CONCAT(badge_value) OVER (
+                       PARTITION BY group_key, badge_kind
+                       ORDER BY badge_value COLLATE BINARY
+                       ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+                   ) AS badge_list
+            FROM badge_values
+        ), badges AS (
+            SELECT group_key,
+                   MAX(CASE WHEN badge_kind = 'course_type' THEN badge_list END) AS course_type,
+                   MAX(CASE WHEN badge_kind = 'category' THEN badge_list END) AS category
+            FROM badge_sequences
+            GROUP BY group_key
+        ), grouped AS (
+            SELECT MAX(CASE WHEN r.representative_rank = 1 THEN r.id END) AS id,
+                   MAX(b.course_type) AS course_type,
+                   MAX(b.category) AS category,
+                   {scalar_columns}
+            FROM ranked AS r
+            LEFT JOIN badges AS b USING (group_key)
+            GROUP BY r.group_key
+        )
+    """
+
+
+def _course_order_by(sort: str, term: str, random_seed: int) -> str:
+    if sort == "random":
+        seed = max(1, int(random_seed))
+        mul = ((seed * 1664525) % 999983) or 7
+        add = (seed * 1013904223) % 999983
+        return (
+            f"((CAST(SUBSTR(id, 2) AS INTEGER) * {mul} "
+            f"+ CASE SUBSTR(id, 1, 1) "
+            f"WHEN 'g' THEN 333331 WHEN 's' THEN 666661 "
+            f"WHEN 'a' THEN 111113 WHEN 'r' THEN 444449 ELSE 0 END "
+            f"+ {add}) % 999983), id"
+        )
+
+    name_asc = "(course_name = '' OR course_name IS NULL), course_name COLLATE NOCASE, id"
+    name_desc = "(course_name = '' OR course_name IS NULL), course_name COLLATE NOCASE DESC, id"
+    sort_map = {
+        "name_asc": name_asc,
+        "pinyin": name_asc,
+        "name_desc": name_desc,
+        "pinyin_desc": name_desc,
+        "credits_asc": f"(credits IS NULL), credits ASC, {name_asc}",
+        "credits_desc": f"(credits IS NULL), credits DESC, {name_asc}",
+        "time_asc": f"(first_period IS NULL), first_period, {name_asc}",
+    }
+    if sort in sort_map:
+        return sort_map[sort]
+
+    sociology_priority = ""
+    if term == "summer":
+        sociology_priority = (
+            "(CASE WHEN department = '社会学系' "
+            "OR department = '中国社会科学调查中心' "
+            "OR original_course_name LIKE '%社会学%' THEN 0 ELSE 1 END), "
+        )
+    return f"{sociology_priority}{name_asc}"
 
 
 @app.get("/api/courses")
@@ -355,7 +593,7 @@ def list_courses(
     weekday: str = Query("", description="Weekday filter"),
     grading: str = Query("", description="Grading filter"),
     classroom: str = Query("", description="Classroom filter (LIKE, classroom column only)"),
-    sort: str = Query("", description="Sort: pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
+    sort: str = Query("", description="Sort: name_asc | name_desc | pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
     random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
     lang: str = Query("zh", description="Display language"),
     term: str = Query("fall", description="spring | summer | fall"),
@@ -365,148 +603,32 @@ def list_courses(
     if term not in TERM_UNION_SQL:
         raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
 
-    where, params = _build_where(q, type, category, credits, department, weekday, grading, classroom)
-
-    if sort == "random":
-        # Deterministic shuffle: same seed → stable order across pagination.
-        # int param is already validated by FastAPI, safe to interpolate.
-        # Two large primes mix the seed so even tiny seeds produce well-spread
-        # mul/add values, giving genuinely different orderings per seed.
-        # The CASE per id prefix breaks 'u123' / 'g123' / 's123' / etc. collisions.
-        seed = max(1, int(random_seed))
-        mul = ((seed * 1664525) % 999983) or 7
-        add = (seed * 1013904223) % 999983
-        # After GROUP BY the id column is the representative id (a single
-        # 'u123' / 'g456' / 's789' / etc. string), so we reach into it via SUBSTR.
-        order_by = (
-            f"((CAST(SUBSTR(id, 2) AS INTEGER) * {mul} "
-            f"+ CASE SUBSTR(id, 1, 1) "
-            f"WHEN 'g' THEN 333331 WHEN 's' THEN 666661 "
-            f"WHEN 'a' THEN 111113 WHEN 'r' THEN 444449 ELSE 0 END "
-            f"+ {add}) % 999983)"
-        )
-    else:
-        sort_map = {
-            "pinyin":       "course_name COLLATE NOCASE",
-            "pinyin_desc":  "course_name COLLATE NOCASE DESC",
-            "credits_asc":  "credits ASC, course_name COLLATE NOCASE",
-            "credits_desc": "credits DESC, course_name COLLATE NOCASE",
-            # Earliest class period first; rows with no schedule sort last.
-            "time_asc":     "(first_period IS NULL), first_period, course_name COLLATE NOCASE",
-        }
-        if sort in sort_map:
-            order_by = sort_map[sort]
-        else:
-            # Default sort: course name asc, empty names last. For summer term
-            # we additionally float "sociology-adjacent" courses to the very
-            # top — the summer audience is primarily 社会学系 / 中国社会科学
-            # 调查中心 partner students plus 爱心社, so this surfaces the most
-            # relevant offerings at first scroll. Spring/fall keep a flat
-            # alphabetical default.
-            if term == "summer":
-                sociology_priority = (
-                    "(CASE WHEN department = '社会学系' "
-                    "OR department = '中国社会科学调查中心' "
-                    "OR course_name LIKE '%社会学%' THEN 0 ELSE 1 END), "
-                )
-            else:
-                sociology_priority = ""
-            order_by = (
-                f"{sociology_priority}"
-                "(course_name = '' OR course_name IS NULL), "
-                "course_name COLLATE NOCASE, id"
-            )
+    filters = {
+        "q": q,
+        "type": type,
+        "category": category,
+        "credits": credits,
+        "department": department,
+        "weekday": weekday,
+        "grading": grading,
+        "classroom": classroom,
+    }
+    source_sql, params, matching_where = _build_course_query(term, lang, filters)
+    ctes = _grouped_course_ctes(source_sql, matching_where)
+    order_by = _course_order_by(sort, term, random_seed)
     offset = (page - 1) * page_size
 
-    union_sql = TERM_UNION_SQL[term]
-
-    # Cross-listed and duplicate-registered rows: PKU lists the same physical
-    # class multiple times — once per (category / undergrad-vs-grad) entry.
-    # We collapse them by (course_code, class_no, teacher), keeping every
-    # distinct course_type and category as a GROUP_CONCAT'd list.
-    #
-    # Why include class_no instead of just (code, teacher)?
-    #   - Some courses (e.g. 发展心理学 0163006) have ONE teacher running FIVE
-    #     parallel sections — they share (code, teacher) but are 5 real classes.
-    #     Dropping class_no from the key would erroneously merge them.
-    #   - Cross-listed UG↔GR rows use different class_no namespaces (UG '1' /
-    #     GR '00'), so they intentionally do NOT merge here; the UG and GR
-    #     cards are kept distinct and the badges show which is which.
-    #
-    # Rows missing a teacher (a handful in UG/GR) get a unique synthetic key
-    # so they never collapse with each other.
-    inner = f"SELECT * FROM {union_sql} AS t {where}"
-    merged_sql = f"""
-        SELECT
-            MIN(id) AS id,
-            GROUP_CONCAT(DISTINCT course_type) AS course_type,
-            MAX(course_code) AS course_code,
-            MAX(class_no) AS class_no,
-            MAX(course_name) AS course_name,
-            GROUP_CONCAT(DISTINCT category) AS category,
-            MAX(credits) AS credits,
-            MAX(teacher) AS teacher,
-            MAX(department) AS department,
-            MAX(major) AS major,
-            MAX(grade) AS grade,
-            MAX(schedule) AS schedule,
-            MAX(classroom) AS classroom,
-            MAX(weekdays) AS weekdays,
-            MIN(first_period) AS first_period,
-            MAX(enrollment) AS enrollment,
-            MAX(pnp) AS pnp,
-            MAX(notes) AS notes,
-            MAX(english_name) AS english_name,
-            MAX(grading) AS grading,
-            MAX(language) AS language,
-            MAX(audience) AS audience
-        FROM ({inner})
-        GROUP BY course_code, class_no,
-                 CASE WHEN teacher IS NULL OR teacher = '' THEN id ELSE teacher END
-    """
-
-    count_sql = f"SELECT COUNT(*) FROM ({merged_sql})"
-    list_sql = f"{merged_sql} ORDER BY {order_by} LIMIT ? OFFSET ?"
-
-    # Maps id prefix → attached DB alias for translation lookup.
-    PREFIX_TO_NS = {prefix: alias for (alias, _, prefix) in TERM_DBS[term]}
+    count_sql = f"{ctes} SELECT COUNT(*) FROM grouped"
+    list_sql = f"{ctes} SELECT * FROM grouped ORDER BY {order_by} LIMIT ? OFFSET ?"
 
     with get_db(term) as conn:
         cur = conn.cursor()
         total = cur.execute(count_sql, params).fetchone()[0]
         rows = cur.execute(list_sql, params + [page_size, offset]).fetchall()
 
-        # Bulk-fetch translations for visible card fields when lang != zh.
-        trans_by_prefix: dict = {p: {} for p in PREFIX_TO_NS}
-        if lang != "zh" and rows:
-            CARD_FIELDS = ("course_name", "classroom", "notes")
-            for prefix, ns in PREFIX_TO_NS.items():
-                ids = [int(r["id"][1:]) for r in rows if r["id"].startswith(prefix)]
-                if not ids:
-                    continue
-                placeholders = ",".join("?" * len(ids))
-                fld_placeholders = ",".join("?" * len(CARD_FIELDS))
-                tr_rows = cur.execute(
-                    f"SELECT course_id, field, text FROM {ns}.translations "
-                    f"WHERE lang=? AND course_id IN ({placeholders}) "
-                    f"AND field IN ({fld_placeholders})",
-                    [lang, *ids, *CARD_FIELDS],
-                ).fetchall()
-                store = trans_by_prefix[prefix]
-                for cid, field, text in tr_rows:
-                    if text:
-                        store.setdefault(cid, {})[field] = text
-
     courses = []
     for r in rows:
         rid = r["id"]
-        prefix = rid[0]
-        local_id = int(rid[1:])
-        trans = trans_by_prefix.get(prefix, {}).get(local_id, {})
-        # GROUP_CONCAT(DISTINCT) returns 'a,b' or '' or None. Categories and
-        # course_types have no embedded commas (verified in build_common), so
-        # splitting on ',' is safe. Empty / single-value cases collapse to a
-        # 1-element list so the frontend can iterate uniformly.
         ct_raw = r["course_type"] or ""
         cat_raw = r["category"] or ""
         courses.append(
@@ -514,7 +636,7 @@ def list_courses(
                 "id": rid,
                 "course_type": [s for s in ct_raw.split(",") if s],
                 "course_code": r["course_code"],
-                "course_name": trans.get("course_name") or r["course_name"],
+                "course_name": r["course_name"],
                 "english_name": r["english_name"],
                 "category": [s for s in cat_raw.split(",") if s],
                 "credits": r["credits"],
@@ -522,10 +644,10 @@ def list_courses(
                 "class_no": r["class_no"],
                 "department": r["department"],
                 "schedule": r["schedule"],
-                "classroom": trans.get("classroom") or r["classroom"],
+                "classroom": r["classroom"],
                 "enrollment": r["enrollment"],
                 "pnp": r["pnp"],
-                "notes": trans.get("notes") or r["notes"],
+                "notes": r["notes"],
                 "major": r["major"],
                 "grade": r["grade"],
                 "language": r["language"],

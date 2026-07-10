@@ -158,3 +158,259 @@ class DatabaseConnectionTests(unittest.TestCase):
                     response = self.health_endpoint()()
 
             self.assert_unhealthy_response(response, tmp)
+
+
+class CourseListTests(unittest.TestCase):
+    UG_DETAIL_COLUMNS = (
+        "english_name",
+        "prerequisites",
+        "intro_cn",
+        "intro_en",
+        "grading",
+        "ge_series",
+        "language",
+        "textbook",
+        "reference_book",
+        "syllabus",
+        "evaluation",
+    )
+
+    def call(self, **overrides):
+        args = dict(
+            q="",
+            type="",
+            category="",
+            credits="",
+            department="",
+            weekday="",
+            grading="",
+            classroom="",
+            sort="",
+            random_seed=0,
+            lang="zh",
+            term="fall",
+            page=1,
+            page_size=200,
+        )
+        args.update(overrides)
+        return app.list_courses(**args)
+
+    def all_courses(self, **overrides):
+        first = self.call(**overrides)
+        courses = list(first["courses"])
+        pages = (first["total"] + first["page_size"] - 1) // first["page_size"]
+        for page in range(2, pages + 1):
+            courses.extend(self.call(page=page, **overrides)["courses"])
+        self.assertEqual(len(courses), first["total"])
+        return courses
+
+    def all_ids(self, term, sort="", random_seed=0, lang="zh", q="", page_size=200):
+        courses = self.all_courses(
+            term=term,
+            sort=sort,
+            random_seed=random_seed,
+            lang=lang,
+            q=q,
+            page_size=page_size,
+        )
+        return len(courses), [course["id"] for course in courses]
+
+    def find_card(self, courses, course_code, class_no, teacher):
+        return next(
+            course
+            for course in courses
+            if course["course_code"] == course_code
+            and course["class_no"] == class_no
+            and course["teacher"] == teacher
+        )
+
+    def detail_score_sql(self):
+        return " + ".join(
+            f"CASE WHEN d.{column} IS NOT NULL "
+            f"AND TRIM(CAST(d.{column} AS TEXT)) != '' THEN 1 ELSE 0 END"
+            for column in self.UG_DETAIL_COLUMNS
+        )
+
+    def test_card_totals_keep_undergrad_and_graduate_separate(self):
+        self.assertEqual(self.call(term="fall", page_size=1)["total"], 4421)
+        self.assertEqual(self.call(term="spring", page_size=1)["total"], 3701)
+        self.assertEqual(self.call(term="summer", page_size=1)["total"], 160)
+
+    def test_filter_preserves_representative_id_and_all_badges(self):
+        with app.get_db("fall") as conn:
+            target = conn.execute(
+                """
+                SELECT course_code, class_no, teacher
+                FROM basic_info
+                WHERE TRIM(COALESCE(teacher, '')) != ''
+                GROUP BY course_code, class_no, teacher
+                HAVING COUNT(DISTINCT category) > 1
+                ORDER BY course_code, class_no, teacher
+                LIMIT 1
+                """
+            ).fetchone()
+
+        course_code, class_no, teacher = target
+        unfiltered = self.all_courses(term="fall", q=course_code)
+        card = self.find_card(unfiltered, course_code, class_no, teacher)
+        self.assertGreater(len(card["category"]), 1)
+
+        for category in card["category"]:
+            filtered = self.all_courses(term="fall", q=course_code, category=category)
+            same = self.find_card(filtered, course_code, class_no, teacher)
+            self.assertEqual(same["id"], card["id"])
+            self.assertEqual(same["category"], card["category"])
+
+    def test_representative_uses_long_detail_fields(self):
+        score_sql = self.detail_score_sql()
+        with app.get_db("spring") as conn:
+            rows = conn.execute(
+                f"""
+                SELECT b.id, b.course_code, b.class_no, b.teacher,
+                       d.evaluation, ({score_sql}) AS detail_score
+                FROM basic_info b
+                JOIN detail_info d ON d.course_id = b.id
+                WHERE b.course_code = '00137975'
+                  AND b.class_no = '1'
+                  AND b.teacher = '王杰(教授)'
+                """
+            ).fetchall()
+
+        expected = min(rows, key=lambda row: (-row["detail_score"], row["id"]))
+        smallest_id = min(rows, key=lambda row: row["id"])
+        self.assertNotEqual(expected["id"], smallest_id["id"])
+        self.assertTrue(expected["evaluation"].strip())
+        self.assertFalse((smallest_id["evaluation"] or "").strip())
+
+        courses = self.all_courses(term="spring", q=expected["course_code"])
+        card = self.find_card(
+            courses,
+            expected["course_code"],
+            expected["class_no"],
+            expected["teacher"],
+        )
+        self.assertEqual(card["id"], f"u{expected['id']}")
+
+    def test_type_filter_preserves_representative_id_and_all_badges(self):
+        courses = self.all_courses(term="spring", q="00137975")
+        card = next(course for course in courses if course["course_code"] == "00137975")
+        self.assertGreater(len(card["course_type"]), 1)
+
+        for course_type in card["course_type"]:
+            filtered = self.all_courses(term="spring", q="00137975", type=course_type)
+            same = self.find_card(filtered, card["course_code"], card["class_no"], card["teacher"])
+            self.assertEqual(same["id"], card["id"])
+            self.assertEqual(same["course_type"], card["course_type"])
+
+    def test_representative_scalar_fields_fall_back_to_a_nonblank_sibling(self):
+        score_sql = self.detail_score_sql()
+        with app.get_db("spring") as conn:
+            rows = conn.execute(
+                f"""
+                SELECT b.id, b.course_code, b.class_no, b.teacher, b.major,
+                       ({score_sql}) AS detail_score
+                FROM basic_info b
+                JOIN detail_info d ON d.course_id = b.id
+                WHERE b.course_code = '00430109'
+                  AND b.class_no = '1'
+                  AND b.teacher = '穆良柱(教授)'
+                """
+            ).fetchall()
+
+        representative = min(rows, key=lambda row: (-row["detail_score"], row["id"]))
+        sibling_major = next(row["major"] for row in rows if (row["major"] or "").strip())
+        self.assertFalse((representative["major"] or "").strip())
+
+        courses = self.all_courses(term="spring", q=representative["course_code"])
+        card = self.find_card(
+            courses,
+            representative["course_code"],
+            representative["class_no"],
+            representative["teacher"],
+        )
+        self.assertEqual(card["id"], f"u{representative['id']}")
+        self.assertEqual(card["major"], sibling_major)
+
+    def test_badge_arrays_have_deterministic_order(self):
+        courses = self.all_courses(term="fall", q="00137975")
+        card = next(course for course in courses if course["course_code"] == "00137975")
+        self.assertEqual(card["course_type"], sorted(card["course_type"]))
+        self.assertEqual(card["category"], sorted(card["category"]))
+
+    def test_translated_course_name_is_searchable(self):
+        with app.get_db("fall") as conn:
+            row = conn.execute(
+                """
+                WITH singleton AS (
+                    SELECT course_code, class_no, teacher
+                    FROM basic_info
+                    WHERE TRIM(COALESCE(teacher, '')) != ''
+                    GROUP BY course_code, class_no, teacher
+                    HAVING COUNT(*) = 1
+                )
+                SELECT b.id, t.text
+                FROM basic_info b
+                JOIN singleton USING (course_code, class_no, teacher)
+                JOIN detail_info d ON d.course_id = b.id
+                JOIN translations t
+                  ON t.course_id = b.id AND t.lang = 'ja' AND t.field = 'course_name'
+                WHERE TRIM(t.text) != ''
+                  AND t.text NOT IN (b.course_name, COALESCE(d.english_name, ''))
+                ORDER BY b.id
+                LIMIT 1
+                """
+            ).fetchone()
+
+        sample_id, translated_name = row
+        result = self.all_courses(term="fall", lang="ja", q=translated_name, sort="name_asc")
+        card = next((course for course in result if course["id"] == f"a{sample_id}"), None)
+        self.assertIsNotNone(card)
+        self.assertEqual(card["course_name"], translated_name)
+
+    def test_translated_classroom_is_searchable(self):
+        with app.get_db("fall") as conn:
+            row = conn.execute(
+                """
+                SELECT b.id, t.text
+                FROM basic_info b
+                JOIN translations t
+                  ON t.course_id = b.id AND t.lang = 'en' AND t.field = 'classroom'
+                WHERE TRIM(t.text) != '' AND t.text != b.classroom
+                ORDER BY b.id
+                LIMIT 1
+                """
+            ).fetchone()
+
+        sample_id, translated_classroom = row
+        result = self.all_courses(term="fall", lang="en", q=translated_classroom)
+        card = next((course for course in result if course["id"] == f"a{sample_id}"), None)
+        self.assertIsNotNone(card)
+        self.assertEqual(card["classroom"], translated_classroom)
+
+    def test_name_sorts_use_display_name_and_legacy_aliases(self):
+        ascending = self.all_courses(term="fall", lang="en", q="of", sort="name_asc")
+        descending = self.all_courses(term="fall", lang="en", q="of", sort="name_desc")
+        legacy_asc = self.all_courses(term="fall", lang="en", q="of", sort="pinyin")
+        legacy_desc = self.all_courses(term="fall", lang="en", q="of", sort="pinyin_desc")
+
+        ascending_names = [course["course_name"].casefold() for course in ascending]
+        descending_names = [course["course_name"].casefold() for course in descending]
+        self.assertEqual(ascending_names, sorted(ascending_names))
+        self.assertEqual(descending_names, sorted(descending_names, reverse=True))
+        self.assertEqual(
+            [course["id"] for course in ascending],
+            [course["id"] for course in legacy_asc],
+        )
+        self.assertEqual(
+            [course["id"] for course in descending],
+            [course["id"] for course in legacy_desc],
+        )
+
+    def test_random_sort_is_stable_complete_and_unique(self):
+        total, first = self.all_ids("summer", sort="random", random_seed=731, page_size=37)
+        _, second = self.all_ids("summer", sort="random", random_seed=731, page_size=37)
+        _, different_seed = self.all_ids("summer", sort="random", random_seed=947, page_size=37)
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, different_seed)
+        self.assertEqual(len(first), total)
+        self.assertEqual(len(set(first)), total)
