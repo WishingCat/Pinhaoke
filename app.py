@@ -24,6 +24,8 @@ NOT need to pass ?term= when fetching a specific course.
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+import threading
+import time
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -53,6 +55,11 @@ TERM_DBS = {
 }
 
 app = FastAPI(title="Pinhaoke")
+
+HEALTH_CACHE_TTL_SECONDS = 300
+_health_cache_lock = threading.Lock()
+_health_cache_payload = None
+_health_cache_checked_at = None
 
 
 def _readonly_uri(path: Path) -> str:
@@ -106,6 +113,24 @@ def check_database_health() -> dict:
                 }
             )
     return {"status": "ok", "databases": databases}
+
+
+def get_cached_database_health() -> dict:
+    global _health_cache_payload, _health_cache_checked_at
+
+    now = time.monotonic()
+    with _health_cache_lock:
+        if (
+            _health_cache_payload is not None
+            and _health_cache_checked_at is not None
+            and now - _health_cache_checked_at < HEALTH_CACHE_TTL_SECONDS
+        ):
+            return _health_cache_payload
+
+        payload = check_database_health()
+        _health_cache_payload = payload
+        _health_cache_checked_at = now
+        return payload
 
 
 # ---- shared SELECT fragments --------------------------------------------------
@@ -635,7 +660,7 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
 @app.get("/api/health")
 def get_health():
     try:
-        payload = check_database_health()
+        payload = get_cached_database_health()
     except (RuntimeError, sqlite3.Error):
         return JSONResponse({"status": "error"}, status_code=503, headers={"Cache-Control": "no-store"})
     return JSONResponse(payload, headers={"Cache-Control": "no-store"})
