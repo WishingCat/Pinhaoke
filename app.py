@@ -22,7 +22,9 @@ The prefix alone determines which DB the detail endpoint opens, so callers do
 NOT need to pass ?term= when fetching a specific course.
 """
 from contextlib import contextmanager
+import math
 from pathlib import Path
+import re
 import sqlite3
 import threading
 import time
@@ -54,6 +56,15 @@ TERM_DBS = {
     ],
 }
 
+VALID_TERMS = frozenset(TERM_DBS)
+VALID_LANGS = frozenset({"zh", "en", "ja", "ko", "fr", "de", "es", "ru"})
+VALID_WEEKDAYS = frozenset({"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"})
+VALID_SORTS = frozenset({
+    "", "name_asc", "name_desc", "pinyin", "pinyin_desc",
+    "credits_asc", "credits_desc", "time_asc", "random",
+})
+COURSE_ID_RE = re.compile(r"^[ugsar][1-9][0-9]*$")
+
 app = FastAPI(title="Pinhaoke")
 
 HEALTH_CACHE_TTL_SECONDS = 300
@@ -70,7 +81,7 @@ def _readonly_uri(path: Path) -> str:
 def get_db(term: str = "fall"):
     config = TERM_DBS.get(term)
     if config is None:
-        raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
+        raise HTTPException(status_code=422, detail="Invalid course query parameter")
     conn = None
     try:
         conn = sqlite3.connect(_readonly_uri(config[0][1]), uri=True)
@@ -291,7 +302,15 @@ TERM_LIST_SELECTS = {
 
 
 @app.get("/api/filters")
-def get_filters(term: str = Query("fall", description="spring | summer | fall")):
+def get_filters(
+    term: str = Query(
+        "fall",
+        description="spring | summer | fall",
+        pattern=r"^(?:spring|summer|fall)$",
+    ),
+):
+    if term not in VALID_TERMS:
+        raise HTTPException(status_code=422, detail="Invalid course query parameter")
     with get_db(term) as conn:
         c = conn.cursor()
 
@@ -681,6 +700,45 @@ def _course_order_by(sort: str, term: str, random_seed: int) -> str:
     return f"{sociology_priority}{name_asc}"
 
 
+def _validate_list_params(
+    term: str,
+    lang: str,
+    weekday: str,
+    sort: str,
+    credits: str,
+    page: int,
+    page_size: int,
+) -> float | None:
+    try:
+        invalid_choice = (
+            term not in VALID_TERMS
+            or lang not in VALID_LANGS
+            or weekday not in VALID_WEEKDAYS
+            or sort not in VALID_SORTS
+        )
+    except TypeError:
+        invalid_choice = True
+    if (
+        invalid_choice
+        or isinstance(page, bool)
+        or not isinstance(page, int)
+        or not 1 <= page <= 10000
+        or isinstance(page_size, bool)
+        or not isinstance(page_size, int)
+        or not 1 <= page_size <= 200
+    ):
+        raise HTTPException(status_code=422, detail="Invalid course query parameter")
+    if not credits:
+        return None
+    try:
+        value = float(credits)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid credits") from exc
+    if not math.isfinite(value):
+        raise HTTPException(status_code=422, detail="Invalid credits")
+    return value
+
+
 @app.get("/api/courses")
 def list_courses(
     q: str = Query("", description="Search query (course name / teacher / classroom / course code / english name)"),
@@ -688,18 +746,21 @@ def list_courses(
     category: str = Query("", description="Category filter"),
     credits: str = Query("", description="Credits filter"),
     department: str = Query("", description="Department filter"),
-    weekday: str = Query("", description="Weekday filter"),
+    weekday: str = Query("", description="Weekday filter", pattern=r"^(?:|周[一二三四五六日])$"),
     grading: str = Query("", description="Grading filter"),
     classroom: str = Query("", description="Classroom filter (LIKE, classroom column only)"),
-    sort: str = Query("", description="Sort: name_asc | name_desc | pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random"),
+    sort: str = Query(
+        "",
+        description="Sort: name_asc | name_desc | pinyin | pinyin_desc | credits_asc | credits_desc | time_asc | random",
+        pattern=r"^(?:|name_asc|name_desc|pinyin|pinyin_desc|credits_asc|credits_desc|time_asc|random)$",
+    ),
     random_seed: int = Query(0, description="Seed used by sort=random; same seed → same order"),
-    lang: str = Query("zh", description="Display language"),
-    term: str = Query("fall", description="spring | summer | fall"),
-    page: int = Query(1, ge=1),
+    lang: str = Query("zh", description="Display language", pattern=r"^(?:zh|en|ja|ko|fr|de|es|ru)$"),
+    term: str = Query("fall", description="spring | summer | fall", pattern=r"^(?:spring|summer|fall)$"),
+    page: int = Query(1, ge=1, le=10000),
     page_size: int = Query(50, ge=1, le=200),
 ):
-    if term not in TERM_UNION_SQL:
-        raise HTTPException(status_code=400, detail=f"Unknown term: {term}")
+    _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
 
     filters = {
         "q": q,
@@ -769,17 +830,13 @@ def _parse_id(course_id: str):
     level is the single-char id prefix ('u' / 'g' / 's' / 'a' / 'r'); term tells get_db()
     which DBs to open.
     """
-    if not course_id:
+    if not isinstance(course_id, str) or not COURSE_ID_RE.fullmatch(course_id):
         return None, None, None
     prefix = course_id[0]
     term = _PREFIX_TERM.get(prefix)
     if term is None:
         return None, None, None
-    try:
-        local_id = int(course_id[1:])
-    except ValueError:
-        return None, None, None
-    return term, prefix, local_id
+    return term, prefix, int(course_id[1:])
 
 
 # Fields the translations table can override per (course_id, field, lang).
@@ -789,7 +846,7 @@ TRANSLATABLE_FIELDS = (
     "course_name", "notes", "pnp", "classroom", "major",
     "prerequisites", "ge_series", "audience", "term",
     "syllabus", "evaluation",
-    "intro_cn", "extra_notes",
+    "intro_cn", "extra_notes", "textbook", "reference_book",
 )
 
 
@@ -803,7 +860,7 @@ def _apply_translations(cur, ns: str, local_id: int, lang: str, out: dict):
         (local_id, lang),
     ).fetchall()
     for field, text in rows:
-        if field in TRANSLATABLE_FIELDS and text:
+        if field in TRANSLATABLE_FIELDS and isinstance(text, str) and text.strip():
             out[field] = text
 
 
@@ -818,6 +875,7 @@ _UG_DETAIL_SELECT = """
            b.enrollment, b.pnp, b.notes,
            d.english_name, d.prerequisites, d.intro_cn, d.intro_en,
            d.grading, d.ge_series, d.language,
+           d.textbook, d.reference_book,
            d.syllabus, d.evaluation
     FROM basic_info b
     LEFT JOIN detail_info d ON d.course_id = b.id
@@ -832,6 +890,7 @@ _GR_DETAIL_SELECT = """
            b.enrollment, '' AS pnp, b.notes,
            d.english_name,
            d.weekly_hours, d.total_hours, d.term, d.audience,
+           '' AS textbook, d.reference_book,
            d.intro AS intro_cn, d.extra_notes,
            {syllabus_expr} AS syllabus
     FROM gr.basic_info b
@@ -841,7 +900,12 @@ _GR_DETAIL_SELECT = """
 
 
 @app.get("/api/courses/{course_id}")
-def get_course_detail(course_id: str, lang: str = Query("zh")):
+def get_course_detail(
+    course_id: str,
+    lang: str = Query("zh", pattern=r"^(?:zh|en|ja|ko|fr|de|es|ru)$"),
+):
+    if lang not in VALID_LANGS:
+        raise HTTPException(status_code=422, detail="Invalid course query parameter")
     term, level, local_id = _parse_id(course_id)
     if level is None:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -868,6 +932,7 @@ def get_course_detail(course_id: str, lang: str = Query("zh")):
     for k in (
         "english_name", "prerequisites", "intro_cn", "intro_en",
         "grading", "ge_series", "language",
+        "textbook", "reference_book",
         "syllabus", "evaluation",
         "weekly_hours", "total_hours", "term", "audience", "extra_notes",
     ):

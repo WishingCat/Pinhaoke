@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import app
 
@@ -554,3 +554,119 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(total, 4421)
         plan_details = [step["detail"] for step in plan]
         self.assertFalse(any("ranked" in detail or "badges" in detail for detail in plan_details))
+
+
+class ValidationAndDetailTests(unittest.TestCase):
+    def list_args(self, **overrides):
+        args = {
+            "q": "",
+            "type": "",
+            "category": "",
+            "credits": "",
+            "department": "",
+            "weekday": "",
+            "grading": "",
+            "classroom": "",
+            "sort": "",
+            "random_seed": 0,
+            "lang": "zh",
+            "term": "fall",
+            "page": 1,
+            "page_size": 20,
+        }
+        args.update(overrides)
+        return args
+
+    def test_course_id_is_canonical(self):
+        self.assertEqual(app._parse_id("a1"), ("fall", "a", 1))
+        for value in ("", "a0", "a01", "a+1", "a-1", "a 1", "a1 ", " x1", "x1"):
+            self.assertEqual(app._parse_id(value), (None, None, None))
+
+    def test_invalid_filter_values_raise_422(self):
+        invalid_values = (
+            ("credits", "abc"),
+            ("credits", "NaN"),
+            ("credits", "Infinity"),
+            ("weekday", "%"),
+            ("lang", "xx"),
+            ("sort", "drop"),
+            ("term", "winter"),
+            ("page", 0),
+            ("page", 10001),
+            ("page_size", 0),
+            ("page_size", 201),
+        )
+        for key, value in invalid_values:
+            with self.subTest(key=key, value=value):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.list_courses(**self.list_args(**{key: value}))
+                self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_invalid_filter_term_raises_422(self):
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.get_filters("winter")
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_valid_but_out_of_range_page_is_empty(self):
+        result = app.list_courses(**self.list_args(term="summer", page=10000))
+        self.assertEqual(result["courses"], [])
+
+    def test_detail_language_is_validated_before_opening_database(self):
+        with patch.object(app, "get_db") as get_db:
+            with self.assertRaises(app.HTTPException) as ctx:
+                app.get_course_detail("a1", lang="xx")
+        self.assertEqual(ctx.exception.status_code, 422)
+        get_db.assert_not_called()
+
+    def test_undergraduate_detail_exposes_books(self):
+        detail = app.get_course_detail("a1", lang="zh")
+        self.assertIn("textbook", detail)
+        self.assertIn("reference_book", detail)
+
+    def test_graduate_detail_has_empty_textbook_and_source_reference_book(self):
+        with app.get_db("fall") as conn:
+            row = conn.execute(
+                """
+                SELECT b.id, d.reference_book
+                FROM gr.basic_info b
+                JOIN gr.detail_info d ON d.course_id = b.id
+                WHERE TRIM(COALESCE(d.reference_book, '')) != ''
+                ORDER BY b.id
+                LIMIT 1
+                """
+            ).fetchone()
+
+        detail = app.get_course_detail(f"r{row['id']}", lang="zh")
+        self.assertEqual(detail["textbook"], "")
+        self.assertEqual(detail["reference_book"], row["reference_book"])
+
+    def test_translated_book_field_replaces_source_text(self):
+        with app.get_db("fall") as conn:
+            row = conn.execute(
+                """
+                SELECT b.id, t.field, t.text, d.textbook, d.reference_book
+                FROM translations t
+                JOIN basic_info b ON b.id = t.course_id
+                JOIN detail_info d ON d.course_id = b.id
+                WHERE t.lang = 'en'
+                  AND t.field IN ('textbook', 'reference_book')
+                  AND TRIM(t.text) != ''
+                  AND t.text != CASE t.field
+                      WHEN 'textbook' THEN COALESCE(d.textbook, '')
+                      ELSE COALESCE(d.reference_book, '')
+                  END
+                ORDER BY b.id, t.field
+                LIMIT 1
+                """
+            ).fetchone()
+
+        self.assertIsNotNone(row)
+        detail = app.get_course_detail(f"a{row['id']}", lang="en")
+        self.assertEqual(detail[row["field"]], row["text"])
+
+    def test_blank_translation_does_not_replace_original(self):
+        out = {"course_name": "Original name"}
+        cursor = Mock()
+        cursor.execute.return_value.fetchall.return_value = [("course_name", "   ")]
+        app._apply_translations(cursor, "main", 1, "en", out)
+        self.assertEqual(out["course_name"], "Original name")
