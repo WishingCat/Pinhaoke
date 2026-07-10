@@ -2,8 +2,9 @@ import copy
 import importlib
 import json
 import os
-import runpy
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import closing
@@ -220,6 +221,18 @@ class AtomicDatabaseTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), b"official")
             self.assert_only_target_remains(tmp, target)
 
+    def test_writable_connection_attribute_cannot_forge_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "courses.db"
+            target.write_bytes(b"official")
+
+            with self.assertRaisesRegex(RuntimeError, "validate_built_database"):
+                with atomic_database(target, atomic_schema()) as conn:
+                    conn.validated_expected_rows = 0
+
+            self.assertEqual(target.read_bytes(), b"official")
+            self.assert_only_target_remains(tmp, target)
+
     def test_success_uses_unique_temp_in_target_directory_and_replaces(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "courses.db"
@@ -246,10 +259,35 @@ class AtomicDatabaseTests(unittest.TestCase):
                 )
                 self.assertEqual(conn.execute("PRAGMA integrity_check").fetchall(), [("ok",)])
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits are required")
+    def test_success_preserves_existing_target_permission_bits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "courses.db"
+
+            for mode in (0o600, 0o640, 0o644):
+                with self.subTest(mode=oct(mode)):
+                    target.write_bytes(b"official")
+                    target.chmod(mode)
+                    with atomic_database(target, atomic_schema()) as conn:
+                        validate_built_database(conn, expected_rows=0)
+
+                    self.assertEqual(target.stat().st_mode & 0o777, mode)
+
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits are required")
+    def test_new_target_uses_normal_readable_database_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "courses.db"
+
+            with atomic_database(target, atomic_schema()) as conn:
+                validate_built_database(conn, expected_rows=0)
+
+            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+
     def test_replacement_failure_keeps_existing_bytes_and_removes_temp(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "courses.db"
             target.write_bytes(b"official")
+            target.chmod(0o640)
 
             with mock.patch(
                 "数据库构建脚本.build_atomic.os.replace",
@@ -262,6 +300,7 @@ class AtomicDatabaseTests(unittest.TestCase):
                         validate_built_database(conn, expected_rows=1)
 
             self.assertEqual(target.read_bytes(), b"official")
+            self.assertEqual(target.stat().st_mode & 0o777, 0o640)
             self.assert_only_target_remains(tmp, target)
 
 
@@ -333,13 +372,63 @@ class SchemaContractTests(BuilderTestCase):
                 finally:
                     conn.close()
 
-    def test_all_builders_import_as_modules_and_script_files(self):
-        for name, _module_name, script_path, _kind in BUILDER_SPECS:
-            with self.subTest(builder=name):
-                namespace = runpy.run_path(
-                    str(script_path), run_name=f"builder_import_{name}"
+
+class BuilderImportTests(unittest.TestCase):
+    def test_all_builders_import_in_clean_isolated_subprocesses(self):
+        module_probe = """
+import importlib
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root))
+module = importlib.import_module(sys.argv[2])
+assert callable(module.build)
+"""
+        script_probe = """
+import pathlib
+import runpy
+import sys
+
+script = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(script.parent))
+namespace = runpy.run_path(str(script), run_name="builder_import_probe")
+assert callable(namespace["build"])
+"""
+        clean_environment = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONIOENCODING": "utf-8",
+        }
+        database_dir = PROJECT_ROOT / "数据库"
+        before = {
+            path.name: (path.stat().st_size, path.stat().st_mtime_ns)
+            for path in database_dir.glob("*.db")
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, module_name, script_path, _kind in BUILDER_SPECS:
+                probes = (
+                    ("module", module_probe, (str(PROJECT_ROOT), module_name)),
+                    ("script", script_probe, (str(script_path),)),
                 )
-                self.assertIn("build", namespace)
+                for probe_name, probe, arguments in probes:
+                    with self.subTest(builder=name, probe=probe_name):
+                        completed = subprocess.run(
+                            [sys.executable, "-I", "-c", probe, *arguments],
+                            cwd=tmp,
+                            env=clean_environment,
+                            capture_output=True,
+                            text=True,
+                            check=False,
+                        )
+                        self.assertEqual(completed.returncode, 0, completed.stderr)
+                        self.assertEqual(completed.stdout, "")
+
+        after = {
+            path.name: (path.stat().st_size, path.stat().st_mtime_ns)
+            for path in database_dir.glob("*.db")
+        }
+        self.assertEqual(after, before)
 
 
 class BuilderEndToEndTests(BuilderTestCase):

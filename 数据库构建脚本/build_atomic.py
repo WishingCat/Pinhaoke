@@ -4,7 +4,9 @@ import json
 import math
 import os
 import sqlite3
+import stat
 import tempfile
+import weakref
 from collections.abc import Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -13,10 +15,12 @@ from pathlib import Path
 
 REQUIRED_TABLES = {"basic_info", "detail_info", "translations"}
 TRANSLATIONS_PRIMARY_KEY = ("course_id", "field", "lang")
+NEW_DATABASE_MODE = 0o644
+_VALIDATED_CONNECTIONS = weakref.WeakKeyDictionary()
 
 
 class _AtomicConnection(sqlite3.Connection):
-    validated_expected_rows = None
+    pass
 
 
 def _remove_database_files(path):
@@ -24,7 +28,12 @@ def _remove_database_files(path):
         Path(f"{path}{suffix}").unlink(missing_ok=True)
 
 
-def _prepare_replacement(path):
+def _prepare_replacement(path, target):
+    try:
+        replacement_mode = stat.S_IMODE(target.stat().st_mode)
+    except FileNotFoundError:
+        replacement_mode = NEW_DATABASE_MODE
+    path.chmod(replacement_mode)
     with path.open("rb") as database_file:
         os.fsync(database_file.fileno())
 
@@ -51,7 +60,7 @@ def atomic_database(target: Path, schema: str):
         conn.executescript(schema)
         yield conn
 
-        expected_rows = conn.validated_expected_rows
+        expected_rows = _VALIDATED_CONNECTIONS.get(conn)
         if expected_rows is None:
             raise RuntimeError(
                 "validate_built_database must succeed before atomic replacement"
@@ -59,10 +68,11 @@ def atomic_database(target: Path, schema: str):
         validate_built_database(conn, expected_rows=expected_rows)
         conn.commit()
         validate_built_database(conn, expected_rows=expected_rows)
+        _VALIDATED_CONNECTIONS.pop(conn, None)
         conn.close()
         conn = None
 
-        _prepare_replacement(temp_path)
+        _prepare_replacement(temp_path, target)
         os.replace(temp_path, target)
         temp_path = None
     except BaseException:
@@ -70,6 +80,7 @@ def atomic_database(target: Path, schema: str):
             with suppress(OSError):
                 os.close(descriptor)
         if conn is not None:
+            _VALIDATED_CONNECTIONS.pop(conn, None)
             with suppress(BaseException):
                 conn.close()
         if temp_path is not None:
@@ -132,7 +143,7 @@ def validate_built_database(
         )
 
     if isinstance(conn, _AtomicConnection):
-        conn.validated_expected_rows = expected_rows
+        _VALIDATED_CONNECTIONS[conn] = expected_rows
 
 
 @dataclass(frozen=True)
