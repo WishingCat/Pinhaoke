@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -41,6 +42,177 @@ def run_node(path: Path, harness: str) -> dict:
     if result.returncode:
         raise AssertionError(
             f"Node contract failed for {path.name}:\n{result.stderr}\n{result.stdout}"
+        )
+    return json.loads(result.stdout)
+
+
+def run_full_node(path: Path, scenario: str) -> dict:
+    source = path.read_text(encoding="utf-8")
+    term = re.search(r'const TERM = "([^"]+)";', source).group(1)
+    query_path = (
+        "/elective2008/edu/pku/stu/elective/controller/"
+        "courseQuery/getCurriculmByForm.do"
+    )
+    detail_path = (
+        "/elective2008/edu/pku/stu/elective/controller/"
+        "courseQuery/goNested.do"
+    )
+    basic_headers = [
+        "课程号", "课程名", "课程类别", "学分", "教师", "班号", "开课单位",
+        "专业", "年级", "上课时间及教室", "限数已选", "备注",
+    ]
+    if "graduate" not in path.name:
+        basic_headers.insert(-1, "自选PNP")
+    prelude = f'''
+const scenario = {json.dumps(scenario)};
+const expectedOrigin = "https://elective.pku.edu.cn";
+const expectedQueryPath = {json.dumps(query_path)};
+const expectedDetailPath = {json.dumps(detail_path)};
+const fixtureHeaders = {json.dumps(basic_headers, ensure_ascii=False)};
+const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
+let timerId = 0;
+const activeTimers = new Set();
+globalThis.setTimeout = (callback) => {{
+  const id = ++timerId;
+  activeTimers.add(id);
+  queueMicrotask(() => {{
+    if (!activeTimers.delete(id)) return;
+    callback();
+  }});
+  return id;
+}};
+globalThis.clearTimeout = (id) => activeTimers.delete(id);
+globalThis.location = {{
+  origin: expectedOrigin,
+  pathname: expectedQueryPath,
+  href: `${{expectedOrigin}}${{expectedQueryPath}}`,
+}};
+globalThis.Node = {{ TEXT_NODE: 3, ELEMENT_NODE: 1 }};
+const textNode = (value) => ({{ nodeType: Node.TEXT_NODE, nodeValue: value }});
+const element = (tagName, value = "") => ({{
+  nodeType: Node.ELEMENT_NODE,
+  tagName,
+  childNodes: [textNode(value)],
+  textContent: value,
+  querySelector: () => null,
+}});
+const headerCells = fixtureHeaders.map((value) => element("TH", value));
+const headerRow = {{
+  nodeType: Node.ELEMENT_NODE,
+  tagName: "TR",
+  childNodes: headerCells,
+  children: headerCells,
+  querySelector: (selector) => selector === "th" ? headerCells[0] : null,
+}};
+const detailHref = `${{expectedOrigin}}${{expectedDetailPath}}?course_seq_no=SEQ-1`;
+const dataCells = fixtureHeaders.map((value, index) => {{
+  const cell = element("TD", index === 0 ? "COURSE-1" : `${{value}}-value`);
+  if (index === 0) {{
+    cell.querySelector = (selector) => selector.includes("goNested.do")
+      ? {{ getAttribute: () => detailHref }}
+      : null;
+  }}
+  return cell;
+}});
+const dataRow = {{
+  nodeType: Node.ELEMENT_NODE,
+  tagName: "TR",
+  childNodes: dataCells,
+  children: dataCells,
+  querySelector: () => null,
+}};
+const listTable = {{
+  querySelectorAll: (selector) => selector === "tr"
+    ? [headerRow, dataRow]
+    : selector === "th" ? headerCells : [],
+}};
+const emptyBody = element("BODY", "Page 1 of 1");
+globalThis.DOMParser = class {{
+  parseFromString(html) {{
+    if (html === "VALID_LIST") {{
+      return {{
+        body: emptyBody,
+        querySelector: (selector) => selector === "table.datagrid" ? listTable : null,
+        querySelectorAll: (selector) => selector.includes("netui_row") ? [] : [],
+      }};
+    }}
+    return {{
+      body: element("BODY", "random login html"),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    }};
+  }}
+}};
+const statusBox = {{ textContent: "" }};
+globalThis.document = {{
+  title: "",
+  body: {{ innerText: `page ${{{json.dumps(term)}}}`, appendChild: () => {{}} }},
+  getElementById: () => statusBox,
+  createElement: () => statusBox,
+  documentElement: {{ appendChild: () => {{}} }},
+}};
+let doneCalls = 0;
+let fatalProgress = false;
+let unhandled = "";
+process.on("unhandledRejection", (error) => {{ unhandled = String(error && error.message || error); }});
+const headers = (contentType) => ({{
+  get: (name) => name.toLowerCase() === "content-type" ? contentType : null,
+}});
+const response = ({{ status = 200, url, redirected = false, html = "", contentType = "text/html; charset=UTF-8" }}) => ({{
+  ok: status >= 200 && status < 300,
+  status,
+  url,
+  redirected,
+  headers: headers(contentType),
+  text: async () => html,
+}});
+globalThis.fetch = async (url, options = {{}}) => {{
+  const value = String(url);
+  if (value.endsWith("/progress")) {{
+    fatalProgress = fatalProgress || String(options.body || "").includes('"stage":"fatal"');
+    return response({{ url: value, html: "ok", contentType: "text/plain; charset=utf-8" }});
+  }}
+  if (value.endsWith("/done")) {{
+    doneCalls += 1;
+    return response({{ url: value, html: "ok", contentType: "text/plain; charset=utf-8" }});
+  }}
+  const requested = new URL(value, expectedOrigin);
+  if (requested.pathname === expectedDetailPath) {{
+    return response({{ url: requested.href, html: "INVALID_DETAIL" }});
+  }}
+  if (scenario === "redirected_login") {{
+    return response({{
+      url: `${{expectedOrigin}}/elective2008/login.do`,
+      redirected: true,
+      html: "random login html",
+    }});
+  }}
+  return response({{
+    url: requested.href,
+    html: scenario === "invalid_detail" ? "VALID_LIST" : "random login html",
+  }});
+}};
+'''
+    epilogue = '''
+realSetTimeout(() => {
+  globalThis.setTimeout = realSetTimeout;
+  globalThis.clearTimeout = realClearTimeout;
+  console.log(JSON.stringify({ doneCalls, fatalProgress, unhandled }));
+}, 25);
+'''
+    program = prelude + "\n" + source + "\n" + epilogue
+    result = subprocess.run(
+        ["node", "-e", program],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    if result.returncode:
+        raise AssertionError(
+            f"Full-script probe failed for {path.name} ({scenario}):\n"
+            f"{result.stderr}\n{result.stdout}"
         )
     return json.loads(result.stdout)
 
@@ -164,6 +336,14 @@ globalThis.setTimeout = (callback, delay) => {
   return id;
 };
 globalThis.clearTimeout = (id) => activeTimers.delete(id);
+const htmlResponse = ({ status = 200, url = `${PKU_ORIGIN}${QUERY_PATH}`, redirected = false, html = "ok", contentType = "text/html; charset=UTF-8" } = {}) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  url,
+  redirected,
+  headers: { get: (name) => name.toLowerCase() === "content-type" ? contentType : null },
+  text: async () => html,
+});
 
 const calls = [];
 let attempt = 0;
@@ -171,9 +351,9 @@ globalThis.fetch = async (url, options) => {
   calls.push({ url, options });
   attempt += 1;
   if (attempt < 3) {
-    return { ok: false, status: 503, text: async () => "busy" };
+    return htmlResponse({ status: 503, html: "busy", contentType: "text/plain" });
   }
-  return { ok: true, status: 200, text: async () => "ok" };
+  return htmlResponse();
 };
 const html = await fetchText(QUERY_PATH, {
   method: "POST",
@@ -193,7 +373,7 @@ const transient = {
 let deterministicAttempts = 0;
 globalThis.fetch = async () => {
   deterministicAttempts += 1;
-  return { ok: false, status: 404, text: async () => "missing" };
+  return htmlResponse({ status: 404, html: "missing", contentType: "text/plain" });
 };
 let deterministicError = "";
 try { await fetchText(QUERY_PATH); } catch (error) { deterministicError = error.message; }
@@ -201,10 +381,59 @@ try { await fetchText(QUERY_PATH); } catch (error) { deterministicError = error.
 let promptAttempts = 0;
 globalThis.fetch = async () => {
   promptAttempts += 1;
-  return { ok: true, status: 200, text: async () => "<title>系统提示</title>" };
+  return htmlResponse({ html: "<title>系统提示</title>" });
 };
 let promptError = "";
 try { await fetchText(QUERY_PATH); } catch (error) { promptError = error.message; }
+
+let redirectedAttempts = 0;
+globalThis.fetch = async () => {
+  redirectedAttempts += 1;
+  return htmlResponse({
+    redirected: true,
+    url: `${PKU_ORIGIN}/elective2008/login.do`,
+    html: "login",
+  });
+};
+let redirectedError = "";
+try { await fetchText(QUERY_PATH); } catch (error) { redirectedError = error.message; }
+
+let wrongUrlAttempts = 0;
+globalThis.fetch = async () => {
+  wrongUrlAttempts += 1;
+  return htmlResponse({ url: `${PKU_ORIGIN}/elective2008/login.do`, html: "login" });
+};
+let wrongUrlError = "";
+try { await fetchText(QUERY_PATH); } catch (error) { wrongUrlError = error.message; }
+
+let contentTypeAttempts = 0;
+globalThis.fetch = async () => {
+  contentTypeAttempts += 1;
+  return htmlResponse({ html: "not html", contentType: "text/plain; charset=utf-8" });
+};
+let contentTypeError = "";
+try { await fetchText(QUERY_PATH); } catch (error) { contentTypeError = error.message; }
+
+const acceptedContentTypes = [];
+for (const contentType of ["text/html", "text/html;charset=UTF-8", 'text/html; charset="UTF-8"']) {
+  globalThis.fetch = async () => htmlResponse({ html: contentType, contentType });
+  acceptedContentTypes.push(await fetchText(QUERY_PATH));
+}
+
+const transientStatuses = {};
+for (const status of [408, 429, 500]) {
+  let statusAttempts = 0;
+  globalThis.fetch = async () => {
+    statusAttempts += 1;
+    return statusAttempts === 1
+      ? htmlResponse({ status, html: "transient", contentType: "text/plain" })
+      : htmlResponse({ html: `recovered-${status}` });
+  };
+  transientStatuses[status] = {
+    html: await fetchText(QUERY_PATH, {}, 1),
+    attempts: statusAttempts,
+  };
+}
 
 let timeoutAttempts = 0;
 const timeoutSignals = [];
@@ -228,6 +457,14 @@ console.log(JSON.stringify({
   deterministicError,
   promptAttempts,
   promptError,
+  redirectedAttempts,
+  redirectedError,
+  wrongUrlAttempts,
+  wrongUrlError,
+  contentTypeAttempts,
+  contentTypeError,
+  acceptedContentTypes,
+  transientStatuses,
   timeoutAttempts,
   timeoutSignalsUnique: new Set(timeoutSignals).size,
   finalActiveTimers: activeTimers.size,
@@ -245,9 +482,115 @@ console.log(JSON.stringify({
             self.assertIn("404", result["deterministicError"], path.name)
             self.assertEqual(result["promptAttempts"], 1, path.name)
             self.assertIn("PKU_SYSTEM_PROMPT", result["promptError"], path.name)
+            self.assertEqual(result["redirectedAttempts"], 1, path.name)
+            self.assertIn("redirect", result["redirectedError"].lower(), path.name)
+            self.assertEqual(result["wrongUrlAttempts"], 1, path.name)
+            self.assertIn("response url", result["wrongUrlError"].lower(), path.name)
+            self.assertEqual(result["contentTypeAttempts"], 1, path.name)
+            self.assertIn("content-type", result["contentTypeError"].lower(), path.name)
+            self.assertEqual(
+                result["acceptedContentTypes"],
+                ["text/html", "text/html;charset=UTF-8", 'text/html; charset="UTF-8"'],
+                path.name,
+            )
+            for status in ("408", "429", "500"):
+                self.assertEqual(result["transientStatuses"][status]["attempts"], 2, path.name)
+                self.assertEqual(
+                    result["transientStatuses"][status]["html"],
+                    f"recovered-{status}",
+                    path.name,
+                )
             self.assertEqual(result["timeoutAttempts"], 3, path.name)
             self.assertEqual(result["timeoutSignalsUnique"], 3, path.name)
             self.assertEqual(result["finalActiveTimers"], 0, path.name)
+
+    def test_list_and_detail_parsers_reject_unrecognized_html(self):
+        harness = r'''
+globalThis.Node = { TEXT_NODE: 3, ELEMENT_NODE: 1 };
+const textNode = (value) => ({ nodeType: Node.TEXT_NODE, nodeValue: value });
+const element = (tagName, value = "") => ({
+  nodeType: Node.ELEMENT_NODE,
+  tagName,
+  childNodes: [textNode(value)],
+  textContent: value,
+  querySelector: () => null,
+});
+const row = (cells, header = false) => ({
+  nodeType: Node.ELEMENT_NODE,
+  tagName: "TR",
+  childNodes: cells,
+  children: cells,
+  querySelector: (selector) => selector === "th" && header ? cells[0] : null,
+});
+const table = (headers, dataRows = []) => {
+  const headerCells = headers.map((value) => element("TH", value));
+  const rows = [row(headerCells, true), ...dataRows];
+  return {
+    querySelectorAll: (selector) => selector === "tr" ? rows : selector === "th" ? headerCells : [],
+  };
+};
+const validEmptyTable = table(BASIC_HEADERS);
+const missingHeaderTable = table(["not", "course", "headers"]);
+const reorderedHeaderTable = table([...BASIC_HEADERS].reverse());
+const shortCells = [element("TD", "only"), element("TD", "two")];
+const malformedTable = table(BASIC_HEADERS, [row(shortCells)]);
+const blankDetailCells = [element("TH", "英文名称"), element("TD", "")];
+const blankDetailRow = row(blankDetailCells);
+globalThis.DOMParser = class {
+  parseFromString(html) {
+    const selectedTable = html === "VALID_EMPTY_LIST" ? validEmptyTable
+      : html === "MISSING_HEADERS" ? missingHeaderTable
+      : html === "REORDERED_HEADERS" ? reorderedHeaderTable
+      : html === "MALFORMED_ROW" ? malformedTable
+      : null;
+    return {
+      body: element("BODY", html === "INVALID_DETAIL" ? "random login html" : ""),
+      querySelector: (selector) => selector === "table.datagrid" ? selectedTable : null,
+      querySelectorAll: (selector) => selector === "tr" && html === "BLANK_DETAIL_LABEL"
+        ? [blankDetailRow]
+        : [],
+    };
+  }
+};
+const typeName = typeof COURSE_TYPES === "undefined" ? undefined : COURSE_TYPES[0][0];
+const emptyRows = parseRows("VALID_EMPTY_LIST", typeName);
+let missingHeadersRejected = false;
+try { parseRows("MISSING_HEADERS", typeName); } catch (_) { missingHeadersRejected = true; }
+let reorderedHeadersRejected = false;
+try { parseRows("REORDERED_HEADERS", typeName); } catch (_) { reorderedHeadersRejected = true; }
+let malformedRowRejected = false;
+try { parseRows("MALFORMED_ROW", typeName); } catch (_) { malformedRowRejected = true; }
+let invalidDetailRejected = false;
+try { parseDetail("INVALID_DETAIL"); } catch (_) { invalidDetailRejected = true; }
+const blankDetail = parseDetail("BLANK_DETAIL_LABEL");
+console.log(JSON.stringify({
+  emptyRows: emptyRows.length,
+  missingHeadersRejected,
+  reorderedHeadersRejected,
+  malformedRowRejected,
+  invalidDetailRejected,
+  blankDetailKeys: Object.keys(blankDetail).sort(),
+  blankDetailValues: Object.values(blankDetail),
+}));
+'''
+        for path in SCRIPTS:
+            result = run_node(path, harness)
+            self.assertEqual(result["emptyRows"], 0, path.name)
+            self.assertTrue(result["missingHeadersRejected"], path.name)
+            self.assertTrue(result["reorderedHeadersRejected"], path.name)
+            self.assertTrue(result["malformedRowRejected"], path.name)
+            self.assertTrue(result["invalidDetailRejected"], path.name)
+            self.assertTrue(result["blankDetailValues"], path.name)
+            self.assertTrue(all(value == "" for value in result["blankDetailValues"]), path.name)
+
+    def test_auth_and_parser_failures_never_reach_done(self):
+        for path in SCRIPTS:
+            for scenario in ("redirected_login", "random_list", "invalid_detail"):
+                with self.subTest(script=path.name, scenario=scenario):
+                    result = run_full_node(path, scenario)
+                    self.assertEqual(result["doneCalls"], 0)
+                    self.assertTrue(result["fatalProgress"])
+                    self.assertTrue(result["unhandled"])
 
     def test_detail_cache_shares_inflight_work_and_evicts_failures(self):
         harness = r'''

@@ -149,6 +149,43 @@
     }
   }
 
+  function assertExpectedHtmlResponse(response, path) {
+    if (response.redirected) {
+      const error = new Error(`redirected PKU response: ${path}`);
+      error.retryable = false;
+      throw error;
+    }
+    let finalUrl;
+    try {
+      finalUrl = new URL(response.url);
+    } catch (_) {
+      const error = new Error(`invalid PKU response URL: ${response.url || "missing"}`);
+      error.retryable = false;
+      throw error;
+    }
+    const expectedUrl = new URL(path, PKU_ORIGIN);
+    if (
+      finalUrl.origin !== PKU_ORIGIN
+      || finalUrl.protocol !== "https:"
+      || finalUrl.host !== "elective.pku.edu.cn"
+      || finalUrl.username
+      || finalUrl.password
+      || finalUrl.pathname !== expectedUrl.pathname
+    ) {
+      const error = new Error(`unexpected PKU response URL: ${finalUrl.href}`);
+      error.retryable = false;
+      throw error;
+    }
+    const contentType = response.headers && response.headers.get("content-type");
+    const parts = String(contentType || "").split(";").map((part) => part.trim());
+    const validCharset = parts.slice(1).every((part) => /^charset\s*=\s*(?:"[^"]+"|[^\s;]+)$/i.test(part));
+    if (parts[0].toLowerCase() !== "text/html" || !validCharset) {
+      const error = new Error(`unexpected PKU Content-Type: ${contentType || "missing"}`);
+      error.retryable = false;
+      throw error;
+    }
+  }
+
   async function fetchText(path, options = {}, retries = 2) {
     assertAllowedPkuPath(path);
     const {
@@ -176,16 +213,17 @@
           headers,
           signal: controller.signal,
         });
+        if (!response.ok) {
+          const error = new Error(`${path} HTTP ${response.status}`);
+          error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+          throw error;
+        }
+        assertExpectedHtmlResponse(response, path);
         const html = await response.text();
         const probe = html.slice(0, 10000);
         if (probe.includes("提示:请不要用刷课机刷课") || probe.includes("<title>系统提示</title>")) {
           const error = new Error("PKU_SYSTEM_PROMPT");
           error.retryable = false;
-          throw error;
-        }
-        if (!response.ok) {
-          const error = new Error(`${path} HTTP ${response.status}`);
-          error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
           throw error;
         }
         return html;
@@ -227,15 +265,37 @@
     return `${PAGER_PATH}?${params.toString()}`;
   }
 
+  function normalizedHeader(value) {
+    return cleanText(value).replace(/[\s/／]+/g, "").toUpperCase();
+  }
+
+  function isKnownNonDataRow(tr, cells) {
+    if (tr.querySelector('select[name="netui_row"]')) return true;
+    if (cells.length !== 1) return false;
+    const text = cellText(cells[0]);
+    return /^(?:暂无数据|暂无记录|无符合条件的记录|没有(?:查询到|找到)?符合条件的(?:数据|记录)|没有记录|No records found)$/i.test(text);
+  }
+
   function parseRows(html, typeName) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const table = doc.querySelector("table.datagrid");
-    if (!table) return [];
+    if (!table) throw new Error(`missing PKU course table: ${typeName}`);
+    const headerSequence = Array.from(table.querySelectorAll("th")).map((cell) => normalizedHeader(cellText(cell)));
+    const expectedHeaders = typeName === "英语课" && headerSequence.includes(normalizedHeader("英语等级"))
+      ? ENGLISH_HEADERS
+      : BASIC_HEADERS;
+    if (!expectedHeaders.every((header, index) => headerSequence[index] === normalizedHeader(header))) {
+      throw new Error(`unrecognized PKU course headers: ${typeName}`);
+    }
     const rows = [];
     for (const tr of table.querySelectorAll("tr")) {
       if (tr.querySelector("th")) continue;
       const cells = Array.from(tr.children).filter((el) => el.tagName && el.tagName.toLowerCase() === "td");
-      if (cells.length < 13) continue;
+      if (cells.length < BASIC_HEADERS.length) {
+        if (cells.length === 0 && !cleanText(textOf(tr))) continue;
+        if (isKnownNonDataRow(tr, cells)) continue;
+        throw new Error(`malformed PKU course row: ${typeName}`);
+      }
       const values = cells.map(cellText);
       const headers = typeName === "英语课" && values.length >= ENGLISH_HEADERS.length
         ? ENGLISH_HEADERS
@@ -265,13 +325,16 @@
     const doc = new DOMParser().parseFromString(html, "text/html");
     const details = Object.fromEntries(DETAIL_FIELDS.map((field) => [field, ""]));
     const aliasToField = {};
+    let recognizedLabels = 0;
     for (const [field, aliases] of Object.entries(DETAIL_ALIASES)) {
       for (const alias of aliases) aliasToField[alias] = field;
     }
 
     function assign(label, value) {
       const field = aliasToField[normLabel(label)];
-      if (field && !details[field]) details[field] = cleanText(value);
+      if (!field) return;
+      recognizedLabels += 1;
+      if (!details[field]) details[field] = cleanText(value);
     }
 
     for (const tr of doc.querySelectorAll("tr")) {
@@ -292,11 +355,13 @@
         const pattern = new RegExp(`${alias}[：:\\t ]+([\\s\\S]*?)(?=${DETAIL_FIELDS.join("|")}|$)`);
         const match = allText.match(pattern);
         if (match) {
+          recognizedLabels += 1;
           details[field] = cleanText(match[1]);
           break;
         }
       }
     }
+    if (recognizedLabels === 0) throw new Error("unrecognized PKU detail page");
     return details;
   }
 
