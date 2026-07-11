@@ -1,90 +1,83 @@
+# 拼好课 V2
 
+拼好课是面向北京大学课程的搜索与筛选工具。生产入口：[https://www.pinhaoke.love](https://www.pinhaoke.love)。
 
+## 学期
 
-# 拼好课 V2.0 - 北京大学课程搜索
+页面学期选项按以下顺序显示：
 
-北京大学 2026 年秋季（默认）+ 春季 + 暑期课程搜索工具，涵盖公选课、通识课、专业课、研究生课、暑期课共 **8681** 条源课程记录的快速检索与筛选。
+1. 2026 春季学期
+2. 2026 暑期学期
+3. 2026 秋季学期
 
-## 使用方法
-直接打开网页：[www.pinhaoke.love](http://www.pinhaoke.love) 即可使用
+秋季为默认学期。春季和秋季同时收录本科生、研究生课程；暑期收录本科生课程。选课系统中的重复挂载会在课程列表合并，因此页面卡片数少于源记录数。
 
 ## 功能
 
-- 按课程名、教师姓名或教室搜索
-- 七维度筛选：课程类型（公选课/通识课/专业课/研究生课）、课程类别、学分、开课单位、成绩记载方式、上课时间（星期）、教室
-- 排序功能：支持按课程名拼音排序
-- 课程详情弹窗：查看完整课程信息，包括中英文简介、教学大纲、教学评估、先修课程等
-- 上课时间与教室分开展示
-- 多语言切换：中文、English、日本語、한국어、Français、Deutsch、Español、Русский
-- 薄荷绿品牌色、柔光渐变、浅/深色模式 UI
+- 按课程名、英文名、教师、教室或课程号搜索
+- 按课程类型、类别、学分、开课单位、星期、成绩记载方式和教室筛选
+- 按课程名、学分、最早节次排序，或使用可稳定翻页的随机排序
+- 查看课程详情、简介、先修课程、教材、参考书、教学大纲和教学评估
+- 将搜索、筛选、排序、学期、语言和课程详情保存在可分享 URL 中
+- 支持中文、English、日本語、한국어、Français、Deutsch、Español、Русский
+- 支持浅色/深色模式、键盘操作和手机窄屏
 
-## 技术架构
+## 本地运行
 
-```
-Nginx (反向代理) → FastAPI (Python 后端) → SQLite × 5（秋季本科 + 秋季研究生 + 春季本科 + 春季研究生 + 暑期本科）
-```
-
-- **后端**：Python FastAPI + Uvicorn；`app.py` 按 `term=fall|spring|summer` 选择数据库，秋季/春季用 SQLite `ATTACH` 连接本科 + 研究生，暑期读取暑期本科库；默认学期为 `fall`
-- **数据库**（`数据库/` 目录下）：
-  - `2026秋季学期本科生课程.db`（3032 门）
-  - `2026秋季学期研究生课程.db`（1611 门）
-  - `2026春季学期本科生课程.db`（2465 门 = 公选 256 + 通识 143 + 专业 2066）
-  - `2026春季学期研究生课程.db`（1379 门）
-  - `2026暑期本科生课程.db`（194 门）
-  - 各自包含：`basic_info` + `detail_info`(1:1) + `translations` + 视图 `courses_view`
-  - 秋季数据库翻译完成后体积较大，使用 Git LFS 管理
-- **前端**：单页 HTML，通过 API 动态加载数据
-- **部署**：阿里云服务器（Ubuntu 24.04），Nginx + systemd
-
-## 数据来源
-
-源 JSON 都在 `课程数据/`：
-
-- `北大本科公选课_25-26第2学期.json` — 256 门
-- `北大本科通识课_25-26第2学期.json` — 143 门
-- `北大本科专业课_25-26第2学期.json` — 2066 门
-- `北大研究生课程_25-26第2学期.json` — 1379 门
-- `北大暑期课程_25-26第3学期.json` — 194 门
-- `北大本科课程_26-27第1学期.json` — 3032 门
-- `北大研究生课程_26-27第1学期.json` — 1611 门
-
-数据来源于 2026 年 3 月 20 日（春季）、5 月 13 日（暑期）和 7 月 9 日（秋季）从北京大学选课系统 `elective.pku.edu.cn` 获取。页面内抓取流程见 `北京大学选课网数据抓取/README.md`。
-
-## 重建数据库
+仓库内 `venv/` 面向生产目录，不适合作为 macOS 开发环境。使用临时虚拟环境：
 
 ```bash
-python3 数据库构建脚本/build_undergrad_db.py        # → 数据库/2026春季学期本科生课程.db
-python3 数据库构建脚本/build_graduate_db.py         # → 数据库/2026春季学期研究生课程.db
-python3 北京大学选课网数据抓取/build_summer_db.py   # → 数据库/2026暑期本科生课程.db
-python3 北京大学选课网数据抓取/build_undergrad_2627_fall_db.py  # → 数据库/2026秋季学期本科生课程.db
-python3 北京大学选课网数据抓取/build_graduate_2627_fall_db.py   # → 数据库/2026秋季学期研究生课程.db
+python3 -m venv /tmp/pinhaoke-dev
+/tmp/pinhaoke-dev/bin/python -m pip install -r requirements.txt
+/tmp/pinhaoke-dev/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-`数据库构建脚本/build_common.py` 提供共用的课表解析函数。旧的派生数据与构建脚本归档在 `归档/`。
+访问 [http://127.0.0.1:8000/](http://127.0.0.1:8000/)。不要直接双击 `index.html`，页面需要 `/api/*` 后端。
 
-## 多语言翻译
+运行测试：
 
-利用 DeepSeek API 把课程内容批量翻译成 7 种语言，落入每个 DB 的 `translations` 表，由 `app.py` 在 `?lang=` 参数下即时切换。春季、暑期、秋季本科和秋季研究生译文均已写入；缺少译文时后端会保留原始中文，后续补跑翻译后会自动替换；脚本与设计见 `北京大学课程数据翻译/README.md`。
+```bash
+python3 -m unittest discover -s tests -v
+```
 
-## 如果有能力的话欢迎赞助 支持网站的运行
-## 只要有人需要 每学期都会一直更新下去的！
+## 项目结构
 
-<table align="center"><tr>
-<td align="center"><img src="Images/wechat_sponsor.jpg" alt="微信赞助" width="150"><br>支付宝赞助码</td>
-<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
-<td align="center"><img src="Images/alipay_sponsor.jpg" alt="支付宝赞助" width="150"><br>微信赞助码</td>
-</tr></table>
-赞助后请微信联系我，我将您加入到赞助列表中感谢！Love
+```text
+app.py                         FastAPI API 与只读 SQLite 查询
+index.html                     无构建步骤的单页前端
+数据库/                        五个课程 SQLite 数据库
+课程数据/                      七份源 JSON 与数据口径说明
+数据库构建脚本/                春季建库及共享原子构建工具
+北京大学选课网数据抓取/         页面内抓取、接收器与暑期/秋季建库
+北京大学课程数据翻译/           七语翻译流水线
+deploy/                        Nginx、systemd 与唯一更新脚本
+归档/                          V1 只读参考
+```
 
-## 如果想要反馈BUG,或者希望有新的功能意见,欢迎微信联系,一定会尽快安排!
+## 文档索引
+
+- [工程与 API 约定](AGENTS.md)
+- [选课网抓取与建库](北京大学选课网数据抓取/README.md)
+- [课程翻译流水线](北京大学课程数据翻译/README.md)
+- [数据来源、数量与 schema](课程数据/数据说明.md)
+- [生产部署与回滚](deploy/README.md)
+- [V1 归档说明](归档/README.md)
+
+## 反馈与赞助
+
+只要课程搜索仍被需要，项目会按学期维护。问题与功能建议可通过微信联系：
+
 <p align="center"><img src="Images/MyWeChat.jpg" alt="微信联系方式" width="200"></p>
 
+<table align="center"><tr>
+<td align="center"><img src="Images/wechat_sponsor.jpg" alt="微信赞助码" width="150"><br>微信赞助码</td>
+<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="center"><img src="Images/alipay_sponsor.jpg" alt="支付宝赞助码" width="150"><br>支付宝赞助码</td>
+</tr></table>
 
 ### 鸣谢赞助
 
-感谢以下朋友的慷慨赞助，你们的支持是项目持续运营的动力！
-
 | 赞助者 | 金额 |
-|--------|------|
-| 噬铁侠 | 100¥ |
-| 罗淦-PKU | 100¥ |
+|---|---:|
+| 噬铁侠 | ¥100 |
+| 罗淦-PKU | ¥100 |

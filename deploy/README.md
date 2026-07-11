@@ -1,27 +1,152 @@
-# 生产部署
+# 生产部署与运维
 
-生产目录固定为 `/opt/pinhaoke`，应用由 `pinhaoke.service` 以 `www-data` 身份只读运行。更新脚本只更新 Git 工作树、Python 虚拟环境和 systemd unit；它不会安装或覆盖 Nginx、Certbot 及证书配置。
+生产站点是 [https://www.pinhaoke.love](https://www.pinhaoke.love)。Nginx 负责 HTTPS 和静态图片，`pinhaoke.service` 以 `www-data` 运行 Uvicorn，应用目录固定为 `/opt/pinhaoke`。
 
-## 更新应用
+> 文档合并任务只更新仓库说明，**本次任务未部署生产**，也没有 push。
 
-先确认服务器已经安装 Git、Git LFS、Python 3、`venv`、`curl`、`flock`、`sha256sum` 和 systemd。然后以 root 运行：
+## 组件边界
+
+- `deploy/update.sh`：唯一应用更新入口，部署精确 `origin/main`。
+- `deploy/pinhaoke.service`：systemd unit，使用 `/opt/pinhaoke/venv/bin/python -m uvicorn`。
+- `deploy/nginx.conf`：与 Certbot 共存的站点模板，更新脚本不会自动安装它。
+- Nginx 监听 80/443；80 和裸域名跳转到 `https://www.pinhaoke.love`。
+- FastAPI 只监听 `127.0.0.1:8000`，不直接暴露公网。
+
+## 权限模型
+
+应用代码、`.git`、虚拟环境和数据库由 `root` 持有。`www-data` 只获得运行所需的目录遍历和文件读取权限，不拥有仓库，也不能修改 SQLite：
+
+- 发布目录通常为 `root:www-data`，目录 `0750`，文件 `0640`
+- `venv` 为 `root:root`，目录 `0755`，普通文件 `0644`，`bin/` 可执行文件 `0755`
+- 数据库由应用以 SQLite `mode=ro` 和 `PRAGMA query_only = ON` 打开
+- systemd 使用 `ProtectSystem=strict`、`ReadOnlyPaths=/opt/pinhaoke`、`NoNewPrivileges=true`、私有临时目录、空 capability 和 `UMask=0027`
+
+不要对 `/opt/pinhaoke` 执行递归 `chown www-data`。更新脚本会避开 `.git`、staging、备份/诊断 venv 和活动 venv，使用 symlink-safe 的权限处理。
+
+## 前置依赖
+
+服务器需要：Git、Git LFS、Python 3、`venv`、`curl`、`flock`、`sha256sum`、systemd，以及可访问 Git remote 和 Python 包源的网络。
+
+首次配置前检查：
+
+```bash
+git --version
+git lfs version
+python3 --version
+systemctl --version
+nginx -v
+```
+
+## 唯一更新命令
+
+以 root 执行：
 
 ```bash
 sudo bash /opt/pinhaoke/deploy/update.sh
 ```
 
-脚本使用非阻塞锁，始终解析并部署精确的 `origin/main` 提交。它会在停服前下载并校验 LFS 对象、从目标提交的 `requirements.txt` 构建候选环境并运行 `pip check`。停服后才会切换代码和环境；服务启动失败或任一 API 烟测失败都会打印 journal 并返回失败。
+不要用手工 `git pull`、直接 `git reset` 或单独重启服务替代该命令。脚本使用非阻塞 `flock`，同一时间只允许一个更新任务。
 
-更新完成后可再次检查：
+## 停服前预检
+
+更新脚本在**停服前**完成可能耗时或可能失败的工作：
+
+1. fetch 并解析精确 `origin/main` commit，同时记录旧 commit、旧 unit 和服务活动状态。
+2. 如果目标提交使用 Git LFS，检查 `git-lfs`，fetch 目标对象并运行 LFS fsck。
+3. 用临时 Git index 把目标 commit 展开到 `.deploy-stage.*`，确认 LFS 文件已经物化而不是 pointer。
+4. 从 staged target 的 `requirements.txt` 计算 SHA-256。
+5. 仅在活动 venv 缺失或 requirements 哈希变化时构建候选 venv，执行 `python -m pip install`、`pip check` 和依赖导入检查。
+
+只有这些步骤全部成功才停止 `pinhaoke.service`。因此下载、LFS 缺失、依赖解析或候选环境错误不会造成服务停机。
+
+## 激活与烟测
+
+进入激活阶段后，脚本会：
+
+1. 停止服务并把工作树切到目标 commit。
+2. 再次物化并校验工作树 LFS 文件。
+3. 安装目标 commit 的 systemd unit。
+4. 仅在候选 venv 已构建时原子交换 venv。
+5. 使用活动 Python 执行 `python -m uvicorn --version`，应用只读权限，reload unit 并启动服务。
+6. 对三个本机 API 执行带重试、超时和 JSON 契约检查的烟测。
+
+烟测目标：
+
+```text
+http://127.0.0.1:8000/api/health
+http://127.0.0.1:8000/api/filters?term=fall
+http://127.0.0.1:8000/api/courses?term=fall&page_size=1
+```
+
+健康检查必须报告五库、五个 ID 前缀和完整性；filters 必须返回六个列表字段；courses 必须返回正整数 total 和一条带 ID 的课程。HTTP 200 但 JSON 不符合契约也视为失败。
+
+## 自动回滚语义
+
+从服务激活开始到成功标记前，以下情况都会触发自动回滚：
+
+- 任意命令错误（ERR）
+- INT、TERM 或 HUP 信号
+- 未经过成功路径的进程 EXIT
+- 服务启动、活动状态或任一烟测失败
+
+自动回滚会停止失败服务，恢复旧 commit 和对应 LFS 文件，恢复旧 systemd unit，重新应用权限，并只在旧服务原本处于 active 时重新启动它。
+
+虚拟环境回滚以 `VENV_SWAPPED=1` 为条件：
+
+- 没有发生 venv 交换时，回滚不会移动或删除活动 venv。
+- 已交换且存在旧 venv 时，失败候选移到 `.venv-failed-<sha>-<pid>`，旧 venv 恢复到 `/opt/pinhaoke/venv`。
+- 已交换但发布前没有旧 venv 时，失败候选仍移到 `.venv-failed-*`，不会伪造旧环境。
+
+`.venv-failed-*` 是诊断制品，不是活动环境。它们会保留以便排查；下一次更新开始时自动删除修改时间超过 7 天的诊断目录。成功部署后临时 stage 和不再需要的 `.venv-backup-*` 会清理。
+
+如果自动回滚自身失败，脚本会明确输出“manual recovery is required”并返回非零；不要把失败退出解释为已经恢复。
+
+## 运行状态与日志
 
 ```bash
 systemctl status pinhaoke --no-pager
+journalctl -u pinhaoke -n 100 --no-pager
+journalctl -u pinhaoke --since '2026-07-11 00:00:00' --no-pager
 curl --fail --silent http://127.0.0.1:8000/api/health
+curl --fail --silent 'http://127.0.0.1:8000/api/filters?term=fall'
+curl --fail --silent 'http://127.0.0.1:8000/api/courses?term=fall&page_size=1'
 ```
 
-## 手动安装 Nginx 模板
+外部检查：
 
-`deploy/nginx.conf` 是 production site 模板，不是完整的 `nginx.conf`。它引用 Certbot 在 `/etc/letsencrypt/` 管理的证书和 TLS 参数；先确认这些文件存在。安装时先备份当前站点，再复制到临时文件并验证：
+```bash
+curl --fail --silent https://www.pinhaoke.love/api/health
+curl --head https://www.pinhaoke.love/
+```
+
+## 手工恢复
+
+只在脚本报告自动回滚不完整时执行手工恢复：
+
+1. 记录日志、`git rev-parse HEAD`、服务状态和 `/opt/pinhaoke/.venv-*` 目录清单。
+2. 选择已经验证的完整 commit SHA；不要用模糊的 `HEAD~N` 或未确认的分支名。
+3. 停止服务，恢复该 commit，执行对应 LFS checkout/fsck。
+4. 恢复该 commit 的 `deploy/pinhaoke.service` 并运行 `systemctl daemon-reload`。
+5. 检查 `/opt/pinhaoke/venv/bin/python -m uvicorn --version`。只有日志证明 venv 已发生交换时，才依据 `.venv-backup-*` / `.venv-failed-*` 现场状态恢复；禁止无条件替换活动 venv。
+6. 恢复 root 所有权与只读权限，启动服务，依次通过 health、filters、courses 三项烟测。
+7. 保存失败诊断目录，完成原因分析后再清理。
+
+手工恢复不是常规发布方式。故障处理后应先修复仓库脚本与测试，再重新使用唯一更新命令。
+
+## Nginx 与证书
+
+`deploy/nginx.conf` 引用 Certbot 文件：
+
+```text
+/etc/letsencrypt/live/pinhaoke.love/fullchain.pem
+/etc/letsencrypt/live/pinhaoke.love/privkey.pem
+/etc/letsencrypt/options-ssl-nginx.conf
+/etc/letsencrypt/ssl-dhparams.pem
+```
+
+模板包含 HTTPS 重定向、HSTS、安全响应头、gzip、`/Images/` 30 天缓存和到 `127.0.0.1:8000` 的反向代理。它不是完整 `nginx.conf`，也不由更新脚本复制。
+
+手工安装或修改时：
 
 ```bash
 sudo cp /etc/nginx/sites-available/pinhaoke /etc/nginx/sites-available/pinhaoke.backup
@@ -31,15 +156,11 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-只有 `nginx -t` 成功后才能 reload。若验证失败，立即把 `sites-enabled/pinhaoke` 指回原文件并再次运行 `nginx -t`。不要让 `deploy/update.sh` 管理这一部分；这样才能与 Certbot 的续期和手工站点调整共存。
+只有 `nginx -t` 成功后才能 reload。失败时把 `sites-enabled/pinhaoke` 指回备份，重新运行 `nginx -t`，通过后再 reload。
 
-## 回滚
+## 发布边界
 
-更新失败时，脚本会保留旧环境并打印 `.venv-backup-*` 的完整路径。先查看失败日志和当前提交：
-
-```bash
-journalctl -u pinhaoke -n 100 --no-pager
-git -C /opt/pinhaoke rev-parse HEAD
-```
-
-回滚代码时，使用已知正常的完整提交 SHA，不要使用模糊分支名；随后把保留的环境目录与 `/opt/pinhaoke/venv` 在同一文件系统内互换，重新安装该提交的 `deploy/pinhaoke.service`，执行 `systemctl daemon-reload` 并启动服务。确认三个 API 烟测都通过后再删除失败环境和备份。Nginx 回滚独立进行：恢复 `sites-enabled` 的备份目标，运行 `nginx -t`，成功后 reload。
+- 本地提交不等于 GitHub 已 push。
+- GitHub 已 push 不等于生产已部署。
+- 只有更新脚本成功输出目标 commit，且本机与外部烟测通过，才能记录生产版本。
+- 不在未获用户明确授权的任务中执行 SSH、push、部署或证书变更。

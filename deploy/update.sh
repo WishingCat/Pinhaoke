@@ -259,6 +259,13 @@ smoke_request() {
     return 1
 }
 
+cleanup_abandoned_artifacts() {
+    find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.deploy-stage.*' -mtime +1 \
+        -exec rm -rf -- {} +
+    find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.venv-failed-*' -mtime +7 \
+        -exec rm -rf -- {} +
+}
+
 main() {
     local tool
 
@@ -292,10 +299,7 @@ main() {
     trap 'on_signal TERM' TERM
     trap 'on_signal HUP' HUP
 
-    find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.deploy-stage.*' -mtime +1 \
-        -exec rm -rf -- {} +
-    find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.venv-failed-*' -mtime +7 \
-        -exec rm -rf -- {} +
+    cleanup_abandoned_artifacts
     STAGE_DIR=$(mktemp -d "$APP_DIR/.deploy-stage.XXXXXXXX")
     TARGET_TREE="$STAGE_DIR/target-tree"
     TARGET_INDEX="$STAGE_DIR/index"

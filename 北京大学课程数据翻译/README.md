@@ -1,160 +1,175 @@
 # 北京大学课程数据翻译
 
-把 SQLite 数据库里的中文课程字段批量翻译成 7 种语言（`en` / `ja` / `ko` / `fr` / `de` / `es` / `ru`），结果写入各数据库自带的 `translations` 表，供前端通过 `?lang=xx` 即时切换。缺少译文时，后端保留原始中文文本。
+本目录把课程自由文本翻译为 `en`、`ja`、`ko`、`fr`、`de`、`es`、`ru`，写入五个 SQLite 数据库各自的 `translations` 表。有限枚举值仍由 `index.html` 的 `dataI18n` 负责。
 
-当前覆盖：
+**自动测试、部署和文档任务绝不自动运行付费 API。** 只有用户明确批准费用、数据库和字段范围后，才能执行翻译命令。
 
-| 数据库 | 课程数 | translations 行数 |
-|---|---:|---:|
-| `数据库/2026秋季学期本科生课程.db` | 3032 | 159138 |
-| `数据库/2026秋季学期研究生课程.db` | 1611 | 52430 |
-| `数据库/2026春季学期本科生课程.db` | 2465 | 100156 |
-| `数据库/2026春季学期研究生课程.db` | 1379 | 39445 |
-| `数据库/2026暑期本科生课程.db` | 194 | 10010 |
+## 五库矩阵
 
-脚本通过 `__file__` 解析项目根目录，从任意工作目录运行都可以。
+仓库数据库快照（2026-07-11）：
 
-## 一、译文存储方式
+| 选择名 | 数据库 | 课程行数 | translations 行数 |
+|---|---|---:|---:|
+| `ug` | `数据库/2026春季学期本科生课程.db` | 2465 | 100156 |
+| `gr` | `数据库/2026春季学期研究生课程.db` | 1379 | 39445 |
+| `summer` | `数据库/2026暑期本科生课程.db` | 194 | 10010 |
+| `fall` | `数据库/2026秋季学期本科生课程.db` | 3032 | 159138 |
+| `fall_gr` | `数据库/2026秋季学期研究生课程.db` | 1611 | 52430 |
 
-每个数据库内都有同样 schema 的表：
+这些数字是表内译文行数，不代表所有非空源字段都具备七种译文。春季长字段仍可能缺少 `syllabus`、`evaluation`、`reference_book` 或研究生 `reference_book`；其他库也应按脚本 pending 扫描结果判断缺口，不能从总行数推断全覆盖。
+
+缺少目标语言译文或译文只含空白时，`app.py` 会**回退原始中文**。因此可以分批补译，不完整译文不会让课程字段变空。
+
+## 存储契约
+
+五库使用相同表结构：
 
 ```sql
 CREATE TABLE translations (
     course_id INTEGER NOT NULL,
-    field     TEXT NOT NULL,
-    lang      TEXT NOT NULL,
-    text      TEXT NOT NULL,
+    field TEXT NOT NULL,
+    lang TEXT NOT NULL,
+    text TEXT NOT NULL,
     PRIMARY KEY (course_id, field, lang)
 );
 CREATE INDEX idx_trans_cid_field ON translations(course_id, field);
 ```
 
-后端 `app.py` 的 `_apply_translations` 在 `lang != zh` 时按 `(course_id, field, lang)` 把原始中文字段替换成译文。课程列表只查卡片可见字段（`course_name` / `classroom` / `notes`），课程详情查 `TRANSLATABLE_FIELDS` 中的完整字段。
+`course_id` 是各数据库内部的整数，不带 API 的 `a/r/u/g/s` 前缀。翻译写入通过 `INSERT OR REPLACE` 按三元组断点续跑。空白 API 结果由 `clean_translation()` 拒绝，不写入数据库。
 
-注意：`translations.course_id` 使用各自数据库内的裸整数 id，不带前端的 `a` / `r` / `u` / `g` / `s` 前缀。前缀只存在于 API 和 URL 层。
+## 配置
 
-## 二、翻译服务
-
-- API 代理：`https://api.qnaigc.com/v1`（兼容 OpenAI Chat Completions）
-- 模型：`deepseek/deepseek-v4-flash`
-- 凭据：环境变量 `DEEPSEEK_API_KEY`
-- 长字段默认要求模型返回 JSON；兜底脚本 `translate_stubborn.py` 改为单语言直返，避免超长 JSON 被代理截断
-
-不要把 API key 写进仓库文件。可以本地放 `.env`，但必须保持忽略：
-
-```text
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-加载示例：
-
-```bash
-set -a; source .env; set +a
-```
-
-## 三、脚本分工
-
-| 脚本 | 覆盖范围 | 常用命令 |
-|---|---|---|
-| `translate_courses.py` | 春季本科 `intro_cn`、暑期本科 `intro_cn`、秋季本科 `intro_cn`、春季研究生/秋季研究生 `intro`（统一存为 `intro_cn`）和 `extra_notes` | `python3 北京大学课程数据翻译/translate_courses.py` |
-| `translate_misc.py` | 春季本科、暑期本科、秋季本科、春季研究生和秋季研究生的其余短字段与长字段：课程名、备注、PNP、教室、专业、先修、通识系列、教材、参考书、教学大纲、教学评估等 | `python3 北京大学课程数据翻译/translate_misc.py --phase short` / `--phase long` |
-| `translate_stubborn.py` | 单语言兜底补齐：研究生 intro/extra/syllabus/reference_book、本科 intro/syllabus/evaluation/reference_book | `python3 北京大学课程数据翻译/translate_stubborn.py` |
-
-所有脚本都可断点续跑。已写入的 `(course_id, field, lang)` 会被跳过或覆盖写入，不需要手工清理。
-
-## 四、典型工作流
+凭据只从环境变量读取：
 
 ```bash
 export DEEPSEEK_API_KEY=sk-xxxxx
-
-# 1. 简介大头
-python3 北京大学课程数据翻译/translate_courses.py
-
-# 2. 短字段：课程名/备注/教室/专业/先修等
-python3 北京大学课程数据翻译/translate_misc.py --phase short
-
-# 3. 长字段：教学大纲/教学评估/参考书等
-python3 北京大学课程数据翻译/translate_misc.py --phase long
-
-# 4. 兜底：补齐被截断或失败的长文本
-python3 北京大学课程数据翻译/translate_stubborn.py
 ```
 
-试跑或限定范围：
+可选配置：
 
 ```bash
-python3 北京大学课程数据翻译/translate_courses.py --limit 5
-python3 北京大学课程数据翻译/translate_courses.py --only summer_intro
-python3 北京大学课程数据翻译/translate_courses.py --only fall_intro
-python3 北京大学课程数据翻译/translate_courses.py --only fall_gr_intro
-python3 北京大学课程数据翻译/translate_misc.py --phase short --workers 10
-python3 北京大学课程数据翻译/translate_misc.py --phase long --workers 10
-python3 北京大学课程数据翻译/translate_stubborn.py --db fall --field intro --workers 10
-python3 北京大学课程数据翻译/translate_stubborn.py --db fall_gr --field syllabus --workers 10
+export DEEPSEEK_API_URL=https://api.qnaigc.com/v1/chat/completions
+export DEEPSEEK_MODEL=deepseek/deepseek-v4-flash
 ```
 
-建议并发从 10 到 15 起步。代理偶尔会对 30 以上并发返回 5xx 或 429。
+不要把 key 写入仓库。三个脚本在导入和 `--help` 时不会读取密钥；只有 pending 任务真正调用 API 时才要求 `DEEPSEEK_API_KEY`。`certifi` 是可选依赖，缺少时使用系统证书上下文。
 
-## 五、当前字段覆盖
+## 脚本与选择参数
 
-### 简介字段
+### `translate_courses.py`
 
-- 春季本科：`detail_info.intro_cn` → `translations.field='intro_cn'`
-- 暑期本科：`detail_info.intro_cn` → `translations.field='intro_cn'`
-- 秋季本科：`detail_info.intro_cn` → `translations.field='intro_cn'`
-- 春季研究生：`detail_info.intro` → `translations.field='intro_cn'`
-- 春季研究生：`detail_info.extra_notes` → `translations.field='extra_notes'`
-- 秋季研究生：`detail_info.intro` → `translations.field='intro_cn'`
-- 秋季研究生：`detail_info.extra_notes` → `translations.field='extra_notes'`
+负责本科简介、研究生简介和研究生详情备注。使用 `--only` 精确选一项：
 
-本科形态数据库如果 `detail_info.intro_en` 已有英文简介，脚本会直接写入 `lang='en'`，不再调用 API。
+| `--only` | 数据库与字段 |
+|---|---|
+| `ug_intro` | 春季本科 `intro_cn` |
+| `gr_intro` | 春季研究生 `intro` -> `intro_cn` |
+| `gr_extra` | 春季研究生 `extra_notes` |
+| `summer_intro` | 暑期本科 `intro_cn` |
+| `fall_intro` | 秋季本科 `intro_cn` |
+| `fall_gr_intro` | 秋季研究生 `intro` -> `intro_cn` |
+| `fall_gr_extra` | 秋季研究生 `extra_notes` |
 
-### 其他字段
-
-短字段包括：
-
-```text
-course_name, notes, pnp, classroom, major,
-prerequisites, ge_series, textbook,
-audience, term
-```
-
-长字段包括：
-
-```text
-syllabus, evaluation, reference_book
-```
-
-春季本科、暑期本科和秋季本科 schema 相同；研究生 schema 不同，因此脚本内部分别列任务。秋季研究生比春季研究生多 `syllabus` 字段，翻译脚本已单独纳入。
-
-## 六、校验
-
-查看各库翻译行数：
+示例：
 
 ```bash
-sqlite3 "数据库/2026秋季学期本科生课程.db" "select count(*) from translations;"
-sqlite3 "数据库/2026秋季学期研究生课程.db" "select count(*) from translations;"
-sqlite3 "数据库/2026春季学期本科生课程.db" "select count(*) from translations;"
-sqlite3 "数据库/2026春季学期研究生课程.db" "select count(*) from translations;"
-sqlite3 "数据库/2026暑期本科生课程.db" "select count(*) from translations;"
+python3 北京大学课程数据翻译/translate_courses.py --only fall_intro --workers 10
+python3 北京大学课程数据翻译/translate_courses.py --only fall_gr_intro --limit 5
 ```
 
-检查某个字段是否缺少语言：
+不传 `--only` 会扫描表中全部七项；执行前必须确认这是预期范围。
+
+### `translate_misc.py`
+
+负责其余字段，使用 `--db` 选库，使用 `--phase` 选字段组：
+
+- `--db ug|gr|summer|fall|fall_gr|all`
+- `--phase short|long|all`
+- `--allow-non-cn`：也处理纯英文等不含中文字符的源文本
+- `--limit N`：限制 pending 行数，适合小规模试跑
+
+短字段任务包括课程名、备注、PNP、教室、专业、先修课程、通识系列、教材、修读对象和开课学期。长字段任务包括教学大纲、教学评估和参考书；秋季研究生还包括 `syllabus`。
 
 ```bash
-sqlite3 "数据库/2026暑期本科生课程.db" "
-select course_id, field, count(*) as langs
+python3 北京大学课程数据翻译/translate_misc.py --db fall --phase short --workers 10
+python3 北京大学课程数据翻译/translate_misc.py --db ug --phase long
+python3 北京大学课程数据翻译/translate_misc.py --db gr --phase long
+```
+
+春季必须分别使用 `--db ug` 和 `--db gr`。推荐先用 `--help` 核对 choices：
+
+```bash
+python3 北京大学课程数据翻译/translate_misc.py --help
+```
+
+### `translate_stubborn.py`
+
+长文本 JSON 返回被截断或单一语言持续缺失时，使用单语言直返兜底：
+
+- `--db gr|ug|summer|fall|fall_gr|all`
+- `--field intro|extra_notes|syllabus|evaluation|reference_book|all`
+- `--workers N`、`--limit N`
+
+```bash
+python3 北京大学课程数据翻译/translate_stubborn.py --db ug --field syllabus --workers 10
+python3 北京大学课程数据翻译/translate_stubborn.py --db fall_gr --field reference_book --limit 5
+```
+
+任务矩阵包含春季本科 `syllabus`、`evaluation`、`reference_book` 和春季研究生 `reference_book`，用于补齐审计发现的长字段缺口。
+
+## 推荐流程
+
+每次只处理一个明确选择：
+
+1. 备份目标数据库，记录 `translations` 行数和文件 SHA-256。
+2. 用 `--help` 核对选择参数。
+3. 用 `--limit 5` 小规模试跑并检查内容质量与费用。
+4. 对简介运行 `translate_courses.py --only ...`。
+5. 对其他字段依次运行 `translate_misc.py --db ... --phase short` 和 `--phase long`。
+6. 用 `translate_stubborn.py --db ... --field ...` 处理剩余长字段。
+7. 检查失败状态、缺失语言、数据库完整性和最终哈希，再决定是否提交数据库。
+
+不要直接运行三个脚本的默认 `all` 范围来“看看还有多少”，因为 pending 记录会立即发起付费请求。需要无费用检查时使用只读 SQL 或测试提供的 mock。
+
+## 重试与失败语义
+
+- 网络和 API 错误由调用层有限退避重试。
+- API 成功后，译文先在内存中清洗，再单独写库。
+- 遇到 SQLite **数据库锁**或 busy 状态，只重试写入；锁重试不会再次调用付费 API。
+- 同一次 `translate_misc.py` 运行按源文本去重，相同文本只调用一次 API，再写入多个课程三元组。
+- worker 或任务存在未处理失败时，进程以非零状态退出。
+- `--only` / `--db` 只初始化、扫描和写入选中的数据库，不得触碰其他库。
+
+## 校验
+
+查看五库译文行数：
+
+```bash
+for db in 数据库/*.db; do
+  printf '%s: ' "$db"
+  sqlite3 "$db" 'select count(*) from translations;'
+done
+```
+
+查看某字段少于七种语言的记录：
+
+```bash
+sqlite3 "数据库/2026春季学期本科生课程.db" "
+select course_id, field, count(*) as languages
 from translations
 group by course_id, field
-having langs < 7
-limit 20;
+having languages < 7
+order by field, course_id
+limit 50;
 "
 ```
 
-## 七、注意事项
+无密钥回归测试不会发起网络请求：
 
-1. **重建 DB 会清空 `translations` 表。** `数据库构建脚本/build_undergrad_db.py`、`build_graduate_db.py`、`北京大学选课网数据抓取/build_summer_db.py`、`build_undergrad_2627_fall_db.py`、`build_graduate_2627_fall_db.py` 都会重建库。重建前先备份，或重建后重新跑翻译。
-2. **代理可能截断长 JSON。** `translate_misc.py --phase long` 对超长教学大纲/评估更容易失败；失败后运行 `translate_stubborn.py`。
-3. **源文本去重只在单次运行内生效。** 大量重复短文本会被缓存减少 API 调用；中断后重跑仍会跳过已写入的三元组。
-4. **`enable_thinking: False` 是省 token 设置。** 如果代理或模型升级后拒绝该字段，删除脚本请求体中的这个字段即可。
-5. **前端短枚举仍在 `index.html`。** 院系、类别、成绩方式、语言、星期等有限字典主要由前端 `dataI18n` 翻译；数据库 `translations` 负责自由文本。
+```bash
+env -u DEEPSEEK_API_KEY python3 -m unittest tests.test_translation_scripts -v
+```
+
+## 数据保护
+
+五个建库脚本会重建 `translations` 为空表。建库前必须备份译文数据库，或接受重新翻译的费用与时间。翻译作业优先在仓库外的数据库副本完成，验收通过后再一次性原子导入，避免持续改写受 Git LFS 管理的大型数据库。

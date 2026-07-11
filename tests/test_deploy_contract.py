@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -331,7 +332,12 @@ class DeployContractTests(unittest.TestCase):
                 UNIT_BACKUP={unit_backup!s}
                 ACTIVATION_STARTED=1
                 apply_release_permissions() {{ :; }}
-                on_signal HUP
+                trap cleanup EXIT
+                trap 'on_error "$LINENO"' ERR
+                trap 'on_signal INT' INT
+                trap 'on_signal TERM' TERM
+                trap 'on_signal HUP' HUP
+                kill -HUP $$
                 """
             )
             result = subprocess.run(
@@ -348,6 +354,102 @@ class DeployContractTests(unittest.TestCase):
             calls = systemctl_log.read_text().splitlines()
             self.assertIn("start pinhaoke", calls)
             self.assertIn("is-active --quiet pinhaoke", calls)
+
+    def test_unexpected_exit_after_activation_runs_exit_trap_rollback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app_dir = root / "app"
+            bin_dir = root / "bin"
+            stage = app_dir / ".deploy-stage.test"
+            app_dir.mkdir()
+            bin_dir.mkdir()
+            stage.mkdir()
+            (app_dir / "code-state").write_text("new")
+            (app_dir / "venv").mkdir()
+            (app_dir / "venv" / "identity").write_text("old-env")
+            unit_path = root / "pinhaoke.service"
+            unit_path.write_text("new-unit")
+            unit_backup = stage / "old-unit"
+            unit_backup.write_text("old-unit")
+            systemctl_log = root / "systemctl.log"
+
+            (bin_dir / "git").write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ $1 == reset ]]; then printf '%s' \"$3\" >\"$APP_DIR/code-state\"; fi\n"
+                "exit 0\n"
+            )
+            (bin_dir / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >>\"$SYSTEMCTL_LOG\"\n"
+                "exit 0\n"
+            )
+            for stub in bin_dir.iterdir():
+                stub.chmod(0o755)
+
+            harness = textwrap.dedent(
+                f"""
+                set -Eeuo pipefail
+                export APP_DIR={app_dir!s}
+                export LIVE_VENV="$APP_DIR/venv"
+                export UNIT_PATH={unit_path!s}
+                export SYSTEMCTL_LOG={systemctl_log!s}
+                export PATH={bin_dir!s}:$PATH
+                source {ROOT / 'deploy/update.sh'}
+                STAGE_DIR={stage!s}
+                TARGET_COMMIT=new
+                PREVIOUS_COMMIT=old
+                PREVIOUS_SERVICE_ACTIVE=1
+                UNIT_PREVIOUSLY_EXISTED=1
+                UNIT_BACKUP={unit_backup!s}
+                ACTIVATION_STARTED=1
+                apply_release_permissions() {{ :; }}
+                trap cleanup EXIT
+                exit 42
+                """
+            )
+            result = subprocess.run(
+                ["bash", "-c", harness],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 42, result.stderr)
+            self.assertEqual((app_dir / "venv" / "identity").read_text(), "old-env")
+            self.assertEqual((app_dir / "code-state").read_text(), "old")
+            self.assertEqual(unit_path.read_text(), "old-unit")
+            self.assertIn("start pinhaoke", systemctl_log.read_text().splitlines())
+
+    def test_abandoned_artifact_cleanup_uses_separate_retention_windows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp)
+            old_stage = app_dir / ".deploy-stage.old"
+            fresh_stage = app_dir / ".deploy-stage.fresh"
+            old_failed = app_dir / ".venv-failed-old"
+            fresh_failed = app_dir / ".venv-failed-fresh"
+            for path in (old_stage, fresh_stage, old_failed, fresh_failed):
+                path.mkdir()
+            now = time.time()
+            os.utime(old_stage, (now - 2 * 86400, now - 2 * 86400))
+            os.utime(fresh_stage, (now, now))
+            os.utime(old_failed, (now - 8 * 86400, now - 8 * 86400))
+            os.utime(fresh_failed, (now, now))
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    f"APP_DIR={app_dir!s}; source {ROOT / 'deploy/update.sh'}; "
+                    "cleanup_abandoned_artifacts",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(old_stage.exists())
+            self.assertTrue(fresh_stage.exists())
+            self.assertFalse(old_failed.exists())
+            self.assertTrue(fresh_failed.exists())
 
     def test_service_runs_as_www_data_with_read_only_sandbox(self):
         for setting in (
@@ -407,12 +509,12 @@ class DeployContractTests(unittest.TestCase):
         for text in (
             "nginx -t",
             "Certbot",
-            "手动",
             "回滚",
             "deploy/update.sh",
             "不会",
         ):
             self.assertIn(text, self.deploy_readme)
+        self.assertRegex(self.deploy_readme, r"手[动工]")
         self.assertRegex(self.deploy_readme, r"systemctl\s+(status|is-active)")
 
 

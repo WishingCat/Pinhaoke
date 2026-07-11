@@ -1,25 +1,20 @@
-# 归档/
+# V1 归档
 
-旧的派生数据与构建脚本，2026 春季学期重构时移入此目录留档。**当前线上服务不依赖任何文件。**
+`归档/` 保存拼好课 V1 的旧单库与静态数据流水线，仅供追溯和对照。**这些文件是只读参考，严禁用于生产、部署、回滚或新数据构建。**
 
-## 文件清单
+## 内容
 
-| 文件 | 大小 | 来源 / 用途 | 替代物 |
-|---|---|---|---|
-| `courses.db` | 20 MB | 旧的统一 SQLite（公选+通识+专业+研究生），由 `build_db.py` 从源 JSON 构建 | `数据库/2026春季学期本科生课程.db` + `数据库/2026春季学期研究生课程.db` |
-| `courses.json` | 1.2 MB | 旧的 xlsx 解析产物，扁平 JSON | 直接读两个新 DB |
-| `courses_data.js` | 636 KB | 旧的 xlsx 解析产物，压缩 JS（前端早期纯静态版本可直接 `<script>` 引入） | `/api/courses` 接口 |
-| `build_db.py` | — | 旧的 JSON→单库构建脚本 | `数据库构建脚本/build_undergrad_db.py` + `build_graduate_db.py`（共用 `build_common.py`） |
-| `build_data.py` | — | 更早的 xlsx→JSON 流水线；依赖的 `pku_*_course_schedule_spring_2026.xlsx` 文件已不存在 | 已废弃 |
+| 文件 | V1 用途 | V2 替代物 |
+|---|---|---|
+| `courses.db` | 春季课程统一 SQLite | `数据库/` 下按学期和学段拆分的五个数据库 |
+| `courses.json` | 旧 xlsx 解析后的扁平 JSON | `课程数据/` 下的选课网源 JSON |
+| `courses_data.js` | 纯静态前端数据 | `/api/courses` |
+| `build_db.py` | 旧单库构建脚本 | `数据库构建脚本/` 与 `北京大学选课网数据抓取/build_*_db.py` |
+| `build_data.py` | 已失去源 xlsx 的更早转换脚本 | 页面内抓取与源 JSON 流水线 |
 
-## 回滚说明
+## 边界
 
-若需要回到旧架构（不推荐）：
-
-```bash
-cp 归档/courses.db .
-cp 归档/build_db.py .
-git checkout HEAD~N -- app.py index.html   # 找到重构前的提交
-```
-
-但要注意旧 `app.py` 读 `courses.db`，新 schema 与之不兼容，需要一并回滚。
+- `app.py`、`index.html`、部署脚本和生产服务均不读取 `归档/`。
+- 不把归档数据库复制到项目根目录，也不让生产服务连接它。
+- 不在归档脚本上继续开发；需要变更时修改 V2 的权威实现和测试。
+- 历史行为只能作为调查线索，不能覆盖 [AGENTS.md](../AGENTS.md) 或现行代码中的契约。
