@@ -22,6 +22,7 @@ PREVIOUS_COMMIT=""
 PREVIOUS_USES_LFS=0
 PREVIOUS_SERVICE_ACTIVE=0
 PREVIOUS_VENV_EXISTED=0
+VENV_SWAPPED=0
 UNIT_BACKUP=""
 UNIT_PREVIOUSLY_EXISTED=0
 BACKUP_VENV=""
@@ -72,6 +73,7 @@ swap_candidate_venv() {
         fi
         return 1
     fi
+    VENV_SWAPPED=1
 }
 
 apply_release_permissions() {
@@ -118,7 +120,7 @@ rollback_activation() {
         return 0
     fi
     ROLLBACK_IN_PROGRESS=1
-    trap - ERR INT TERM
+    trap - ERR INT TERM HUP
     set +e
     echo "==> Rolling back failed activation: $reason" >&2
 
@@ -132,14 +134,14 @@ rollback_activation() {
         fi
     fi
 
-    if [[ -e "$BACKUP_VENV" || -L "$BACKUP_VENV" ]]; then
+    if [[ "$VENV_SWAPPED" -eq 1 && ( -e "$BACKUP_VENV" || -L "$BACKUP_VENV" ) ]]; then
         if [[ -e "$LIVE_VENV" || -L "$LIVE_VENV" ]]; then
             FAILED_VENV="$APP_DIR/.venv-failed-${TARGET_COMMIT:0:12}-$$"
             mv "$LIVE_VENV" "$FAILED_VENV" || rollback_failed=1
         fi
         mv "$BACKUP_VENV" "$LIVE_VENV" || rollback_failed=1
         BACKUP_VENV=""
-    elif [[ "$PREVIOUS_VENV_EXISTED" -eq 0 && -n "$CANDIDATE_VENV" && \
+    elif [[ "$VENV_SWAPPED" -eq 1 && "$PREVIOUS_VENV_EXISTED" -eq 0 && \
             ( -e "$LIVE_VENV" || -L "$LIVE_VENV" ) ]]; then
         FAILED_VENV="$APP_DIR/.venv-failed-${TARGET_COMMIT:0:12}-$$"
         mv "$LIVE_VENV" "$FAILED_VENV" || rollback_failed=1
@@ -171,6 +173,9 @@ rollback_activation() {
 cleanup() {
     local status=$?
     set +e
+    if [[ "$ACTIVATION_STARTED" -eq 1 && "$DEPLOY_SUCCEEDED" -ne 1 ]]; then
+        rollback_activation "unexpected exit $status" || status=1
+    fi
     if [[ -n "$STAGE_DIR" && -d "$STAGE_DIR" ]]; then
         rm -rf -- "$STAGE_DIR"
     fi
@@ -195,6 +200,7 @@ on_error() {
 on_signal() {
     local signal=$1
     local status=130
+    [[ "$signal" == "HUP" ]] && status=129
     [[ "$signal" == "TERM" ]] && status=143
     set +e
     echo "ERROR: update interrupted by $signal" >&2
@@ -284,8 +290,11 @@ main() {
     trap 'on_error "$LINENO"' ERR
     trap 'on_signal INT' INT
     trap 'on_signal TERM' TERM
+    trap 'on_signal HUP' HUP
 
     find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.deploy-stage.*' -mtime +1 \
+        -exec rm -rf -- {} +
+    find "$APP_DIR" -xdev -maxdepth 1 -type d -name '.venv-failed-*' -mtime +7 \
         -exec rm -rf -- {} +
     STAGE_DIR=$(mktemp -d "$APP_DIR/.deploy-stage.XXXXXXXX")
     TARGET_TREE="$STAGE_DIR/target-tree"

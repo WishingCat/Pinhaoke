@@ -201,8 +201,10 @@ class DeployContractTests(unittest.TestCase):
             'trap \'on_error "$LINENO"\' ERR',
             "trap 'on_signal INT' INT",
             "trap 'on_signal TERM' TERM",
+            "trap 'on_signal HUP' HUP",
             'rollback_activation "error at line $line"',
             'rollback_activation "signal $signal"',
+            'rollback_activation "unexpected exit $status"',
             'PREVIOUS_COMMIT=$(git rev-parse --verify "HEAD^{commit}")',
             'PREVIOUS_SERVICE_ACTIVE=1',
             'UNIT_BACKUP=',
@@ -280,6 +282,72 @@ class DeployContractTests(unittest.TestCase):
                 text=True,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_hup_before_venv_swap_restores_release_without_moving_live_venv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app_dir = root / "app"
+            bin_dir = root / "bin"
+            stage = app_dir / ".deploy-stage.test"
+            app_dir.mkdir()
+            bin_dir.mkdir()
+            stage.mkdir()
+            (app_dir / "code-state").write_text("new")
+            (app_dir / "venv").mkdir()
+            (app_dir / "venv" / "identity").write_text("old-env")
+            unit_path = root / "pinhaoke.service"
+            unit_path.write_text("new-unit")
+            unit_backup = stage / "old-unit"
+            unit_backup.write_text("old-unit")
+            systemctl_log = root / "systemctl.log"
+
+            (bin_dir / "git").write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ $1 == reset ]]; then printf '%s' \"$3\" >\"$APP_DIR/code-state\"; fi\n"
+                "exit 0\n"
+            )
+            (bin_dir / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >>\"$SYSTEMCTL_LOG\"\n"
+                "exit 0\n"
+            )
+            for stub in bin_dir.iterdir():
+                stub.chmod(0o755)
+
+            harness = textwrap.dedent(
+                f"""
+                set -Eeuo pipefail
+                export APP_DIR={app_dir!s}
+                export LIVE_VENV="$APP_DIR/venv"
+                export UNIT_PATH={unit_path!s}
+                export SYSTEMCTL_LOG={systemctl_log!s}
+                export PATH={bin_dir!s}:$PATH
+                source {ROOT / 'deploy/update.sh'}
+                STAGE_DIR={stage!s}
+                TARGET_COMMIT=new
+                PREVIOUS_COMMIT=old
+                PREVIOUS_SERVICE_ACTIVE=1
+                UNIT_PREVIOUSLY_EXISTED=1
+                UNIT_BACKUP={unit_backup!s}
+                ACTIVATION_STARTED=1
+                apply_release_permissions() {{ :; }}
+                on_signal HUP
+                """
+            )
+            result = subprocess.run(
+                ["bash", "-c", harness],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 129, result.stderr)
+            self.assertEqual((app_dir / "venv" / "identity").read_text(), "old-env")
+            self.assertEqual((app_dir / "code-state").read_text(), "old")
+            self.assertEqual(unit_path.read_text(), "old-unit")
+            self.assertFalse(list(app_dir.glob(".venv-failed-*")))
+            calls = systemctl_log.read_text().splitlines()
+            self.assertIn("start pinhaoke", calls)
+            self.assertIn("is-active --quiet pinhaoke", calls)
 
     def test_service_runs_as_www_data_with_read_only_sandbox(self):
         for setting in (
