@@ -52,12 +52,13 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 更新脚本在**停服前**完成可能耗时或可能失败的工作：
 
 1. fetch 并解析精确 `origin/main` commit，同时记录旧 commit、旧 unit 和服务活动状态。
-2. 如果目标提交使用 Git LFS，检查 `git-lfs`，fetch 目标对象并运行 LFS fsck。
-3. 用临时 Git index 把目标 commit 展开到 `.deploy-stage.*`，确认 LFS 文件已经物化而不是 pointer。
-4. 从 staged target 的 `requirements.txt` 计算 SHA-256。
-5. 仅在活动 venv 缺失或 requirements 哈希变化时构建候选 venv，执行 `python -m pip install`、`pip check` 和依赖导入检查。
+2. 如果旧提交使用 Git LFS，检查 `git-lfs`，fetch 旧对象并运行 LFS fsck；再用独立临时 Git index 展开旧提交，确认旧 LFS 文件已经物化而不是 pointer。
+3. 如果目标提交使用 Git LFS，同样 fetch 目标对象并运行 LFS fsck。
+4. 用另一份临时 Git index 把目标 commit 展开到 `.deploy-stage.*`，确认目标 LFS 文件已经物化而不是 pointer。
+5. 从 staged target 的 `requirements.txt` 计算 SHA-256。
+6. 仅在活动 venv 缺失或 requirements 哈希变化时构建候选 venv，执行 `python -m pip install`、`pip check` 和依赖导入检查。
 
-只有这些步骤全部成功才停止 `pinhaoke.service`。因此下载、LFS 缺失、依赖解析或候选环境错误不会造成服务停机。
+只有这些步骤全部成功才停止 `pinhaoke.service`。旧版本或目标版本的 LFS 对象缺失、下载失败、未正确物化，以及依赖解析或候选环境错误都不会造成服务停机。
 
 ## 激活与烟测
 
@@ -89,7 +90,7 @@ http://127.0.0.1:8000/api/courses?term=fall&page_size=1
 - 未经过成功路径的进程 EXIT
 - 服务启动、活动状态或任一烟测失败
 
-自动回滚会停止失败服务，恢复旧 commit 和对应 LFS 文件，恢复旧 systemd unit，重新应用权限，并只在旧服务原本处于 active 时重新启动它。
+自动回滚会停止失败服务，恢复旧 commit 和对应 LFS 文件，恢复旧 systemd unit，重新应用权限，并只在旧服务原本处于 active 时重新启动它。旧版本 LFS 对象已在停服前完成 fetch、fsck 和独立物化验证，回滚阶段只使用这些已验证的本地对象，不依赖临时网络下载。
 
 虚拟环境回滚以 `VENV_SWAPPED=1` 为条件：
 

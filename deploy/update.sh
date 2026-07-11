@@ -15,6 +15,8 @@ SMOKE_MAX_SECONDS=${SMOKE_MAX_SECONDS:-15}
 STAGE_DIR=""
 TARGET_TREE=""
 TARGET_INDEX=""
+PREVIOUS_TREE=""
+PREVIOUS_INDEX=""
 CANDIDATE_VENV=""
 TARGET_COMMIT=""
 TARGET_USES_LFS=0
@@ -51,6 +53,29 @@ verify_materialized_lfs() {
             return 1
         fi
     done < <(git lfs ls-files --name-only "$commit")
+}
+
+preflight_previous_lfs_release() {
+    local commit=$1
+    local tree=${2:-$PREVIOUS_TREE}
+    local index=${3:-$PREVIOUS_INDEX}
+
+    if [[ "$PREVIOUS_USES_LFS" -ne 1 ]]; then
+        return 0
+    fi
+    if ! command -v git-lfs >/dev/null 2>&1; then
+        echo "ERROR: previous commit uses Git LFS but git-lfs is unavailable" >&2
+        return 1
+    fi
+
+    git lfs install --local
+    git lfs fetch origin "$commit"
+    git lfs fsck --objects "$commit"
+    mkdir -p "$tree"
+    GIT_INDEX_FILE="$index" git read-tree "$commit"
+    GIT_INDEX_FILE="$index" git checkout-index --all --force --prefix="$tree/"
+    git lfs fsck --objects "$commit"
+    verify_materialized_lfs "$tree" "$commit"
 }
 
 swap_candidate_venv() {
@@ -303,6 +328,8 @@ main() {
     STAGE_DIR=$(mktemp -d "$APP_DIR/.deploy-stage.XXXXXXXX")
     TARGET_TREE="$STAGE_DIR/target-tree"
     TARGET_INDEX="$STAGE_DIR/index"
+    PREVIOUS_TREE="$STAGE_DIR/previous-tree"
+    PREVIOUS_INDEX="$STAGE_DIR/previous-index"
     CANDIDATE_VENV="$STAGE_DIR/venv"
     mkdir -p "$TARGET_TREE"
 
@@ -324,6 +351,9 @@ main() {
         UNIT_BACKUP="$STAGE_DIR/previous.service"
         cp -p "$UNIT_PATH" "$UNIT_BACKUP"
     fi
+
+    echo "==> Verifying previous release rollback data before downtime"
+    preflight_previous_lfs_release "$PREVIOUS_COMMIT" "$PREVIOUS_TREE" "$PREVIOUS_INDEX"
 
     if git cat-file -e "$TARGET_COMMIT:.gitattributes" 2>/dev/null; then
         git show "$TARGET_COMMIT:.gitattributes" >"$STAGE_DIR/gitattributes"

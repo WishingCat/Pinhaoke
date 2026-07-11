@@ -287,25 +287,37 @@ def fetch_jobs(jobs, allow_non_cn=False):
     return out
 
 
-def reuse_english_for_course_names(db_paths):
-    """Copy english_name into translations as (course_id, 'course_name', 'en')."""
+def reuse_english_for_course_names(db_paths, limit=0):
+    """Copy english_name into course_name/en, respecting a global write limit."""
+    total = 0
     for db_path in db_paths:
+        if limit and total >= limit:
+            break
         with closing(sqlite3.connect(db_path)) as conn:
-            rows = conn.execute(
+            query = (
                 "SELECT course_id, english_name FROM detail_info "
                 "WHERE english_name IS NOT NULL AND TRIM(english_name) != '' "
                 "AND NOT EXISTS ("
                 "SELECT 1 FROM translations t WHERE t.course_id=detail_info.course_id "
                 "AND t.field='course_name' AND t.lang='en'"
-                ")"
-            ).fetchall()
+                ") ORDER BY course_id"
+            )
+            params = ()
+            if limit:
+                query += " LIMIT ?"
+                params = (limit - total,)
+            rows = conn.execute(query, params).fetchall()
         n = 0
         for cid, en in rows:
+            if limit and total >= limit:
+                break
             write_translation_with_retry(
                 db_path, cid, "course_name", "en", clean_translation(en)
             )
             n += 1
+            total += 1
         print(f"[reuse en] {db_path}: {n} course_name 'en' rows seeded from english_name")
+    return total
 
 
 def build_parser():
@@ -324,14 +336,9 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    selected_paths = list({
-        "ug":     {UG_DB},
-        "gr":     {GR_DB},
-        "summer": {SUMMER_DB},
-        "fall":   {FALL_DB},
-        "fall_gr": {FALL_GR_DB},
-        "all":    {UG_DB, GR_DB, SUMMER_DB, FALL_DB, FALL_GR_DB},
-    }[args.db])
+    selected_paths = (
+        list(DATABASES.values()) if args.db == "all" else [DATABASES[args.db]]
+    )
 
     jobs = []
     if args.phase in ("short", "all"):
@@ -343,13 +350,20 @@ def main(argv=None):
     try:
         for db_path in selected_paths:
             setup_db(db_path)
-        reuse_english_for_course_names(selected_paths)
-        pending = fetch_jobs(jobs, allow_non_cn=args.allow_non_cn)
+        reused = 0
+        if args.phase in ("short", "all"):
+            reused = reuse_english_for_course_names(selected_paths, limit=args.limit)
+        remaining = max(args.limit - reused, 0) if args.limit else 0
+        pending = (
+            fetch_jobs(jobs, allow_non_cn=args.allow_non_cn)
+            if not args.limit or remaining
+            else []
+        )
     except Exception as exc:
         print(f"Setup, reuse, or pending scan failed: {type(exc).__name__}: {exc}")
         return 1
     if args.limit:
-        pending = pending[: args.limit]
+        pending = pending[:remaining]
 
     if not pending:
         print("Nothing pending.")

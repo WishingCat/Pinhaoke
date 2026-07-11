@@ -70,7 +70,7 @@ git diff --check
 
 `get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写数据库。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
 
-`GET /api/health` 检查五库可读性、`basic_info` / `detail_info` / `translations` 表、详情 1:1 行数与 `PRAGMA integrity_check`，结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
+`GET /api/health` 检查五库可读性、`basic_info` / `detail_info` / `translations` 表、详情行数、两表 ID 集合与唯一性、`PRAGMA foreign_key_check` 和 `PRAGMA integrity_check`。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
 
 ## API 契约
 
@@ -140,7 +140,7 @@ python3 北京大学选课网数据抓取/build_undergrad_2627_fall_db.py
 python3 北京大学选课网数据抓取/build_graduate_2627_fall_db.py
 ```
 
-`数据库构建脚本/build_atomic.py` 是唯一共享原子构建实现。各入口先完整解析源 JSON，严格检查必填字段、学分和冲突键，再通过 `atomic_database` 在目标同目录构建临时库。只有表、视图、外键、行数、1:1 详情和完整性检查全部通过后才 `os.replace` 正式库；失败时正式文件不变，并保留正式文件原权限模式。
+`数据库构建脚本/build_atomic.py` 是唯一共享原子构建实现。各入口先完整解析源 JSON，严格检查必填字段、学分和冲突键，再通过 `atomic_database` 在目标同目录构建临时库。只有表、视图、外键、行数、1:1 详情和完整性检查全部通过后才 `os.replace` 正式库，并立即 fsync 目标父目录。替换前失败时正式文件不变；替换后的目录同步失败会明确报错，说明新目录项尚未确认持久化。替换沿用正式文件原权限模式。
 
 重建会创建空 `translations` 表，等同于删除该库既有译文。运行建库前必须备份正式库或明确接受后续重新翻译。不要复制第二份 `build_common.py`。
 

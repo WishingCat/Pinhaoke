@@ -38,6 +38,42 @@ def _prepare_replacement(path, target):
         os.fsync(database_file.fileno())
 
 
+def _fsync_parent_directory(target):
+    directory = target.parent
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    try:
+        descriptor = os.open(directory, flags)
+    except OSError as exc:
+        raise RuntimeError(
+            f"database was replaced but parent directory fsync failed; "
+            f"replacement is not durably recorded: {exc}"
+        ) from exc
+
+    sync_error = None
+    close_error = None
+    try:
+        try:
+            os.fsync(descriptor)
+        except OSError as exc:
+            sync_error = exc
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError as exc:
+            close_error = exc
+
+    if sync_error is not None:
+        raise RuntimeError(
+            f"database was replaced but parent directory fsync failed; "
+            f"replacement is not durably recorded: {sync_error}"
+        ) from sync_error
+    if close_error is not None:
+        raise RuntimeError(
+            f"database was replaced and parent directory fsync completed, but "
+            f"closing the directory descriptor failed: {close_error}"
+        ) from close_error
+
+
 @contextmanager
 def atomic_database(target: Path, schema: str):
     """Build a SQLite file beside target and replace target only after validation."""
@@ -75,6 +111,7 @@ def atomic_database(target: Path, schema: str):
         _prepare_replacement(temp_path, target)
         os.replace(temp_path, target)
         temp_path = None
+        _fsync_parent_directory(target)
     except BaseException:
         if descriptor is not None:
             with suppress(OSError):

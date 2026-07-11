@@ -107,10 +107,38 @@ def check_database_health() -> dict:
                 }
                 basic = conn.execute("SELECT COUNT(*) FROM basic_info").fetchone()[0]
                 detail = conn.execute("SELECT COUNT(*) FROM detail_info").fetchone()[0]
+                relations_match = conn.execute(
+                    """
+                    SELECT
+                        NOT EXISTS (
+                            SELECT id FROM basic_info
+                            EXCEPT
+                            SELECT course_id FROM detail_info
+                        )
+                        AND NOT EXISTS (
+                            SELECT course_id FROM detail_info
+                            EXCEPT
+                            SELECT id FROM basic_info
+                        )
+                        AND (SELECT COUNT(*) FROM basic_info)
+                            = (SELECT COUNT(DISTINCT id) FROM basic_info)
+                        AND (SELECT COUNT(*) FROM detail_info)
+                            = (SELECT COUNT(DISTINCT course_id) FROM detail_info)
+                    """
+                ).fetchone()[0]
+                foreign_key_violation = conn.execute(
+                    "PRAGMA foreign_key_check"
+                ).fetchone()
                 integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
             finally:
                 conn.close()
-            if not {"basic_info", "detail_info", "translations"}.issubset(tables) or basic != detail or integrity != "ok":
+            if (
+                not {"basic_info", "detail_info", "translations"}.issubset(tables)
+                or basic != detail
+                or not relations_match
+                or foreign_key_violation is not None
+                or integrity != "ok"
+            ):
                 raise RuntimeError(f"Unhealthy database: {path.name}")
             databases.append(
                 {

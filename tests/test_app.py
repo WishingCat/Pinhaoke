@@ -1,3 +1,4 @@
+from contextlib import closing
 import sqlite3
 import subprocess
 import sys
@@ -108,9 +109,10 @@ class DatabaseConnectionTests(unittest.TestCase):
     def test_health_endpoint_hides_missing_required_table_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             database = Path(tmp) / "missing-translations.db"
-            with sqlite3.connect(database) as conn:
+            with closing(sqlite3.connect(database)) as conn:
                 conn.execute("CREATE TABLE basic_info(id INTEGER)")
                 conn.execute("CREATE TABLE detail_info(course_id INTEGER)")
+                conn.commit()
             with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
                 response = self.health_endpoint()()
 
@@ -119,11 +121,64 @@ class DatabaseConnectionTests(unittest.TestCase):
     def test_health_endpoint_hides_basic_detail_count_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
             database = Path(tmp) / "count-mismatch.db"
-            with sqlite3.connect(database) as conn:
+            with closing(sqlite3.connect(database)) as conn:
                 conn.execute("CREATE TABLE basic_info(id INTEGER)")
                 conn.execute("CREATE TABLE detail_info(course_id INTEGER)")
                 conn.execute("CREATE TABLE translations(course_id INTEGER)")
                 conn.execute("INSERT INTO basic_info VALUES (1)")
+                conn.commit()
+            with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
+                response = self.health_endpoint()()
+
+            self.assert_unhealthy_response(response, tmp)
+
+    def test_health_endpoint_hides_equal_count_but_mismatched_course_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / "relation-mismatch.db"
+            with closing(sqlite3.connect(database)) as conn:
+                conn.execute("CREATE TABLE basic_info(id INTEGER PRIMARY KEY)")
+                conn.execute("CREATE TABLE detail_info(course_id INTEGER PRIMARY KEY)")
+                conn.execute("CREATE TABLE translations(course_id INTEGER)")
+                conn.execute("INSERT INTO basic_info VALUES (1)")
+                conn.execute("INSERT INTO detail_info VALUES (2)")
+                conn.commit()
+            with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
+                response = self.health_endpoint()()
+
+            self.assert_unhealthy_response(response, tmp)
+
+    def test_health_endpoint_hides_duplicate_course_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / "duplicate-ids.db"
+            with closing(sqlite3.connect(database)) as conn:
+                conn.execute("CREATE TABLE basic_info(id INTEGER)")
+                conn.execute("CREATE TABLE detail_info(course_id INTEGER)")
+                conn.execute("CREATE TABLE translations(course_id INTEGER)")
+                conn.executemany("INSERT INTO basic_info VALUES (?)", [(1,), (1,)])
+                conn.executemany("INSERT INTO detail_info VALUES (?)", [(1,), (1,)])
+                conn.commit()
+            with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
+                response = self.health_endpoint()()
+
+            self.assert_unhealthy_response(response, tmp)
+
+    def test_health_endpoint_hides_foreign_key_violations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / "foreign-key-violation.db"
+            with closing(sqlite3.connect(database)) as conn:
+                conn.execute("CREATE TABLE basic_info(id INTEGER PRIMARY KEY)")
+                conn.execute(
+                    "CREATE TABLE detail_info("
+                    "course_id INTEGER PRIMARY KEY REFERENCES basic_info(id))"
+                )
+                conn.execute(
+                    "CREATE TABLE translations("
+                    "course_id INTEGER REFERENCES basic_info(id))"
+                )
+                conn.execute("INSERT INTO basic_info VALUES (1)")
+                conn.execute("INSERT INTO detail_info VALUES (1)")
+                conn.execute("INSERT INTO translations VALUES (2)")
+                conn.commit()
             with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
                 response = self.health_endpoint()()
 
@@ -144,10 +199,11 @@ class DatabaseConnectionTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             database = Path(tmp) / "integrity-failure.db"
-            with sqlite3.connect(database) as conn:
+            with closing(sqlite3.connect(database)) as conn:
                 conn.execute("CREATE TABLE basic_info(id INTEGER)")
                 conn.execute("CREATE TABLE detail_info(course_id INTEGER)")
                 conn.execute("CREATE TABLE translations(course_id INTEGER)")
+                conn.commit()
             real_connect = sqlite3.connect
             with patch.dict(app.TERM_DBS, {"test": [("main", database, "x")]}, clear=True):
                 with patch.object(
@@ -344,7 +400,7 @@ class CourseListTests(unittest.TestCase):
         params = [fixture[column] for fixture in fixtures for column in columns]
         sql = f"{app._grouped_course_ctes(source_sql, '')} SELECT * FROM grouped"
 
-        with sqlite3.connect(":memory:") as conn:
+        with closing(sqlite3.connect(":memory:")) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(sql, params).fetchone()
 
@@ -506,7 +562,7 @@ class CourseListTests(unittest.TestCase):
         if group_key_sql is None:
             return
 
-        with sqlite3.connect(":memory:") as conn:
+        with closing(sqlite3.connect(":memory:")) as conn:
             rows = conn.execute(
                 f"""
                 WITH sample(_level, course_code, class_no, teacher, id) AS (

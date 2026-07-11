@@ -86,9 +86,11 @@ python3 北京大学课程数据翻译/translate_courses.py --only fall_gr_intro
 - `--db ug|gr|summer|fall|fall_gr|all`
 - `--phase short|long|all`
 - `--allow-non-cn`：也处理纯英文等不含中文字符的源文本
-- `--limit N`：限制 pending 行数，适合小规模试跑
+- `--limit N`：限制本次总写入/API 任务行数，适合小规模试跑
 
 短字段任务包括课程名、备注、PNP、教室、专业、先修课程、通识系列、教材、修读对象和开课学期。长字段任务包括教学大纲、教学评估和参考书；秋季研究生还包括 `syllabus`。
+
+已有 `english_name` 只会在 `--phase short` 或 `--phase all` 中复用为课程名英语译文，`--phase long` 不读取或写入这项短字段。复用写入与 API 待处理项共享同一个 `--limit`：例如 `--limit 5` 最多处理五个 `(course_id, field)` 行，先计入无需 API 的英语名复用，再用剩余额度安排 API 任务；不能用复用绕过小批试跑范围。
 
 ```bash
 python3 北京大学课程数据翻译/translate_misc.py --db fall --phase short --workers 10

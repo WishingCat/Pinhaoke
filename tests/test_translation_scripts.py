@@ -212,10 +212,42 @@ class SelectionScopeTests(unittest.TestCase):
                         status = module.main(["--db", "fall_gr", "--phase", "all"])
         self.assertEqual(status, 0)
         setup.assert_called_once_with(target)
-        reuse.assert_called_once_with([target])
+        reuse.assert_called_once_with([target], limit=0)
         selected_jobs = fetch.call_args.args[0]
         self.assertTrue(selected_jobs)
         self.assertEqual({job[0] for job in selected_jobs}, {target})
+
+    def test_misc_long_phase_does_not_reuse_short_course_name_field(self):
+        module = import_script("translate_misc")
+        target = module.DATABASES["ug"]
+        with patch.object(module, "setup_db"):
+            with patch.object(module, "reuse_english_for_course_names") as reuse:
+                with patch.object(module, "fetch_jobs", return_value=[]) as fetch:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        status = module.main(["--db", "ug", "--phase", "long"])
+        self.assertEqual(status, 0)
+        reuse.assert_not_called()
+        self.assertTrue(fetch.call_args.args[0])
+        self.assertEqual({job[0] for job in fetch.call_args.args[0]}, {target})
+        self.assertTrue(all(job[5] for job in fetch.call_args.args[0]))
+
+    def test_misc_limit_is_shared_by_reuse_writes_and_api_tasks(self):
+        module = import_script("translate_misc")
+        target = module.DATABASES["ug"]
+        pending = [(target, "notes", "note", 9, "备注", ["en"])]
+        with patch.object(module, "setup_db"):
+            with patch.object(
+                module, "reuse_english_for_course_names", return_value=1
+            ) as reuse:
+                with patch.object(module, "fetch_jobs", return_value=pending):
+                    with patch.object(module, "call_api") as call_api:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            status = module.main(
+                                ["--db", "ug", "--phase", "short", "--limit", "1"]
+                            )
+        self.assertEqual(status, 0)
+        reuse.assert_called_once_with([target], limit=1)
+        call_api.assert_not_called()
 
     def test_stubborn_db_and_field_selection_happens_before_database_access(self):
         module = import_script("translate_stubborn")
@@ -251,6 +283,31 @@ class SelectionScopeTests(unittest.TestCase):
                 untouched_rows = conn.execute("SELECT text FROM translations").fetchall()
         self.assertEqual(selected_rows, [("Course",)])
         self.assertEqual(untouched_rows, [])
+
+    def test_fixture_reuse_honors_global_limit(self):
+        common = importlib.import_module(f"{PACKAGE}.translation_common")
+        module = import_script("translate_misc")
+        with tempfile.TemporaryDirectory() as tmp:
+            selected = Path(tmp) / "selected.db"
+            make_translation_db(selected)
+            common.setup_translation_db(selected)
+            with closing(sqlite3.connect(selected)) as conn:
+                with conn:
+                    conn.executemany(
+                        "INSERT INTO basic_info(id, course_name) VALUES (?, ?)",
+                        [(1, "课程一"), (2, "课程二"), (3, "课程三")],
+                    )
+                    conn.executemany(
+                        "INSERT INTO detail_info(course_id, english_name) VALUES (?, ?)",
+                        [(1, "One"), (2, "Two"), (3, "Three")],
+                    )
+            written = module.reuse_english_for_course_names([selected], limit=2)
+            with closing(sqlite3.connect(selected)) as conn:
+                rows = conn.execute(
+                    "SELECT course_id, text FROM translations ORDER BY course_id"
+                ).fetchall()
+        self.assertEqual(written, 2)
+        self.assertEqual(rows, [(1, "One"), (2, "Two")])
 
 
 class ApiAndFailureStatusTests(unittest.TestCase):

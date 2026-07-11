@@ -177,6 +177,69 @@ class DeployContractTests(unittest.TestCase):
         self.assertIn('"$APP_DIR/Images"', self.update)
         self.assertIn('"$APP_DIR/数据库"', self.update)
 
+    def test_previous_lfs_release_is_fetched_and_materialized_before_stop(self):
+        stop = self.main.index('systemctl stop "$SERVICE"')
+        preflight = 'preflight_previous_lfs_release'
+        self.assertIn(f'{preflight} "$PREVIOUS_COMMIT"', self.main)
+        self.assertLess(self.main.index(f'{preflight} "$PREVIOUS_COMMIT"'), stop)
+        for fragment in (
+            'git lfs fetch origin "$commit"',
+            'git lfs fsck --objects "$commit"',
+            'GIT_INDEX_FILE="$index" git read-tree "$commit"',
+            'GIT_INDEX_FILE="$index" git checkout-index',
+            'verify_materialized_lfs "$tree" "$commit"',
+        ):
+            self.assertIn(fragment, self.update)
+
+    def test_missing_previous_lfs_object_fails_before_service_stop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            systemctl_log = root / "systemctl.log"
+            git_log = root / "git.log"
+
+            (bin_dir / "git").write_text(
+                "#!/usr/bin/env bash\n"
+                'printf \'%s\\n\' "$*" >>"$GIT_LOG"\n'
+                'if [[ "$*" == "lfs fsck --objects old" ]]; then exit 23; fi\n'
+                "exit 0\n"
+            )
+            (bin_dir / "git-lfs").write_text("#!/usr/bin/env bash\nexit 0\n")
+            (bin_dir / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                'printf \'%s\\n\' "$*" >>"$SYSTEMCTL_LOG"\n'
+                "exit 0\n"
+            )
+            for stub in bin_dir.iterdir():
+                stub.chmod(0o755)
+
+            harness = textwrap.dedent(
+                f"""
+                set -Eeuo pipefail
+                export PATH={bin_dir!s}:$PATH
+                export GIT_LOG={git_log!s}
+                export SYSTEMCTL_LOG={systemctl_log!s}
+                source {ROOT / 'deploy/update.sh'}
+                PREVIOUS_USES_LFS=1
+                PREVIOUS_TREE={root / 'previous-tree'!s}
+                PREVIOUS_INDEX={root / 'previous-index'!s}
+                preflight_previous_lfs_release old
+                systemctl stop pinhaoke
+                """
+            )
+            result = subprocess.run(
+                ["bash", "-c", harness],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 23, result.stderr)
+            git_calls = git_log.read_text().splitlines()
+            self.assertIn("lfs fetch origin old", git_calls)
+            self.assertIn("lfs fsck --objects old", git_calls)
+            self.assertFalse(systemctl_log.exists())
+
     def test_update_smoke_tests_all_three_api_contracts_with_bounded_retries(self):
         for endpoint in (
             "/api/health",

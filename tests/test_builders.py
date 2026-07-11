@@ -259,6 +259,107 @@ class AtomicDatabaseTests(unittest.TestCase):
                 )
                 self.assertEqual(conn.execute("PRAGMA integrity_check").fetchall(), [("ok",)])
 
+    @unittest.skipIf(os.name == "nt", "directory fsync requires POSIX file descriptors")
+    def test_success_fsyncs_target_parent_after_replace_and_closes_directory_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "courses.db"
+            target.write_bytes(b"official")
+            real_open = os.open
+            real_close = os.close
+            real_fsync = os.fsync
+            real_replace = os.replace
+            directory_fds = []
+            closed_fds = []
+            events = []
+
+            def tracked_open(path, flags, mode=0o777, *, dir_fd=None):
+                fd = real_open(path, flags, mode, dir_fd=dir_fd)
+                if Path(path) == target.parent:
+                    directory_fds.append((fd, flags))
+                return fd
+
+            def tracked_close(fd):
+                closed_fds.append(fd)
+                return real_close(fd)
+
+            def tracked_fsync(fd):
+                if directory_fds and fd == directory_fds[-1][0]:
+                    events.append("directory_fsync")
+                return real_fsync(fd)
+
+            def tracked_replace(source, destination):
+                events.append("replace")
+                return real_replace(source, destination)
+
+            with (
+                mock.patch("数据库构建脚本.build_atomic.os.open", side_effect=tracked_open),
+                mock.patch("数据库构建脚本.build_atomic.os.close", side_effect=tracked_close),
+                mock.patch("数据库构建脚本.build_atomic.os.fsync", side_effect=tracked_fsync),
+                mock.patch(
+                    "数据库构建脚本.build_atomic.os.replace",
+                    side_effect=tracked_replace,
+                ),
+            ):
+                with atomic_database(target, atomic_schema()) as conn:
+                    validate_built_database(conn, expected_rows=0)
+
+            self.assertEqual(events, ["replace", "directory_fsync"])
+            self.assertEqual(len(directory_fds), 1)
+            directory_fd, flags = directory_fds[0]
+            if hasattr(os, "O_DIRECTORY"):
+                self.assertEqual(flags & os.O_DIRECTORY, os.O_DIRECTORY)
+            self.assertIn(directory_fd, closed_fds)
+
+    @unittest.skipIf(os.name == "nt", "directory fsync requires POSIX file descriptors")
+    def test_directory_fsync_failure_reports_replacement_not_durable_and_closes_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "courses.db"
+            target.write_bytes(b"official")
+            real_open = os.open
+            real_close = os.close
+            real_fsync = os.fsync
+            directory_fds = []
+            closed_fds = []
+
+            def tracked_open(path, flags, mode=0o777, *, dir_fd=None):
+                fd = real_open(path, flags, mode, dir_fd=dir_fd)
+                if Path(path) == target.parent:
+                    directory_fds.append(fd)
+                return fd
+
+            def tracked_close(fd):
+                closed_fds.append(fd)
+                return real_close(fd)
+
+            def fail_directory_fsync(fd):
+                if directory_fds and fd == directory_fds[-1]:
+                    raise OSError("simulated directory fsync failure")
+                return real_fsync(fd)
+
+            with (
+                mock.patch("数据库构建脚本.build_atomic.os.open", side_effect=tracked_open),
+                mock.patch("数据库构建脚本.build_atomic.os.close", side_effect=tracked_close),
+                mock.patch(
+                    "数据库构建脚本.build_atomic.os.fsync",
+                    side_effect=fail_directory_fsync,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "replaced.*parent directory fsync failed.*not durably recorded",
+                ):
+                    with atomic_database(target, atomic_schema()) as conn:
+                        conn.execute("INSERT INTO basic_info VALUES (1)")
+                        conn.execute("INSERT INTO detail_info VALUES (1)")
+                        validate_built_database(conn, expected_rows=1)
+
+            self.assertEqual(len(directory_fds), 1)
+            self.assertIn(directory_fds[0], closed_fds)
+            with closing(sqlite3.connect(target)) as conn:
+                self.assertEqual(
+                    conn.execute("SELECT id FROM basic_info").fetchone()[0], 1
+                )
+
     @unittest.skipIf(os.name == "nt", "POSIX permission bits are required")
     def test_success_preserves_existing_target_permission_bits(self):
         with tempfile.TemporaryDirectory() as tmp:
