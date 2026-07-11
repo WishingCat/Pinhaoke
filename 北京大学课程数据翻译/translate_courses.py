@@ -1,153 +1,136 @@
 #!/usr/bin/env python3
-"""Batch-translate course intro and extra_notes via DeepSeek v4-pro into 7 languages.
+"""Batch-translate course introductions and graduate extra notes."""
 
-Stores results in a `translations` table per DB:
-    translations(course_id INTEGER, field TEXT, lang TEXT, text TEXT, PRIMARY KEY(...))
-
-Scope (per user request 2026-05-13):
-  - undergrad detail_info.intro_cn      → field 'intro_cn'
-  - graduate  detail_info.intro          → field 'intro_cn' (same UI slot)
-  - graduate  detail_info.extra_notes    → field 'extra_notes'
-
-For English, reuse undergrad detail_info.intro_en when present (no API call needed).
-
-Resumable: re-running skips (course_id, field, lang) triples already in translations.
-"""
 import argparse
 import json
 import os
 import sqlite3
-import ssl
-import sys
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
+from contextlib import closing
 
 try:
-    import certifi
-    SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+    from .translation_common import (
+        DATABASES,
+        LANGUAGE_NAMES,
+        LANGUAGES,
+        SSL_CONTEXT,
+        clean_translation,
+        get_api_key,
+        nonnegative_int,
+        positive_int,
+        setup_translation_db,
+        write_translation_with_retry,
+    )
 except ImportError:
-    SSL_CTX = ssl.create_default_context()
+    from translation_common import (
+        DATABASES,
+        LANGUAGE_NAMES,
+        LANGUAGES,
+        SSL_CONTEXT,
+        clean_translation,
+        get_api_key,
+        nonnegative_int,
+        positive_int,
+        setup_translation_db,
+        write_translation_with_retry,
+    )
 
-API_KEY = os.environ.get("DEEPSEEK_API_KEY") or sys.exit(
-    "Set DEEPSEEK_API_KEY env var (e.g. export DEEPSEEK_API_KEY=sk-...)"
-)
+
 API_URL = os.environ.get("DEEPSEEK_API_URL", "https://api.qnaigc.com/v1/chat/completions")
 MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek/deepseek-v4-flash")
 ENABLE_THINKING = os.environ.get("DEEPSEEK_ENABLE_THINKING")
 THINKING = os.environ.get("DEEPSEEK_THINKING")
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-UG_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期本科生课程.db")
-GR_DB = str(_PROJECT_ROOT / "数据库" / "2026春季学期研究生课程.db")
-SUMMER_DB = str(_PROJECT_ROOT / "数据库" / "2026暑期本科生课程.db")
-FALL_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db")
-FALL_GR_DB = str(_PROJECT_ROOT / "数据库" / "2026秋季学期研究生课程.db")
+LANGS = LANGUAGES
+LANG_NAMES = LANGUAGE_NAMES
+UG_DB = DATABASES["ug"]
+GR_DB = DATABASES["gr"]
+SUMMER_DB = DATABASES["summer"]
+FALL_DB = DATABASES["fall"]
+FALL_GR_DB = DATABASES["fall_gr"]
 
-LANGS = ["en", "ja", "ko", "fr", "de", "es", "ru"]
-LANG_NAMES = {
-    "en": "English",
-    "ja": "Japanese (日本語)",
-    "ko": "Korean (한국어)",
-    "fr": "French (français)",
-    "de": "German (Deutsch)",
-    "es": "Spanish (español)",
-    "ru": "Russian (русский)",
-}
-
-
-def setup_db(db_path: str):
-    conn = sqlite3.connect(db_path)
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS translations (
-            course_id INTEGER NOT NULL,
-            field     TEXT NOT NULL,
-            lang      TEXT NOT NULL,
-            text      TEXT NOT NULL,
-            PRIMARY KEY (course_id, field, lang)
-        );
-        CREATE INDEX IF NOT EXISTS idx_trans_cid_field
-            ON translations(course_id, field);
-        """
-    )
-    conn.commit()
-    conn.close()
+# (CLI name, DB key, schema shape, source field, stored field, display label)
+JOBS = (
+    ("ug_intro", "ug", "undergrad", "intro_cn", "intro_cn", "undergrad intro_cn"),
+    ("gr_intro", "gr", "graduate", "intro", "intro_cn", "graduate intro"),
+    ("gr_extra", "gr", "graduate", "extra_notes", "extra_notes", "graduate extra"),
+    ("summer_intro", "summer", "undergrad", "intro_cn", "intro_cn", "summer intro_cn"),
+    ("fall_intro", "fall", "undergrad", "intro_cn", "intro_cn", "fall intro_cn"),
+    ("fall_gr_intro", "fall_gr", "graduate", "intro", "intro_cn", "fall grad intro"),
+    ("fall_gr_extra", "fall_gr", "graduate", "extra_notes", "extra_notes", "fall grad extra"),
+)
 
 
-def fetch_pending_undergrad(db_path: str = UG_DB):
-    """Returns list[(course_id, source_text, missing_langs)] for a UG-shape DB.
+def setup_db(db_path):
+    setup_translation_db(db_path)
 
-    UG-shape = detail_info has columns intro_cn + intro_en (spring undergrad
-    AND summer undergrad both qualify).
-    """
-    conn = sqlite3.connect(db_path)
-    rows = conn.execute(
-        "SELECT course_id, intro_cn, intro_en FROM detail_info "
-        "WHERE intro_cn IS NOT NULL AND intro_cn != ''"
-    ).fetchall()
+
+def fetch_pending_undergrad(db_path=UG_DB):
+    """Return pending intro rows, seeding available English text first."""
     pending = []
-    for cid, src, intro_en in rows:
-        existing = {
-            r[0]
-            for r in conn.execute(
-                "SELECT lang FROM translations WHERE course_id=? AND field='intro_cn'",
-                (cid,),
-            )
-        }
-        missing = [l for l in LANGS if l not in existing]
-        if "en" in missing and intro_en and intro_en.strip():
-            conn.execute(
-                "INSERT OR REPLACE INTO translations VALUES (?,?,?,?)",
-                (cid, "intro_cn", "en", intro_en),
-            )
-            missing.remove("en")
-        if missing:
-            pending.append((cid, src, missing))
-    conn.commit()
-    conn.close()
+    english_reuse = []
+    with closing(sqlite3.connect(db_path)) as conn:
+        rows = conn.execute(
+            "SELECT course_id, intro_cn, intro_en FROM detail_info "
+            "WHERE intro_cn IS NOT NULL AND TRIM(intro_cn) != ''"
+        ).fetchall()
+        for cid, source, intro_en in rows:
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT lang FROM translations WHERE course_id=? AND field='intro_cn'",
+                    (cid,),
+                )
+            }
+            missing = [lang for lang in LANGS if lang not in existing]
+            if "en" in missing and isinstance(intro_en, str) and intro_en.strip():
+                english_reuse.append((cid, clean_translation(intro_en)))
+                missing.remove("en")
+            if missing:
+                pending.append((cid, source, missing))
+    for cid, english in english_reuse:
+        write_translation_with_retry(db_path, cid, "intro_cn", "en", english)
     return pending
 
 
-def fetch_pending_grad(field_src: str, field_store: str, db_path: str = GR_DB):
-    conn = sqlite3.connect(db_path)
-    rows = conn.execute(
-        f"SELECT course_id, {field_src} FROM detail_info "
-        f"WHERE {field_src} IS NOT NULL AND {field_src} != ''"
-    ).fetchall()
-    pending = []
-    for cid, src in rows:
-        existing = {
-            r[0]
-            for r in conn.execute(
-                "SELECT lang FROM translations WHERE course_id=? AND field=?",
-                (cid, field_store),
-            )
-        }
-        missing = [l for l in LANGS if l not in existing]
-        if missing:
-            pending.append((cid, src, missing))
-    conn.close()
+def fetch_pending_grad(field_src, field_store, db_path=GR_DB):
+    with closing(sqlite3.connect(db_path)) as conn:
+        rows = conn.execute(
+            f"SELECT course_id, {field_src} FROM detail_info "
+            f"WHERE {field_src} IS NOT NULL AND TRIM({field_src}) != ''"
+        ).fetchall()
+        pending = []
+        for cid, source in rows:
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT lang FROM translations WHERE course_id=? AND field=?",
+                    (cid, field_store),
+                )
+            }
+            missing = [lang for lang in LANGS if lang not in existing]
+            if missing:
+                pending.append((cid, source, missing))
     return pending
 
 
-def call_api(text: str, langs):
-    lang_spec = ", ".join(f"{l} ({LANG_NAMES[l]})" for l in langs)
+def call_api(text, langs, max_retries=3):
+    lang_spec = ", ".join(f"{lang} ({LANG_NAMES[lang]})" for lang in langs)
     user_prompt = (
-        f"Translate the following Chinese university course content to these "
+        "Translate the following Chinese university course content to these "
         f"languages: {lang_spec}.\n\n"
         f"Return strict JSON with exactly these keys: {langs}. "
-        f"No markdown wrappers, no commentary, no extra fields.\n\n"
-        f"Guidelines:\n"
-        f"- Preserve academic terminology and proper-noun translations standard "
-        f"in each language (e.g. 量子力学→Quantum Mechanics, "
-        f"北京大学→Peking University).\n"
-        f"- Preserve newlines and bullet-list structure from source.\n"
-        f"- Keep Latin abbreviations / numbers / dates verbatim.\n"
-        f"- Translate naturally; do not transliterate Chinese names of academic "
-        f"departments — use the official institutional translation when known.\n\n"
+        "No markdown wrappers, no commentary, no extra fields.\n\n"
+        "Guidelines:\n"
+        "- Preserve academic terminology and proper-noun translations standard "
+        "in each language (e.g. 量子力学→Quantum Mechanics, 北京大学→Peking University).\n"
+        "- Preserve newlines and bullet-list structure from source.\n"
+        "- Keep Latin abbreviations / numbers / dates verbatim.\n"
+        "- Translate naturally; do not transliterate Chinese names of academic "
+        "departments — use the official institutional translation when known.\n\n"
         f"Source (Chinese):\n{text}\n\nOutput JSON:"
     )
     body = {
@@ -171,159 +154,139 @@ def call_api(text: str, langs):
         body["enable_thinking"] = False
     if "api.deepseek.com" in API_URL:
         body["thinking"] = {"type": THINKING or "disabled"}
-    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
+
+    request = urllib.request.Request(
         API_URL,
-        data=data,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {API_KEY}",
+            "Authorization": f"Bearer {get_api_key()}",
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=240, context=SSL_CTX) as resp:
-        result = json.loads(resp.read())
-    content = result["choices"][0]["message"]["content"]
-    parsed = json.loads(content)
-    missing_in_resp = [l for l in langs if l not in parsed or not parsed[l]]
-    if missing_in_resp:
-        raise ValueError(f"API response missing langs: {missing_in_resp}")
-    return parsed, result.get("usage", {})
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(request, timeout=240, context=SSL_CONTEXT) as response:
+                result = json.loads(response.read())
+            parsed = json.loads(result["choices"][0]["message"]["content"])
+            cleaned = {lang: clean_translation(parsed.get(lang)) for lang in langs}
+            return cleaned, result.get("usage", {})
+        except urllib.error.HTTPError as exc:
+            last_error = RuntimeError(f"HTTP {exc.code}: {exc.read()[:200]!r}")
+        except Exception as exc:
+            last_error = exc
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)
+    raise last_error
 
 
 def translate_one(item, db_path, field):
-    cid, src, missing_langs = item
-    last_err = None
-    for attempt in range(3):
-        try:
-            translations, usage = call_api(src, missing_langs)
-            conn = sqlite3.connect(db_path, timeout=30)
-            for lang, txt in translations.items():
-                if lang in missing_langs:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO translations VALUES (?,?,?,?)",
-                        (cid, field, lang, txt),
-                    )
-            conn.commit()
-            conn.close()
-            return (cid, True, None, usage)
-        except urllib.error.HTTPError as e:
-            last_err = f"HTTP {e.code}: {e.read()[:200]!r}"
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}"
-        time.sleep(2 ** attempt)
-    return (cid, False, last_err, {})
+    cid, source, missing_langs = item
+    try:
+        translations, usage = call_api(source, missing_langs)
+    except Exception as exc:
+        return cid, False, f"{type(exc).__name__}: {exc}", {}
+
+    try:
+        for lang in missing_langs:
+            write_translation_with_retry(db_path, cid, field, lang, translations[lang])
+    except Exception as exc:
+        return cid, False, f"{type(exc).__name__}: {exc}", usage
+    return cid, True, None, usage
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--limit", type=int, default=0,
-                    help="Translate at most N rows total (for testing).")
-    ap.add_argument("--workers", type=int, default=10,
-                    help="Parallel API workers.")
-    ap.add_argument("--only",
-                    choices=[
-                        "ug_intro", "gr_intro", "gr_extra", "summer_intro", "fall_intro",
-                        "fall_gr_intro", "fall_gr_extra",
-                    ],
-                    help="Restrict to one job for testing.")
-    args = ap.parse_args()
+def build_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--limit",
+        type=nonnegative_int,
+        default=0,
+        help="Translate at most N rows total (for testing).",
+    )
+    parser.add_argument(
+        "--workers", type=positive_int, default=10, help="Parallel API workers."
+    )
+    parser.add_argument(
+        "--only",
+        choices=[job[0] for job in JOBS],
+        help="Restrict to one translation job.",
+    )
+    return parser
 
-    print("== Setup ==")
-    setup_db(UG_DB)
-    setup_db(GR_DB)
-    setup_db(SUMMER_DB)
-    setup_db(FALL_DB)
-    setup_db(FALL_GR_DB)
 
-    print("== Pending lists ==")
-    ug = fetch_pending_undergrad(UG_DB)
-    gr_intro = fetch_pending_grad("intro", "intro_cn", GR_DB)
-    gr_extra = fetch_pending_grad("extra_notes", "extra_notes", GR_DB)
-    summer = fetch_pending_undergrad(SUMMER_DB)
-    fall = fetch_pending_undergrad(FALL_DB)
-    fall_gr_intro = fetch_pending_grad("intro", "intro_cn", FALL_GR_DB)
-    fall_gr_extra = fetch_pending_grad("extra_notes", "extra_notes", FALL_GR_DB)
-    print(f"  undergrad intro_cn : {len(ug):4d} rows")
-    print(f"  graduate  intro    : {len(gr_intro):4d} rows")
-    print(f"  graduate  extra    : {len(gr_extra):4d} rows")
-    print(f"  summer    intro_cn : {len(summer):4d} rows")
-    print(f"  fall      intro_cn : {len(fall):4d} rows")
-    print(f"  fall grad intro    : {len(fall_gr_intro):4d} rows")
-    print(f"  fall grad extra    : {len(fall_gr_extra):4d} rows")
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    selected = [job for job in JOBS if args.only is None or job[0] == args.only]
 
-    jobs = []
-    if args.only in (None, "ug_intro"):
-        jobs.append((UG_DB, "intro_cn", ug))
-    if args.only in (None, "gr_intro"):
-        jobs.append((GR_DB, "intro_cn", gr_intro))
-    if args.only in (None, "gr_extra"):
-        jobs.append((GR_DB, "extra_notes", gr_extra))
-    if args.only in (None, "summer_intro"):
-        jobs.append((SUMMER_DB, "intro_cn", summer))
-    if args.only in (None, "fall_intro"):
-        jobs.append((FALL_DB, "intro_cn", fall))
-    if args.only in (None, "fall_gr_intro"):
-        jobs.append((FALL_GR_DB, "intro_cn", fall_gr_intro))
-    if args.only in (None, "fall_gr_extra"):
-        jobs.append((FALL_GR_DB, "extra_notes", fall_gr_extra))
+    try:
+        selected_paths = list(dict.fromkeys(DATABASES[job[1]] for job in selected))
+        for db_path in selected_paths:
+            setup_db(db_path)
 
-    all_items = []
-    for db, field, items in jobs:
-        for it in items:
-            all_items.append((db, field, it))
+        all_items = []
+        print("== Pending lists ==")
+        for _name, db_key, shape, source_field, store_field, label in selected:
+            db_path = DATABASES[db_key]
+            if shape == "undergrad":
+                pending = fetch_pending_undergrad(db_path)
+            else:
+                pending = fetch_pending_grad(source_field, store_field, db_path)
+            print(f"  {label:20s}: {len(pending):4d} rows")
+            all_items.extend((db_path, store_field, item) for item in pending)
+    except Exception as exc:
+        print(f"Setup or pending scan failed: {type(exc).__name__}: {exc}")
+        return 1
 
     if args.limit:
         all_items = all_items[: args.limit]
-
     total = len(all_items)
     if total == 0:
         print("Nothing to translate. All up to date.")
-        return
+        return 0
 
     print(f"== Starting {total} API calls with {args.workers} workers ==")
-    t0 = time.time()
+    started = time.time()
     done = 0
     errors = []
-    total_input_tokens = 0
-    total_output_tokens = 0
-
-    with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {
-            ex.submit(translate_one, item, db, field): (db, field, item[0])
-            for db, field, item in all_items
+    input_tokens = 0
+    output_tokens = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {
+            executor.submit(translate_one, item, db_path, field): (db_path, field, item[0])
+            for db_path, field, item in all_items
         }
-        for fut in as_completed(futs):
-            db, field, cid = futs[fut]
+        for future in as_completed(futures):
+            db_path, field, cid = futures[future]
             try:
-                _cid, ok, err, usage = fut.result()
-                total_input_tokens += usage.get("prompt_tokens", 0)
-                total_output_tokens += usage.get("completion_tokens", 0)
-            except Exception as e:
-                ok, err = False, f"future error: {e}"
+                _cid, ok, error, usage = future.result()
+            except Exception as exc:
+                ok = False
+                error = f"future error: {type(exc).__name__}: {exc}"
+                usage = {}
+            input_tokens += usage.get("prompt_tokens", 0)
+            output_tokens += usage.get("completion_tokens", 0)
             done += 1
             if not ok:
-                errors.append((db, field, cid, err))
+                errors.append((db_path, field, cid, error))
             if done % 10 == 0 or done == total:
-                elapsed = time.time() - t0
+                elapsed = time.time() - started
                 rate = done / max(elapsed, 0.01)
                 eta = (total - done) / max(rate, 0.01)
                 print(
-                    f"  [{done}/{total}] elapsed={elapsed:5.0f}s "
-                    f"rate={rate:4.1f}/s eta={eta:5.0f}s "
-                    f"in={total_input_tokens} out={total_output_tokens} "
+                    f"  [{done}/{total}] elapsed={elapsed:5.0f}s rate={rate:4.1f}/s "
+                    f"eta={eta:5.0f}s in={input_tokens} out={output_tokens} "
                     f"errors={len(errors)}"
                 )
 
-    elapsed = time.time() - t0
+    elapsed = time.time() - started
     print(f"\n== Done in {elapsed:.0f}s ==")
     print(f"  OK     : {total - len(errors)}")
     print(f"  FAILED : {len(errors)}")
-    print(f"  tokens : input={total_input_tokens} output={total_output_tokens}")
-    if errors:
-        print(f"\nFirst 10 errors:")
-        for db, field, cid, err in errors[:10]:
-            print(f"  {os.path.basename(db)} {field} cid={cid}: {err[:200]}")
+    print(f"  tokens : input={input_tokens} output={output_tokens}")
+    for db_path, field, cid, error in errors[:10]:
+        print(f"  {os.path.basename(db_path)} {field} cid={cid}: {error[:200]}")
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
