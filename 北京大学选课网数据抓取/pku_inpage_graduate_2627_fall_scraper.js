@@ -1,8 +1,12 @@
 (async () => {
   const RECEIVER_URL = "__RECEIVER_URL__";
+  const RECEIVER_TOKEN = "__RECEIVER_TOKEN__";
+  const PKU_ORIGIN = "https://elective.pku.edu.cn";
   const TERM = "26-27学年第1学期";
   const QUERY_PATH = "/elective2008/edu/pku/stu/elective/controller/courseQuery/getCurriculmByForm.do";
   const PAGER_PATH = "/elective2008/edu/pku/stu/elective/controller/courseQuery/queryCurriculum.jsp";
+  const DETAIL_PATH = "/elective2008/edu/pku/stu/elective/controller/courseQuery/goNested.do";
+  const detailBySeq = new Map();
 
   const BASIC_HEADERS = [
     "课程号", "课程名", "课程类别", "学分", "教师", "班号", "开课单位",
@@ -23,6 +27,7 @@
     "详情备注": ["详情备注", "备注"],
     "大纲": ["大纲", "教学大纲"],
   };
+  const UNIQUE_KEY_FIELDS = ["课程号", "班号", "教师", "开课单位"];
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,12 +75,23 @@
       await fetch(`${RECEIVER_URL}/progress`, {
         method: "POST",
         mode: "cors",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-PKU-Receiver-Token": RECEIVER_TOKEN,
+        },
         body: JSON.stringify(payload),
       });
     } catch (_) {
       // Progress is best effort; final data is posted separately.
     }
+  }
+
+  function assertExpectedTerm() {
+    if (location.origin !== PKU_ORIGIN || location.pathname !== QUERY_PATH) {
+      throw new Error(`wrong PKU query page: ${location.href}`);
+    }
+    const pageText = document.body ? document.body.innerText : "";
+    if (!pageText.includes(TERM)) throw new Error(`expected term not visible: ${TERM}`);
   }
 
   function setStatus(message) {
@@ -110,23 +126,64 @@
     });
   }
 
-  async function fetchText(path, options = {}) {
-    const headers = { ...(options.headers || {}) };
-    if (options.method && options.method.toUpperCase() === "POST") {
+  function assertAllowedPkuPath(path) {
+    const url = new URL(path, PKU_ORIGIN);
+    const allowedPaths = new Set([QUERY_PATH, PAGER_PATH, DETAIL_PATH]);
+    if (url.origin !== PKU_ORIGIN || !allowedPaths.has(url.pathname)) {
+      throw new Error(`disallowed PKU request: ${url.href}`);
+    }
+  }
+
+  async function fetchText(path, options = {}, retries = 2) {
+    assertAllowedPkuPath(path);
+    const {
+      headers: ignoredHeaders,
+      signal: ignoredSignal,
+      credentials: ignoredCredentials,
+      ...requestOptions
+    } = options;
+    void ignoredHeaders;
+    void ignoredSignal;
+    void ignoredCredentials;
+    const headers = {};
+    if (requestOptions.method && requestOptions.method.toUpperCase() === "POST") {
       headers["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8";
     }
-    const response = await fetch(path, {
-      credentials: "include",
-      ...options,
-      headers,
-    });
-    const html = await response.text();
-    if (!response.ok) throw new Error(`${path} HTTP ${response.status}`);
-    const probe = html.slice(0, 10000);
-    if (probe.includes("提示:请不要用刷课机刷课") || probe.includes("<title>系统提示</title>")) {
-      throw new Error(`${path} returned system prompt`);
+
+    let lastError;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      try {
+        const response = await fetch(path, {
+          ...requestOptions,
+          credentials: "include",
+          headers,
+          signal: controller.signal,
+        });
+        const html = await response.text();
+        const probe = html.slice(0, 10000);
+        if (probe.includes("提示:请不要用刷课机刷课") || probe.includes("<title>系统提示</title>")) {
+          const error = new Error("PKU_SYSTEM_PROMPT");
+          error.retryable = false;
+          throw error;
+        }
+        if (!response.ok) {
+          const error = new Error(`${path} HTTP ${response.status}`);
+          error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+          throw error;
+        }
+        return html;
+      } catch (error) {
+        lastError = error;
+        const retryable = error.retryable === true || error.name === "AbortError" || error instanceof TypeError;
+        if (!retryable || attempt === retries) throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+      await sleep(400 * (2 ** attempt));
     }
-    return html;
+    throw lastError;
   }
 
   function pagerValues(html) {
@@ -205,6 +262,48 @@
     return details;
   }
 
+  function validateDetailLink(item) {
+    const seq = item["课程序号"];
+    const link = item["详情链接"];
+    if (typeof seq !== "string" || !seq.trim()) throw new Error("missing course sequence");
+    if (typeof link !== "string" || !link.trim()) throw new Error(`missing detail link: ${seq}`);
+    const url = new URL(link);
+    const values = url.searchParams.getAll("course_seq_no");
+    if (
+      url.origin !== PKU_ORIGIN
+      || url.protocol !== "https:"
+      || url.host !== "elective.pku.edu.cn"
+      || url.username
+      || url.password
+      || url.pathname !== DETAIL_PATH
+      || url.hash
+      || url.search.slice(1).split("&").length !== 1
+      || !url.search.includes("=")
+      || Array.from(url.searchParams.keys()).some((key) => key !== "course_seq_no")
+      || values.length !== 1
+      || values[0] !== seq
+    ) {
+      throw new Error(`invalid detail link: ${seq}`);
+    }
+    return url.href;
+  }
+
+  async function loadDetail(item) {
+    const seq = item["课程序号"];
+    const detailUrl = validateDetailLink(item);
+    if (detailBySeq.has(seq)) return detailBySeq.get(seq);
+    const pending = fetchText(detailUrl, { method: "GET" }).then(parseDetail);
+    detailBySeq.set(seq, pending);
+    try {
+      const detail = await pending;
+      detailBySeq.set(seq, detail);
+      return detail;
+    } catch (error) {
+      if (detailBySeq.get(seq) === pending) detailBySeq.delete(seq);
+      throw error;
+    }
+  }
+
   async function scrapeAllCourses() {
     setStatus("PKU graduate scrape: querying all courses");
     const firstHtml = await fetchText(QUERY_PATH, {
@@ -225,17 +324,9 @@
       await sleep(120);
     }
 
-    const detailBySeq = new Map();
     for (let index = 0; index < rows.length; index += 1) {
       const item = rows[index];
-      const seq = item["课程序号"] || "";
-      if (seq && detailBySeq.has(seq)) {
-        item["详细信息"] = detailBySeq.get(seq);
-      } else if (item["详情链接"]) {
-        const html = await fetchText(item["详情链接"], { method: "GET" });
-        item["详细信息"] = parseDetail(html);
-        if (seq) detailBySeq.set(seq, item["详细信息"]);
-      }
+      item["详细信息"] = await loadDetail(item);
       if (index % 10 === 0 || index === rows.length - 1) {
         setStatus(`PKU graduate scrape: details ${index + 1}/${rows.length}`);
         await postProgress({ stage: "detail", done: index + 1, total: rows.length });
@@ -246,7 +337,8 @@
     return { rows, pageStats };
   }
 
-  function validatePayload(rows, pageStats) {
+  function validatePayload(rows, pageStats, stats) {
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error("payload rows must be nonempty");
     const duplicateSeqs = [];
     const duplicateKeys = [];
     const missingDetailLinks = [];
@@ -254,29 +346,63 @@
     const seqSeen = new Set();
     const keySeen = new Set();
 
-    for (const row of rows) {
+    const requiredBasic = new Set(BASIC_HEADERS);
+    for (const [index, row] of rows.entries()) {
+      if (!row || typeof row !== "object" || row["数据学期"] !== TERM) {
+        throw new Error(`row ${index} has invalid term or shape`);
+      }
       const bi = row["基本信息"] || {};
       const seq = row["课程序号"] || "";
-      const key = [bi["课程号"] || "", bi["班号"] || "", bi["教师"] || "", bi["开课单位"] || ""].join("\u0001");
+      const basicKeys = Object.keys(bi);
+      if (
+        basicKeys.length !== BASIC_HEADERS.length
+        || !Array.from(requiredBasic).every((key) => Object.hasOwn(bi, key))
+        || !Object.values(bi).every((value) => typeof value === "string")
+      ) {
+        throw new Error(`row ${index} basic fields do not match schema`);
+      }
+      const detail = row["详细信息"];
+      if (
+        !detail
+        || Object.keys(detail).length !== DETAIL_FIELDS.length
+        || !DETAIL_FIELDS.every((field) => Object.hasOwn(detail, field))
+        || !Object.values(detail).every((value) => typeof value === "string")
+      ) {
+        throw new Error(`row ${index} detail fields do not match schema`);
+      }
+      const key = UNIQUE_KEY_FIELDS.map((field) => bi[field] || "").join("\u0001");
       if (!bi["课程号"]) missingCourseCodes.push(key);
       if (!row["详情链接"]) missingDetailLinks.push(key);
-      if (seq) {
-        if (seqSeen.has(seq)) duplicateSeqs.push(seq);
-        seqSeen.add(seq);
-      }
+      validateDetailLink(row);
+      if (seqSeen.has(seq)) duplicateSeqs.push(seq);
+      seqSeen.add(seq);
       if (keySeen.has(key)) duplicateKeys.push(key);
       keySeen.add(key);
     }
 
+    if (
+      !stats
+      || Object.keys(stats).length !== 1
+      || !Object.hasOwn(stats, "研究生课")
+      || !Number.isInteger(stats["研究生课"])
+      || stats["研究生课"] !== rows.length
+    ) {
+      throw new Error("stats do not match rows");
+    }
+    if (!Array.isArray(pageStats) || pageStats.length === 0) throw new Error("pageStats must be nonempty");
     const suspiciousPages = [];
+    let pageTotal = 0;
     for (let i = 0; i < pageStats.length; i += 1) {
       const page = pageStats[i];
+      if (!page || !Number.isInteger(page.rows) || page.rows < 0) throw new Error("invalid pageStats row count");
+      pageTotal += page.rows;
       const isLast = i === pageStats.length - 1;
       if (!isLast && page.rows !== 100) {
         suspiciousPages.push({ page: page.page, rows: page.rows, expected: 100 });
       }
     }
-    return {
+    if (pageTotal !== rows.length) throw new Error("pageStats total does not match rows");
+    const validation = {
       totalRows: rows.length,
       duplicateSeqs,
       duplicateKeys,
@@ -284,29 +410,42 @@
       missingCourseCodes,
       suspiciousPages,
     };
+    if (missingDetailLinks.length || missingCourseCodes.length || duplicateKeys.length || suspiciousPages.length) {
+      throw new Error(`local payload validation failed: ${JSON.stringify(validation)}`);
+    }
+    return validation;
   }
 
   async function postDone(payload) {
     const response = await fetch(`${RECEIVER_URL}/done`, {
       method: "POST",
       mode: "cors",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-PKU-Receiver-Token": RECEIVER_TOKEN,
+      },
       body: JSON.stringify(payload),
     });
-    if (!response.ok) throw new Error(`receiver HTTP ${response.status}`);
+    const responseText = await response.text();
+    if (!response.ok || responseText.trim() !== "ok") {
+      throw new Error(`receiver HTTP ${response.status}: ${responseText.slice(0, 200)}`);
+    }
   }
 
   try {
+    assertExpectedTerm();
     setStatus("PKU graduate scrape: start");
     await postProgress({ stage: "start", url: location.href, term: TERM });
     const result = await scrapeAllCourses();
+    const stats = { "研究生课": result.rows.length };
+    const validation = validatePayload(result.rows, result.pageStats, stats);
     const payload = {
       scrapedAt: new Date().toISOString(),
       term: TERM,
       sourceUrl: location.href,
-      stats: { "研究生课": result.rows.length },
+      stats,
       pageStats: result.pageStats,
-      validation: validatePayload(result.rows, result.pageStats),
+      validation,
       errors: [],
       rows: result.rows,
     };
