@@ -305,7 +305,9 @@ def _atomic_write(path: Path, body: bytes) -> None:
     )
     temporary_path = Path(temporary_name)
     backup_path: Path | None = None
+    restore_path: Path | None = None
     preserve_backup = False
+    committed = False
     try:
         os.fchmod(descriptor, mode)
         with os.fdopen(descriptor, "wb") as handle:
@@ -331,18 +333,43 @@ def _atomic_write(path: Path, body: bytes) -> None:
         except BaseException:
             if backup_path is not None:
                 try:
-                    os.replace(backup_path, path)
+                    restore_descriptor, restore_name = tempfile.mkstemp(
+                        prefix=f".{path.name}.",
+                        suffix=".restore",
+                        dir=path.parent,
+                    )
+                    os.close(restore_descriptor)
+                    restore_path = Path(restore_name)
+                    restore_path.unlink()
+                    os.link(
+                        backup_path,
+                        restore_path,
+                        follow_symlinks=False,
+                    )
+                    os.replace(restore_path, path)
                 except BaseException:
                     preserve_backup = True
                     raise
-                backup_path = None
             else:
                 path.unlink(missing_ok=True)
             try:
                 _directory_fsync(path.parent)
-            except OSError:
-                pass
+            except BaseException:
+                preserve_backup = backup_path is not None
+                raise
+            if backup_path is not None:
+                try:
+                    backup_path.unlink()
+                except OSError:
+                    pass
+                else:
+                    backup_path = None
+                    try:
+                        _directory_fsync(path.parent)
+                    except OSError:
+                        pass
             raise
+        committed = True
 
         if backup_path is not None:
             try:
@@ -358,7 +385,18 @@ def _atomic_write(path: Path, body: bytes) -> None:
     finally:
         if descriptor >= 0:
             os.close(descriptor)
-        temporary_path.unlink(missing_ok=True)
+        if committed:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        else:
+            temporary_path.unlink(missing_ok=True)
+        if restore_path is not None:
+            try:
+                restore_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         if backup_path is not None and not preserve_backup:
             try:
                 backup_path.unlink(missing_ok=True)

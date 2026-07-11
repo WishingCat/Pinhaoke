@@ -94,6 +94,20 @@ GRADUATE_DETAIL_FIELDS = (
 
 
 class ReceiverTestCase(unittest.TestCase):
+    def fail_final_temp_cleanup(self, config: ReceiverConfig):
+        real_unlink = Path.unlink
+
+        def fail_after_commit(path, *args, **kwargs):
+            if (
+                path.parent == config.final_output.parent
+                and path.suffix == ".tmp"
+                and kwargs.get("missing_ok") is True
+            ):
+                raise OSError("simulated post-commit temp cleanup failure")
+            return real_unlink(path, *args, **kwargs)
+
+        return fail_after_commit
+
     def config(self, root: str | Path) -> ReceiverConfig:
         root = Path(root)
         return ReceiverConfig(
@@ -974,6 +988,48 @@ class ReceiverHTTPTests(ReceiverTestCase):
                 self.valid_payload()["rows"],
             )
 
+    def test_postcommit_temp_cleanup_failure_still_returns_success_and_shuts_down(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.config(tmp)
+            headers = {
+                **self.actual_headers(token=self.token),
+                "Content-Type": "application/json",
+            }
+            payload = self.valid_payload()
+            body = json.dumps(payload, ensure_ascii=False).encode()
+            with self.running_server(config) as server:
+                shutdown_requested = threading.Event()
+                real_shutdown = server.shutdown
+
+                def observe_shutdown():
+                    shutdown_requested.set()
+                    real_shutdown()
+
+                server.shutdown = observe_shutdown
+                try:
+                    with mock.patch.object(
+                        Path,
+                        "unlink",
+                        new=self.fail_final_temp_cleanup(config),
+                    ):
+                        status, _, response = self.request(
+                            server,
+                            "POST",
+                            "/done",
+                            body=body,
+                            headers=headers,
+                        )
+                    self.assertEqual(status, 200)
+                    self.assertEqual(response, b"ok\n")
+                    self.assertTrue(shutdown_requested.wait(0.5))
+                finally:
+                    server.shutdown = real_shutdown
+
+            self.assertEqual(
+                json.loads(config.final_output.read_text(encoding="utf-8")),
+                payload["rows"],
+            )
+
     def test_concurrent_done_requests_publish_only_one_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.config(tmp)
@@ -1205,7 +1261,7 @@ class ReceiverPublishingAtomicityTests(ReceiverTestCase):
 
             def fail_backup_restore(source, destination):
                 if (
-                    Path(source).suffix == ".backup"
+                    Path(source).suffix in (".backup", ".restore")
                     and Path(destination) == config.final_output
                 ):
                     raise OSError("simulated backup restore failure")
@@ -1231,6 +1287,46 @@ class ReceiverPublishingAtomicityTests(ReceiverTestCase):
             self.assertEqual(backups[0].read_bytes(), b"official")
             self.assertEqual(stat.S_IMODE(backups[0].stat().st_mode), 0o640)
             self.assertEqual(config.raw_output.read_bytes(), body)
+
+    def test_rollback_fsync_failure_preserves_named_original_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.config(tmp)
+            config.final_output.parent.mkdir(parents=True)
+            config.final_output.write_bytes(b"official")
+            os.chmod(config.final_output, 0o640)
+            body = json.dumps(self.valid_payload(), ensure_ascii=False).encode()
+            real_fsync = receiver_common._directory_fsync
+            final_fsync_calls = 0
+
+            def fail_publish_and_rollback_fsync(directory):
+                nonlocal final_fsync_calls
+                if Path(directory) == config.final_output.parent:
+                    final_fsync_calls += 1
+                    if final_fsync_calls == 1:
+                        raise OSError("simulated publication directory fsync failure")
+                    if final_fsync_calls == 2:
+                        raise OSError("simulated rollback directory fsync failure")
+                return real_fsync(directory)
+
+            with mock.patch.object(
+                receiver_common,
+                "_directory_fsync",
+                side_effect=fail_publish_and_rollback_fsync,
+            ):
+                with self.assertRaisesRegex(OSError, "rollback directory fsync"):
+                    publish_payload(body, config)
+
+            backups = list(config.final_output.parent.glob("*.backup"))
+            self.assertEqual(config.final_output.read_bytes(), b"official")
+            self.assertEqual(stat.S_IMODE(config.final_output.stat().st_mode), 0o640)
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), b"official")
+            self.assertEqual(stat.S_IMODE(backups[0].stat().st_mode), 0o640)
+            self.assertEqual(config.raw_output.read_bytes(), body)
+            self.assertEqual(
+                list(config.final_output.parent.glob("*.restore")),
+                [],
+            )
 
     def test_post_commit_backup_cleanup_failure_does_not_report_publish_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1258,6 +1354,27 @@ class ReceiverPublishingAtomicityTests(ReceiverTestCase):
                 rows,
             )
             self.assertEqual(list(config.final_output.parent.glob("*.backup")), [])
+
+    def test_postcommit_temp_cleanup_failure_does_not_report_publish_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.config(tmp)
+            config.final_output.parent.mkdir(parents=True)
+            config.final_output.write_bytes(b"official")
+            payload = self.valid_payload()
+            body = json.dumps(payload, ensure_ascii=False).encode()
+
+            with mock.patch.object(
+                Path,
+                "unlink",
+                new=self.fail_final_temp_cleanup(config),
+            ):
+                rows = publish_payload(body, config)
+
+            self.assertEqual(rows, payload["rows"])
+            self.assertEqual(
+                json.loads(config.final_output.read_text(encoding="utf-8")),
+                rows,
+            )
 
 
 class ReceiverRunnerTests(ReceiverTestCase):
