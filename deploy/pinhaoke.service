@@ -9,7 +9,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/pinhaoke
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/pinhaoke/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/opt/pinhaoke/venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=on-failure
 RestartSec=5
 UMask=0027

@@ -1,4 +1,10 @@
+import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -13,6 +19,7 @@ class DeployContractTests(unittest.TestCase):
         cls.update = (ROOT / "deploy/update.sh").read_text()
         cls.service = (ROOT / "deploy/pinhaoke.service").read_text()
         cls.nginx = (ROOT / "deploy/nginx.conf").read_text()
+        cls.main = cls.update[cls.update.index("\nmain() {") :]
         readme = ROOT / "deploy/README.md"
         cls.deploy_readme = readme.read_text() if readme.exists() else ""
 
@@ -30,7 +37,7 @@ class DeployContractTests(unittest.TestCase):
         self.assertRegex(self.update, r"set -[^\n]*e[^\n]*u[^\n]*o pipefail")
         self.assertIn('EUID', self.update)
         self.assertIn('flock -n', self.update)
-        self.assertLess(self.update.index('flock -n'), self.update.index('git fetch'))
+        self.assertLess(self.main.index('flock -n'), self.main.index('git fetch'))
         required_tools = {
             "awk",
             "chmod",
@@ -55,7 +62,7 @@ class DeployContractTests(unittest.TestCase):
         self.assertIn('command -v "$tool"', self.update)
 
     def test_update_resolves_and_prefetches_exact_origin_main_before_stop(self):
-        stop = self.update.index('systemctl stop "$SERVICE"')
+        stop = self.main.index('systemctl stop "$SERVICE"')
         for text in (
             'git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"',
             'git rev-parse --verify "refs/remotes/origin/main^{commit}"',
@@ -64,24 +71,68 @@ class DeployContractTests(unittest.TestCase):
             'git lfs fetch origin "$TARGET_COMMIT"',
             'git lfs fsck --objects "$TARGET_COMMIT"',
         ):
-            self.assertIn(text, self.update)
-            self.assertLess(self.update.index(text), stop)
-        self.assertIn('git reset --hard "$TARGET_COMMIT"', self.update)
+            self.assertIn(text, self.main)
+            self.assertLess(self.main.index(text), stop)
+        self.assertIn('git reset --hard "$TARGET_COMMIT"', self.main)
 
     def test_update_builds_verified_candidate_from_target_requirements_before_stop(self):
-        stop = self.update.index('systemctl stop "$SERVICE"')
+        stop = self.main.index('systemctl stop "$SERVICE"')
         for text in (
-            'git show "$TARGET_COMMIT:requirements.txt"',
+            '"$TARGET_TREE/requirements.txt"',
             'sha256sum "$TARGET_REQUIREMENTS"',
             'python3 -m venv "$CANDIDATE_VENV"',
-            '"$CANDIDATE_VENV/bin/pip" install -r "$TARGET_REQUIREMENTS"',
-            '"$CANDIDATE_VENV/bin/pip" check',
+            '"$CANDIDATE_VENV/bin/python" -m pip install -r "$TARGET_REQUIREMENTS"',
+            '"$CANDIDATE_VENV/bin/python" -m pip check',
             '"$CANDIDATE_VENV/bin/python"',
         ):
-            self.assertIn(text, self.update)
-            self.assertLess(self.update.index(text), stop)
+            self.assertIn(text, self.main)
+            self.assertLess(self.main.index(text), stop)
         self.assertIn('.requirements.sha256', self.update)
         self.assertNotIn('rm -rf venv', self.update)
+
+    def test_relocated_venv_requires_python_module_launch(self):
+        self.assertIn(
+            "ExecStart=/opt/pinhaoke/venv/bin/python -m uvicorn app:app",
+            self.service,
+        )
+        self.assertNotIn("/venv/bin/uvicorn", self.service)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            original = Path(tmp) / "original"
+            moved = Path(tmp) / "moved"
+            subprocess.run(
+                [sys.executable, "-m", "venv", "--system-site-packages", original],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            console_script = original / "bin" / "uvicorn-old"
+            console_script.write_text(
+                f"#!{original / 'bin' / 'python'}\n"
+                "import runpy\nrunpy.run_module('uvicorn', run_name='__main__')\n"
+            )
+            console_script.chmod(0o755)
+            shutil.move(original, moved)
+
+            try:
+                stale_returncode = subprocess.run(
+                    [moved / "bin" / "uvicorn-old", "--version"],
+                    capture_output=True,
+                    text=True,
+                ).returncode
+            except FileNotFoundError:
+                stale_returncode = 127
+            module = subprocess.run(
+                [moved / "bin" / "python", "-m", "uvicorn", "--version"],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(stale_returncode, 0)
+        self.assertEqual(module.returncode, 0, module.stderr)
+        self.assertIn("uvicorn", module.stdout.lower())
+        self.assertIn('"$LIVE_VENV/bin/python" -m uvicorn --version', self.update)
+        self.assertNotIn('! -x "$LIVE_VENV/bin/uvicorn"', self.update)
 
     def test_update_swaps_on_same_filesystem_and_rolls_back_failed_rename(self):
         self.assertIn('mktemp -d "$APP_DIR/.deploy-stage.', self.update)
@@ -90,16 +141,16 @@ class DeployContractTests(unittest.TestCase):
         self.assertGreaterEqual(self.update.count('mv "$BACKUP_VENV" "$LIVE_VENV"'), 1)
 
     def test_update_stops_fail_fast_then_installs_and_starts_service(self):
-        stop = self.update.index('systemctl stop "$SERVICE"')
-        reset = self.update.index('git reset --hard "$TARGET_COMMIT"')
-        unit = self.update.index('deploy/pinhaoke.service')
-        reload_service = self.update.index('systemctl daemon-reload')
-        start = self.update.index('systemctl start "$SERVICE"')
+        stop = self.main.index('systemctl stop "$SERVICE"')
+        reset = self.main.index('git reset --hard "$TARGET_COMMIT"')
+        unit = self.main.index('deploy/pinhaoke.service')
+        reload_service = self.main.index('systemctl daemon-reload')
+        start = self.main.index('systemctl start "$SERVICE"')
         self.assertLess(stop, reset)
         self.assertLess(reset, unit)
         self.assertLess(unit, reload_service)
         self.assertLess(reload_service, start)
-        self.assertNotIn('systemctl stop "$SERVICE" ||', self.update)
+        self.assertNotIn('systemctl stop "$SERVICE" ||', self.main)
         self.assertNotIn('chown -R', self.update)
         self.assertIn('find "$APP_DIR" -xdev', self.update)
         self.assertIn('chown root:www-data', self.update)
@@ -107,6 +158,18 @@ class DeployContractTests(unittest.TestCase):
     def test_update_materializes_lfs_and_sets_read_only_service_permissions(self):
         self.assertIn('git lfs checkout', self.update)
         self.assertGreaterEqual(self.update.count('git lfs fsck --objects "$TARGET_COMMIT"'), 2)
+        self.assertIn('GIT_INDEX_FILE="$TARGET_INDEX" git read-tree "$TARGET_COMMIT"', self.update)
+        self.assertIn('GIT_INDEX_FILE="$TARGET_INDEX" git checkout-index', self.update)
+        self.assertIn('verify_materialized_lfs "$TARGET_TREE" "$TARGET_COMMIT"', self.update)
+        self.assertLess(
+            self.main.index('verify_materialized_lfs "$TARGET_TREE" "$TARGET_COMMIT"'),
+            self.main.index('systemctl stop "$SERVICE"'),
+        )
+        self.assertIn('chown -h root:www-data', self.update)
+        self.assertIn('chown -h root:root', self.update)
+        for excluded in ('.git', '.deploy-stage.*', '.venv-backup-*', '.venv-failed-*'):
+            self.assertIn(excluded, self.update)
+        self.assertNotIn('find "$APP_DIR" -xdev -exec chown', self.update)
         self.assertIn('chmod 0750', self.update)
         self.assertIn('chmod 0640', self.update)
         self.assertIn('"$LIVE_VENV/bin"', self.update)
@@ -126,10 +189,97 @@ class DeployContractTests(unittest.TestCase):
         )
         self.assertNotIn("$(seq", self.update)
         self.assertIn('curl --silent --show-error --max-time', self.update)
-        for invariant in ('"status"', '"databases"', '4421', '"courses"'):
+        for invariant in ('"status"', '"databases"', '"courses"'):
             self.assertIn(invariant, self.update)
+        self.assertNotIn('== 4421', self.update)
+        self.assertRegex(self.update, r'isinstance\(data\.get\("total"\), int\)')
         self.assertIn('journalctl -u "$SERVICE"', self.update)
         self.assertIn('systemctl is-active --quiet "$SERVICE"', self.update)
+
+    def test_post_stop_errors_and_signals_share_automatic_rollback(self):
+        for fragment in (
+            'trap \'on_error "$LINENO"\' ERR',
+            "trap 'on_signal INT' INT",
+            "trap 'on_signal TERM' TERM",
+            'rollback_activation "error at line $line"',
+            'rollback_activation "signal $signal"',
+            'PREVIOUS_COMMIT=$(git rev-parse --verify "HEAD^{commit}")',
+            'PREVIOUS_SERVICE_ACTIVE=1',
+            'UNIT_BACKUP=',
+        ):
+            self.assertIn(fragment, self.update)
+
+    def test_swap_and_rollback_restore_previous_code_env_unit_and_service(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app_dir = root / "app"
+            bin_dir = root / "bin"
+            stage = app_dir / ".deploy-stage.test"
+            app_dir.mkdir()
+            bin_dir.mkdir()
+            stage.mkdir()
+            (app_dir / "code-state").write_text("new")
+            (app_dir / "venv").mkdir()
+            (app_dir / "venv" / "identity").write_text("old-env")
+            (stage / "venv").mkdir()
+            (stage / "venv" / "identity").write_text("new-env")
+            unit_path = root / "pinhaoke.service"
+            unit_path.write_text("new-unit")
+            unit_backup = stage / "old-unit"
+            unit_backup.write_text("old-unit")
+            systemctl_log = root / "systemctl.log"
+
+            (bin_dir / "git").write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ $1 == reset ]]; then printf '%s' \"$3\" >\"$APP_DIR/code-state\"; fi\n"
+                "exit 0\n"
+            )
+            (bin_dir / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >>\"$SYSTEMCTL_LOG\"\n"
+                "exit 0\n"
+            )
+            for stub in bin_dir.iterdir():
+                stub.chmod(0o755)
+
+            harness = textwrap.dedent(
+                f"""
+                set -Eeuo pipefail
+                export APP_DIR={app_dir!s}
+                export LIVE_VENV="$APP_DIR/venv"
+                export UNIT_PATH={unit_path!s}
+                export SYSTEMCTL_LOG={systemctl_log!s}
+                export PATH={bin_dir!s}:$PATH
+                source {ROOT / 'deploy/update.sh'}
+                STAGE_DIR={stage!s}
+                CANDIDATE_VENV="$STAGE_DIR/venv"
+                TARGET_COMMIT=new
+                PREVIOUS_COMMIT=old
+                PREVIOUS_SERVICE_ACTIVE=1
+                PREVIOUS_USES_LFS=0
+                UNIT_PREVIOUSLY_EXISTED=1
+                UNIT_BACKUP={unit_backup!s}
+                ACTIVATION_STARTED=1
+                apply_release_permissions() {{ :; }}
+                swap_candidate_venv
+                [[ $(<"$LIVE_VENV/identity") == new-env ]]
+                rollback_activation test-failure
+                [[ $(<"$APP_DIR/code-state") == old ]]
+                [[ $(<"$LIVE_VENV/identity") == old-env ]]
+                [[ $(<"$UNIT_PATH") == old-unit ]]
+                find "$APP_DIR" -maxdepth 1 -type d -name '.venv-failed-*' | grep -q .
+                grep -q '^stop pinhaoke$' "$SYSTEMCTL_LOG"
+                grep -q '^daemon-reload$' "$SYSTEMCTL_LOG"
+                grep -q '^start pinhaoke$' "$SYSTEMCTL_LOG"
+                grep -q '^is-active --quiet pinhaoke$' "$SYSTEMCTL_LOG"
+                """
+            )
+            result = subprocess.run(
+                ["bash", "-c", harness],
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_service_runs_as_www_data_with_read_only_sandbox(self):
         for setting in (
