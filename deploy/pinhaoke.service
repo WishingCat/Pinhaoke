@@ -1,13 +1,38 @@
 [Unit]
 Description=Pinhaoke Course Search
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+Type=simple
 User=www-data
+Group=www-data
 WorkingDirectory=/opt/pinhaoke
+Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/opt/pinhaoke/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2
-Restart=always
+Restart=on-failure
 RestartSec=5
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/opt/pinhaoke
 
 [Install]
 WantedBy=multi-user.target
