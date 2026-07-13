@@ -152,10 +152,30 @@ class FrontendContractTests(unittest.TestCase):
         self.assertLess(term_nav_end, review_link)
         self.assertLess(review_shell, review_link)
         self.assertIn('.term-nav, .review-nav-shell {', REVIEWS_HTML)
-        self.assertIn('.term-nav a, .review-nav-link { padding: 6px 14px;', REVIEWS_HTML)
+        self.assertIn('.term-nav a { padding: 7px 18px; border-radius: 999px; }', REVIEWS_HTML)
+        self.assertIn('.term-nav a, .review-nav-link { padding: 6px 14px; font-size: 0.82rem; }', REVIEWS_HTML)
         self.assertIn('.review-nav-shell { width: 100%;', REVIEWS_HTML)
         self.assertIn('.review-nav-link { width: 100%;', REVIEWS_HTML)
         self.assertIn('.term-nav a { flex-basis: 100%;', REVIEWS_HTML)
+
+    def test_review_page_matches_index_visual_language(self):
+        # 与课程页共享的视觉记号：标题字号、学期控件尺寸、暗色底色、
+        # 激活态渐变、卡片/弹窗圆角、页脚与回到顶部
+        for token in (
+            "font-size: 3.3rem",
+            "#0E1013",
+            "linear-gradient(135deg, #08766B, #075F57)",
+            "rgba(22, 123, 114, 0.35)",
+            "linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%)",
+        ):
+            self.assertIn(token, REVIEWS_HTML)
+            self.assertIn(token, HTML)
+        self.assertIn("border-radius: 14px; background: var(--surface)", REVIEWS_HTML)
+        self.assertIn('class="site-footer"', REVIEWS_HTML)
+        self.assertIn('class="footer-contact"', REVIEWS_HTML)
+        self.assertIn("tuzengji", REVIEWS_HTML)
+        self.assertIn('id="backTop"', REVIEWS_HTML)
+        self.assertIn("window.scrollY > 600", REVIEWS_HTML)
 
     def test_review_page_shows_date_range_and_combined_review_count(self):
         self.assertEqual(REVIEWS_HTML.count('class="stat"'), 2)
@@ -182,10 +202,20 @@ class FrontendContractTests(unittest.TestCase):
     def test_review_page_uses_distinct_two_color_ambient_glow(self):
         self.assertIn("radial-gradient(40% 62% at 14% 0%", REVIEWS_HTML)
         self.assertIn("radial-gradient(36% 58% at 88% 5%", REVIEWS_HTML)
+        self.assertIn("radial-gradient(30% 50% at 60% 30%", REVIEWS_HTML)
+        self.assertIn("#F2578F", REVIEWS_HTML)
+        self.assertIn("#5C8FDB", REVIEWS_HTML)
         self.assertIn("#FF8FAB", REVIEWS_HTML)
         self.assertIn("#A7C5D8", REVIEWS_HTML)
+        self.assertIn(".page-head::before", REVIEWS_HTML)
+        self.assertIn("radial-gradient(45% 60% at 33% 42%", REVIEWS_HTML)
+        self.assertIn("radial-gradient(40% 55% at 67% 46%", REVIEWS_HTML)
         self.assertIn("body::before { animation: none !important; }", REVIEWS_HTML)
         self.assertNotIn("linear-gradient(118deg, rgba(53, 198, 167, 0.10)", REVIEWS_HTML)
+        # 页面环境光晕（body::before）与标题光晕不得回退到课程页的薄荷绿/靛蓝
+        ambient = REVIEWS_HTML[REVIEWS_HTML.index("body::before"):REVIEWS_HTML.index(".page-head::before")]
+        self.assertNotIn("rgba(53, 198, 167", ambient)
+        self.assertNotIn("rgba(79, 70, 229", ambient)
 
     def test_review_search_placeholder_mentions_courses_and_teachers(self):
         self.assertIn(
