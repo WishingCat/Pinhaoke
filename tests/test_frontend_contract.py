@@ -97,6 +97,13 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('class="about-contact"', HTML)
         self.assertIn('class="footer-contact"', HTML)
 
+    def test_about_panel_stays_open_and_allows_text_selection(self):
+        self.assertIn('class="tip-wrap about-wrap"', HTML)
+        self.assertIn(".about-wrap:hover::after", HTML)
+        self.assertIn("pointer-events: auto;", HTML)
+        self.assertIn("-webkit-user-select: text;", HTML)
+        self.assertIn("user-select: text;", HTML)
+
     def test_review_page_uses_read_only_apis_and_safe_text_rendering(self):
         for endpoint in ("/api/reviews?", "/api/review-courses?", "/api/reviews/meta"):
             self.assertIn(endpoint, REVIEWS_HTML)
@@ -149,6 +156,14 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn(".stat + .stat { padding-left: 28px; text-align: right; }", REVIEWS_HTML)
         self.assertNotIn("搜索课程名，查看课程评测主帖及其中有实际评价信息的回复。", REVIEWS_HTML)
 
+    def test_review_page_uses_distinct_two_color_ambient_glow(self):
+        self.assertIn("radial-gradient(40% 62% at 14% 0%", REVIEWS_HTML)
+        self.assertIn("radial-gradient(36% 58% at 88% 5%", REVIEWS_HTML)
+        self.assertIn("#FF8FAB", REVIEWS_HTML)
+        self.assertIn("#A7C5D8", REVIEWS_HTML)
+        self.assertIn("body::before { animation: none !important; }", REVIEWS_HTML)
+        self.assertNotIn("linear-gradient(118deg, rgba(53, 198, 167, 0.10)", REVIEWS_HTML)
+
     def test_review_search_placeholder_mentions_courses_and_teachers(self):
         self.assertIn(
             'placeholder="可以搜索课程、老师，例如 YQF，马原……"',
@@ -161,15 +176,21 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('padding: 14px 20px;', REVIEWS_HTML)
         self.assertIn('border-radius: 14px;', REVIEWS_HTML)
         self.assertIn('id="popularButton"', REVIEWS_HTML)
-        self.assertIn('<span>查看热门课程</span>', REVIEWS_HTML)
+        self.assertIn('<span>热门课程</span>', REVIEWS_HTML)
         self.assertIn('aria-controls="popularCourses"', REVIEWS_HTML)
-        self.assertIn("fetch('/api/review-courses?q=&limit=12'", REVIEWS_HTML)
+        self.assertIn("fetch('/api/review-courses?q=&limit=24'", REVIEWS_HTML)
+        self.assertNotIn("查看热门课程", REVIEWS_HTML)
         self.assertIn("searchInput.addEventListener('input', scheduleSearch)", REVIEWS_HTML)
         self.assertIn("setTimeout(() => runSearch(searchInput.value), 300)", REVIEWS_HTML)
         self.assertNotIn('class="submit-search"', REVIEWS_HTML)
         self.assertNotIn('id="suggestions"', REVIEWS_HTML)
         self.assertNotIn('role="combobox"', REVIEWS_HTML)
         self.assertNotIn("searchInput.addEventListener('focus'", REVIEWS_HTML)
+
+    def test_review_page_omits_archive_eyebrow(self):
+        self.assertNotIn("PKU TREEHOLE ARCHIVE", REVIEWS_HTML)
+        self.assertNotIn('class="eyebrow"', REVIEWS_HTML)
+        self.assertNotIn(".eyebrow {", REVIEWS_HTML)
 
     def test_load_more_guards_before_next_page_and_commits_after_success(self):
         body = function_body("loadMore")
@@ -705,14 +726,32 @@ class FrontendContractTests(unittest.TestCase):
         rules = match.group(1)
         self.assertIn("display: flex", rules)
         self.assertIn("justify-content: center", rules)
-        self.assertIn("width: min(280px, 78%)", rules)
-        self.assertIn("min-height: 44px", rules)
+        self.assertIn("width: 100%", rules)
+        self.assertIn("min-height: 50px", rules)
         self.assertIn("margin: 0 auto 14px", rules)
+        self.assertIn("padding: 12px 16px", rules)
+        self.assertIn("border: 1px solid var(--border)", rules)
+        self.assertIn("border-radius: var(--r-lg)", rules)
         self.assertIn("background: var(--surface)", rules)
+        self.assertNotIn("var(--accent)", rules)
         self.assertNotIn("gradient", rules)
         self.assertIn("font-size: 0.94rem", rules)
         self.assertIn("font-weight: 700", rules)
+        self.assertIn(".filters-toggle:focus-visible {", HTML)
+        self.assertIn("border-color: var(--border-2);", HTML)
+        self.assertIn("color-mix(in srgb, var(--ink) 8%, transparent)", HTML)
         self.assertRegex(HTML, r"\.container\s*\{[^}]*min-width:\s*0")
+
+    def test_mobile_filter_grid_keeps_at_least_two_columns(self):
+        self.assertIn(
+            ".filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }",
+            HTML,
+        )
+        self.assertIn(".filter-group { position: relative; min-width: 0; }", HTML)
+        self.assertNotIn(
+            "@media (max-width: 400px) { .filter-grid { grid-template-columns: 1fr; } }",
+            HTML,
+        )
 
     def test_privacy_and_dead_font_cleanup(self):
         self.assertNotIn("HarmonyOS Sans SC", HTML)

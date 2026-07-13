@@ -18,7 +18,19 @@
 html { background: var(--bg); color-scheme: light; scroll-behavior: smooth; }
 html[data-theme="dark"] { color-scheme: dark; }
 body { margin: 0; min-width: 0; min-height: 100vh; background: transparent; color: var(--ink); font-family: var(--sans); line-height: 1.65; letter-spacing: 0; font-feature-settings: "kern" 1, "palt" 1; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
-body::before { content: ''; position: fixed; inset: 0 0 auto; height: 520px; z-index: -1; pointer-events: none; background: linear-gradient(118deg, rgba(53, 198, 167, 0.10), transparent 34%, rgba(79, 70, 229, 0.055) 66%, transparent 92%); animation: ambient-shift 24s ease-in-out infinite alternate; }
+body::before {
+  content: '';
+  position: fixed;
+  inset: -10% -10% auto;
+  height: 620px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 62% at 14% 0%, color-mix(in srgb, #FF8FAB 14%, transparent), transparent 64%),
+    radial-gradient(36% 58% at 88% 5%, color-mix(in srgb, #A7C5D8 16%, transparent), transparent 62%);
+  filter: blur(6px);
+  animation: ambient-shift 26s ease-in-out infinite alternate;
+}
 button, input { font: inherit; letter-spacing: 0; }
 button { color: inherit; }
 a { color: inherit; }
@@ -63,7 +75,11 @@ html[data-theme="dark"] {
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
   --shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
 }
-html[data-theme="dark"] body::before { background: linear-gradient(118deg, rgba(70, 214, 184, 0.12), transparent 34%, rgba(115, 150, 242, 0.075) 68%, transparent 94%); }
+html[data-theme="dark"] body::before {
+  background:
+    radial-gradient(40% 62% at 14% 0%, color-mix(in srgb, #FF8FAB 18%, transparent), transparent 64%),
+    radial-gradient(36% 58% at 88% 5%, color-mix(in srgb, #A7C5D8 20%, transparent), transparent 62%);
+}
 
 ::selection { background: var(--accent); color: #FFFFFF; }
 .topbar { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(14px); }
@@ -84,7 +100,6 @@ html[data-theme="dark"] .theme-moon { display: block; }
 
 .page { width: min(1120px, 100%); margin: 0 auto; padding: 48px 28px 80px; }
 .page-head { display: block; text-align: center; animation: enter 0.35s ease-out both; }
-.eyebrow { margin: 0 0 7px; color: var(--source); font-family: var(--mono); font-size: 0.73rem; font-weight: 700; text-transform: uppercase; }
 h1 { margin: 0; font-size: 3.15rem; line-height: 1.15; font-weight: 750; letter-spacing: 0; background-image: linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 html[data-theme="dark"] h1 { background-image: linear-gradient(118deg, #5CE8C6 8%, #35C6A7 58%, #27A68E 94%); }
 .scope { max-width: 620px; margin: 12px auto 0; color: var(--ink-3); font-size: 0.93rem; }
@@ -197,8 +212,11 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
 .footnote { margin: 38px 0 0; padding-top: 18px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 0.75rem; }
 @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer { to { transform: translateX(100%); } }
-@keyframes ambient-shift { from { transform: translateY(0); opacity: 0.85; } to { transform: translateY(14px); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; } }
+@keyframes ambient-shift { from { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; } to { transform: translate3d(0, 14px, 0) scale(1.05); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; }
+  body::before { animation: none !important; }
+}
 
 @media (max-width: 640px) {
   .topbar-inner { height: 52px; padding: 0 16px; }
@@ -265,7 +283,6 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
 <main class="page">
   <div class="page-head">
     <div>
-      <p class="eyebrow">PKU TREEHOLE ARCHIVE</p>
       <h1>树洞课程评测</h1>
       <p class="scope">数据全部来自北大树洞大家的真实回复</p>
     </div>
@@ -296,7 +313,7 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
       <div class="popular-control">
         <button class="popular-button" id="popularButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="popularCourses">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
-          <span>查看热门课程</span>
+          <span>热门课程</span>
         </button>
         <div class="popular-courses" id="popularCourses" role="listbox" aria-label="热门课程" hidden></div>
       </div>
@@ -669,7 +686,7 @@ async function fetchPopularCourses() {
   popularCoursesEl.replaceChildren(makeElement('div', 'popular-status', '正在加载热门课程…'));
   popularCoursesEl.hidden = false;
   try {
-    const response = await fetch('/api/review-courses?q=&limit=12', { signal: controller.signal });
+    const response = await fetch('/api/review-courses?q=&limit=24', { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const items = await response.json();
     if (controller.signal.aborted || popularButton.getAttribute('aria-expanded') !== 'true') return;

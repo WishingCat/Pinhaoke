@@ -10,7 +10,7 @@
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
-- 树洞课程评测作为学期控件旁的独立入口，在手机窄屏下单独占行。评测搜索框输入即搜，不显示联想下拉；课程热榜只由右侧“查看热门课程”按钮展开。
+- 树洞课程评测作为学期控件旁的独立入口，在手机窄屏下单独占行。评测搜索框输入即搜，不显示联想下拉；前 `24` 门课程热榜只由右侧“热门课程”按钮展开。
 
 ## 目录职责
 
@@ -82,7 +82,7 @@ git diff --check
 | `GET /api/courses` | 返回 `{total, page, page_size, courses}`。支持搜索、筛选、排序、语言和分页。 |
 | `GET /api/courses/{id}` | 前缀已包含学期与学段，不接受 `term`；支持 `lang`。 |
 | `GET /api/reviews` | 返回 `{total, page, page_size, query, threads}`，按时间倒序检索评测主题及相关回复。 |
-| `GET /api/review-courses` | 返回按热度排序且可按 `q` 过滤的课程名、课程号、主题数和条目数；评测页用它填充“查看热门课程”菜单。 |
+| `GET /api/review-courses` | 返回按热度排序且可按 `q` 过滤的课程名、课程号、主题数和条目数；评测页用它填充“热门课程”菜单。 |
 | `GET /api/reviews/meta` | 返回保留条目的起止日期、树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 

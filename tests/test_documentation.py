@@ -64,7 +64,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("手机端", text)
         self.assertIn("课程名、教师名", text)
         self.assertIn("高置信缩写会加粗彩色高亮", text)
-        self.assertIn("查看热门课程", text)
+        self.assertIn("热度最高的 `24` 门课程", text)
+        self.assertIn("“热门课程”", text)
         self.assertIn("不显示输入联想", text)
         self.assertIn("数据范围 `2022-12-21` 至 `2026-07-13`", text)
         self.assertIn("评测数据量 `62716`", text)
@@ -94,7 +95,7 @@ class DocumentationTests(unittest.TestCase):
             "summer=160",
             "GET /api/reviews",
             "GET /api/review-courses",
-            "查看热门课程",
+            "热门课程",
             "树洞课程评测.db",
             "31642",
             "62716",
