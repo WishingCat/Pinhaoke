@@ -70,6 +70,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("数据范围 `2022-12-21` 至 `2026-07-13`", text)
         self.assertIn("评测数据量 `62716`", text)
         self.assertIn("`31642` 个主题加 `31074` 条相关回复", text)
+        self.assertIn("点击卡片", text)
+        self.assertIn("145738", text)
         self.assertRegex(
             text,
             r'wechat_sponsor\.jpg"[^>]*alt="微信赞助码"[^\n]*微信赞助码',
@@ -94,11 +96,15 @@ class DocumentationTests(unittest.TestCase):
             "spring=3701",
             "summer=160",
             "GET /api/reviews",
+            "GET /api/reviews/{pid}",
             "GET /api/review-courses",
             "热门课程",
             "树洞课程评测.db",
             "31642",
             "62716",
+            "145738",
+            "thread_replies",
+            "--enrich-thread-replies",
             "entry_highlights",
             "entity_aliases",
             "96555",
@@ -167,6 +173,9 @@ class DocumentationTests(unittest.TestCase):
             "95.24%",
             "31642",
             "62716",
+            "145738",
+            "thread_replies",
+            "--enrich-thread-replies",
             "course_catalog",
             "entry_highlights",
             "entity_aliases",
@@ -187,6 +196,7 @@ class DocumentationTests(unittest.TestCase):
             "journalctl -u pinhaoke",
             "/api/health",
             "/api/reviews?page_size=1",
+            "/api/reviews/{pid}",
         ):
             self.assertIn(fact, deploy)
         self.assertNotIn("本次任务未部署生产", deploy)

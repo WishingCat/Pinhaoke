@@ -59,6 +59,21 @@ CREATE INDEX IF NOT EXISTS idx_entity_aliases_lookup
 ON entity_aliases(entity_type, normalized_alias);
 """
 
+THREAD_REPLIES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS thread_replies (
+    pid INTEGER NOT NULL REFERENCES threads(pid) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK(ordinal > 0),
+    cid INTEGER,
+    floor INTEGER,
+    posted_at INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    PRIMARY KEY(pid, ordinal)
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_replies_pid
+ON thread_replies(pid, ordinal);
+"""
+
 SCHEMA = f"""
 PRAGMA foreign_keys = ON;
 
@@ -88,6 +103,8 @@ CREATE TABLE entries (
     CHECK((kind = 'post' AND cid IS NULL AND floor IS NULL)
        OR (kind = 'reply' AND cid IS NOT NULL AND floor IS NOT NULL))
 );
+
+{THREAD_REPLIES_SCHEMA}
 
 CREATE TABLE thread_courses (
     pid INTEGER NOT NULL REFERENCES threads(pid) ON DELETE CASCADE,
@@ -1078,6 +1095,36 @@ def _is_reply_relevant(text: str, courses: set[str]) -> bool:
     return True
 
 
+def _snapshot_replies(post: dict) -> list[dict]:
+    comments = post.get("comments")
+    if comments is None:
+        comments = []
+    if not isinstance(comments, list):
+        raise ValueError(f"invalid comments for treehole {post.get('pid')}")
+
+    replies = []
+    for ordinal, comment in enumerate(comments, start=1):
+        if not isinstance(comment, dict):
+            raise ValueError(
+                f"invalid comment {ordinal} for treehole {post.get('pid')}"
+            )
+        cleaned = sanitize_text(str(comment.get("text") or ""))
+        if not cleaned:
+            continue
+        cid = comment.get("cid")
+        floor = comment.get("floor")
+        replies.append(
+            {
+                "ordinal": ordinal,
+                "cid": cid if isinstance(cid, int) else None,
+                "floor": floor if isinstance(floor, int) else None,
+                "posted_at": int(comment.get("timestamp") or 0),
+                "content": cleaned,
+            }
+        )
+    return replies
+
+
 def analyze_thread(post: dict, matcher: CourseMatcher, source_month: str):
     pid = post.get("pid")
     raw_post_text = str(post.get("text") or "")
@@ -1092,8 +1139,14 @@ def analyze_thread(post: dict, matcher: CourseMatcher, source_month: str):
         return None
 
     comments = post.get("comments") or []
+    if not isinstance(comments, list):
+        comments = []
+    all_replies = _snapshot_replies(post)
+
     direct_courses = {}
     for comment in comments:
+        if not isinstance(comment, dict):
+            continue
         cid = comment.get("cid")
         raw_text = str(comment.get("text") or "")
         comment_allow_short = bool(_COURSE_CONTEXT_RE.search(raw_text))
@@ -1115,6 +1168,8 @@ def analyze_thread(post: dict, matcher: CourseMatcher, source_month: str):
     thread_courses = set(post_courses)
 
     for comment in comments:
+        if not isinstance(comment, dict):
+            continue
         cid = comment.get("cid")
         floor = comment.get("floor")
         if not isinstance(cid, int) or not isinstance(floor, int):
@@ -1156,6 +1211,7 @@ def analyze_thread(post: dict, matcher: CourseMatcher, source_month: str):
         "source_url": source_url,
         "post_kind": _post_kind(raw_post_text),
         "entries": entries,
+        "all_replies": all_replies,
         "courses": sorted(thread_courses),
     }
 
@@ -1188,6 +1244,16 @@ def _insert_thread(conn, thread):
             "INSERT INTO entry_courses VALUES (?, ?)",
             ((entry["entry_key"], name) for name in entry["courses"]),
         )
+    conn.executemany(
+        "INSERT INTO thread_replies VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            (
+                thread["pid"], reply["ordinal"], reply["cid"], reply["floor"],
+                reply["posted_at"], reply["content"],
+            )
+            for reply in thread["all_replies"]
+        ),
+    )
     conn.executemany(
         "INSERT INTO thread_courses VALUES (?, ?, ?)",
         (
@@ -1265,10 +1331,12 @@ def _refresh_entry_highlights(conn, highlighter: EntityHighlighter | None):
     return stats
 
 
-def _validate_database(conn, expected_threads, expected_entries):
+def _validate_database(
+    conn, expected_threads, expected_entries, expected_snapshot_replies
+):
     required = {
-        "metadata", "threads", "entries", "thread_courses", "entry_courses",
-        "course_catalog", "entity_aliases", "entry_highlights",
+        "metadata", "threads", "entries", "thread_replies", "thread_courses",
+        "entry_courses", "course_catalog", "entity_aliases", "entry_highlights",
     }
     tables = {
         row[0]
@@ -1282,11 +1350,20 @@ def _validate_database(conn, expected_threads, expected_entries):
         raise RuntimeError("review database integrity check failed")
     threads = conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0]
     entries = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+    snapshot_replies = conn.execute(
+        "SELECT COUNT(*) FROM thread_replies"
+    ).fetchone()[0]
     posts = conn.execute("SELECT COUNT(*) FROM entries WHERE kind='post'").fetchone()[0]
-    if (threads, entries, posts) != (expected_threads, expected_entries, expected_threads):
+    if (threads, entries, snapshot_replies, posts) != (
+        expected_threads,
+        expected_entries,
+        expected_snapshot_replies,
+        expected_threads,
+    ):
         raise RuntimeError(
             "review database row count mismatch: "
-            f"threads={threads}/{expected_threads} entries={entries}/{expected_entries} posts={posts}"
+            f"threads={threads}/{expected_threads} entries={entries}/{expected_entries} "
+            f"snapshot_replies={snapshot_replies}/{expected_snapshot_replies} posts={posts}"
         )
     invalid_alias = conn.execute(
         """
@@ -1344,6 +1421,7 @@ def build_review_database(
         "matched_threads": 0,
         "matched_entries": 0,
         "matched_replies": 0,
+        "snapshot_replies": 0,
     }
 
     try:
@@ -1368,6 +1446,7 @@ def build_review_database(
                 stats["matched_threads"] += 1
                 stats["matched_entries"] += len(thread["entries"])
                 stats["matched_replies"] += len(thread["entries"]) - 1
+                stats["snapshot_replies"] += len(thread["all_replies"])
             conn.commit()
             print(
                 f"[{source_month}] posts={stats['source_posts']} "
@@ -1413,7 +1492,12 @@ def build_review_database(
             ((key, str(value)) for key, value in metadata.items()),
         )
         conn.commit()
-        _validate_database(conn, stats["matched_threads"], stats["matched_entries"])
+        _validate_database(
+            conn,
+            stats["matched_threads"],
+            stats["matched_entries"],
+            stats["snapshot_replies"],
+        )
         conn.close()
         conn = None
 
@@ -1426,7 +1510,8 @@ def build_review_database(
         print(f"Review database built: {target}")
         print(
             f"  threads={stats['matched_threads']} entries={stats['matched_entries']} "
-            f"replies={stats['matched_replies']} highlights="
+            f"replies={stats['matched_replies']} snapshot_replies={stats['snapshot_replies']} "
+            f"highlights="
             f"{stats['course_highlights'] + stats['teacher_highlights']}"
         )
         return stats
@@ -1476,8 +1561,11 @@ def enrich_existing_database(target: Path, highlighter: EntityHighlighter):
         )
         threads = conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0]
         entries = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+        snapshot_replies = conn.execute(
+            "SELECT COUNT(*) FROM thread_replies"
+        ).fetchone()[0]
         conn.commit()
-        _validate_database(conn, threads, entries)
+        _validate_database(conn, threads, entries, snapshot_replies)
         conn.close()
         conn = None
 
@@ -1496,6 +1584,129 @@ def enrich_existing_database(target: Path, highlighter: EntityHighlighter):
             f"teacher_aliases={highlight_stats['teacher_aliases']}"
         )
         return highlight_stats
+    finally:
+        if source_conn is not None:
+            with suppress(Exception):
+                source_conn.close()
+        if conn is not None:
+            with suppress(Exception):
+                conn.close()
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
+def enrich_thread_replies_database(source_dir: Path, target: Path = DEFAULT_TARGET):
+    """Atomically add every cached reply for the database's existing thread set."""
+    source_dir = Path(source_dir)
+    target = Path(target)
+    if not target.is_file():
+        raise FileNotFoundError(target)
+    with (source_dir / "manifest.json").open(encoding="utf-8") as stream:
+        manifest = json.load(stream)
+    shard_paths = sorted((source_dir / "shards").glob("*.json"))
+    if not shard_paths:
+        raise ValueError("no treehole shards found")
+
+    target_mode = stat.S_IMODE(target.stat().st_mode)
+    descriptor, raw_temp = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+    )
+    os.close(descriptor)
+    temp_path = Path(raw_temp)
+    source_conn = None
+    conn = None
+    try:
+        source_conn = sqlite3.connect(
+            f"file:{target.resolve().as_posix()}?mode=ro", uri=True
+        )
+        conn = sqlite3.connect(temp_path)
+        source_conn.backup(conn)
+        source_conn.close()
+        source_conn = None
+        conn.execute("PRAGMA foreign_keys = ON")
+
+        metadata = dict(conn.execute("SELECT key, value FROM metadata"))
+        if metadata.get("snapshot_date") != str(manifest.get("snapshotDate") or ""):
+            raise RuntimeError("treehole snapshot date does not match review database")
+        expected_shards = int(metadata.get("source_shards", -1))
+        if expected_shards != len(shard_paths):
+            raise RuntimeError(
+                f"treehole shard count mismatch: {len(shard_paths)}/{expected_shards}"
+            )
+
+        thread_months = dict(conn.execute("SELECT pid, source_month FROM threads"))
+        wanted_pids = set(thread_months)
+        found_pids = set()
+        snapshot_reply_count = 0
+        conn.execute("DROP TABLE IF EXISTS thread_replies")
+        conn.executescript(THREAD_REPLIES_SCHEMA)
+
+        for shard_path in shard_paths:
+            payload = _load_shard(shard_path)
+            if payload.get("version") != 2 or not isinstance(payload.get("posts"), dict):
+                raise ValueError(f"invalid treehole shard: {shard_path}")
+            source_month = str(payload.get("key") or shard_path.stem)
+            matched_in_shard = 0
+            for post in payload["posts"].values():
+                pid = post.get("pid")
+                if pid not in wanted_pids:
+                    continue
+                if pid in found_pids:
+                    raise RuntimeError(f"duplicate treehole pid in source snapshot: {pid}")
+                if thread_months[pid] != source_month:
+                    raise RuntimeError(
+                        f"treehole source month mismatch for {pid}: "
+                        f"{source_month}/{thread_months[pid]}"
+                    )
+                replies = _snapshot_replies(post)
+                conn.executemany(
+                    "INSERT INTO thread_replies VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        (
+                            pid, reply["ordinal"], reply["cid"], reply["floor"],
+                            reply["posted_at"], reply["content"],
+                        )
+                        for reply in replies
+                    ),
+                )
+                found_pids.add(pid)
+                matched_in_shard += 1
+                snapshot_reply_count += len(replies)
+            conn.commit()
+            print(
+                f"[{source_month}] matched_threads={matched_in_shard} "
+                f"snapshot_replies={snapshot_reply_count}"
+            )
+
+        missing = wanted_pids - found_pids
+        if missing:
+            sample = ", ".join(map(str, sorted(missing)[:10]))
+            raise RuntimeError(
+                f"treehole snapshot is missing {len(missing)} review threads: {sample}"
+            )
+        conn.execute(
+            """
+            INSERT INTO metadata(key, value) VALUES ('snapshot_replies', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            (str(snapshot_reply_count),),
+        )
+        threads = conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0]
+        entries = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+        conn.commit()
+        _validate_database(conn, threads, entries, snapshot_reply_count)
+        conn.close()
+        conn = None
+
+        temp_path.chmod(target_mode)
+        with temp_path.open("rb") as stream:
+            os.fsync(stream.fileno())
+        os.replace(temp_path, target)
+        temp_path = None
+        _fsync_parent_directory(target)
+        print(f"Review snapshot replies enriched: {target}")
+        print(f"  threads={threads} snapshot_replies={snapshot_reply_count}")
+        return {"threads": threads, "snapshot_replies": snapshot_reply_count}
     finally:
         if source_conn is not None:
             with suppress(Exception):
@@ -1549,17 +1760,31 @@ def main(argv=None):
         help="Refresh course and teacher highlights in an existing review database",
     )
     parser.add_argument(
+        "--enrich-thread-replies",
+        action="store_true",
+        help="Add every cached reply for existing review threads without reclassification",
+    )
+    parser.add_argument(
         "--month",
         action="append",
         default=[],
         help="Build selected YYYY-MM shard only; repeat for multiple months",
     )
     args = parser.parse_args(argv)
+    if args.enrich_existing and args.enrich_thread_replies:
+        parser.error("enrichment modes cannot be combined")
     if args.enrich_existing:
         if args.source or args.month:
             parser.error("--enrich-existing cannot be combined with --source or --month")
         highlighter = load_entity_highlighter(_course_database_paths())
         enrich_existing_database(args.target, highlighter)
+        return 0
+    if args.enrich_thread_replies:
+        if args.source is None:
+            parser.error("--source is required with --enrich-thread-replies")
+        if args.month:
+            parser.error("--enrich-thread-replies cannot be combined with --month")
+        enrich_thread_replies_database(args.source, args.target)
         return 0
     if args.source is None:
         parser.error("--source is required unless --enrich-existing is used")

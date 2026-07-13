@@ -75,6 +75,7 @@ class DatabaseConnectionTests(unittest.TestCase):
         self.assertTrue(all(item["integrity"] == "ok" for item in payload["databases"]))
         self.assertEqual(payload["reviews"]["integrity"], "ok")
         self.assertEqual(payload["reviews"]["threads"], 31642)
+        self.assertEqual(payload["reviews"]["snapshot_replies"], 145738)
         self.assertEqual(payload["reviews"]["highlights"], 156849)
 
     def test_health_endpoint_disables_caching(self):
@@ -244,6 +245,7 @@ class ReviewApiTests(unittest.TestCase):
         self.assertEqual(metadata["matched_threads"], 31642)
         self.assertEqual(metadata["matched_entries"], 62716)
         self.assertEqual(metadata["matched_replies"], 31074)
+        self.assertEqual(metadata["snapshot_replies"], 145738)
         self.assertEqual(
             metadata["matched_threads"] + metadata["matched_replies"],
             metadata["matched_entries"],
@@ -311,6 +313,40 @@ class ReviewApiTests(unittest.TestCase):
         self.assertIn("course", {item["entity_type"] for item in highlights})
         self.assertIn("teacher", {item["entity_type"] for item in highlights})
         self.assertNotIn("entry_key", repr(thread))
+
+    def test_review_thread_detail_returns_all_snapshot_replies_without_identity_fields(self):
+        with app.get_reviews_db() as conn:
+            pid, expected_count = conn.execute(
+                "SELECT pid, COUNT(*) AS reply_count FROM thread_replies "
+                "GROUP BY pid ORDER BY reply_count DESC, pid LIMIT 1"
+            ).fetchone()
+
+        thread = app.get_review_thread(pid)
+        self.assertEqual(thread["pid"], pid)
+        self.assertEqual(thread["reply_count"], expected_count)
+        self.assertEqual(len(thread["replies"]), expected_count)
+        self.assertEqual(
+            set(thread),
+            {
+                "pid", "source_month", "posted_at", "content", "source_url",
+                "post_kind", "reply_count", "replies",
+            },
+        )
+        for reply in thread["replies"]:
+            self.assertEqual(set(reply), {"cid", "floor", "posted_at", "content"})
+        serialized = repr(thread)
+        for private_field in ("authorTag", "authorLabel", "replyTo", "entry_key"):
+            self.assertNotIn(private_field, serialized)
+
+    def test_review_thread_detail_validates_id_and_returns_404(self):
+        for pid in (0, -1, True, "1"):
+            with self.subTest(pid=pid):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.get_review_thread(pid)
+                self.assertEqual(ctx.exception.status_code, 422)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.get_review_thread(9_999_999_999)
+        self.assertEqual(ctx.exception.status_code, 404)
 
     def test_review_pagination_is_stable_and_non_overlapping(self):
         first = self.call(page=1, page_size=17)

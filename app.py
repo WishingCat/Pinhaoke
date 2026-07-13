@@ -179,6 +179,9 @@ def check_database_health() -> dict:
         }
         review_threads = conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0]
         review_entries = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+        review_snapshot_replies = conn.execute(
+            "SELECT COUNT(*) FROM thread_replies"
+        ).fetchone()[0]
         review_posts = conn.execute(
             "SELECT COUNT(*) FROM entries WHERE kind='post'"
         ).fetchone()[0]
@@ -222,13 +225,15 @@ def check_database_health() -> dict:
     finally:
         conn.close()
     required_review_tables = {
-        "metadata", "threads", "entries", "thread_courses",
+        "metadata", "threads", "entries", "thread_replies", "thread_courses",
         "entry_courses", "course_catalog", "entity_aliases", "entry_highlights",
     }
     try:
         review_metadata_matches = (
             int(review_metadata.get("matched_threads", -1)) == review_threads
             and int(review_metadata.get("matched_entries", -1)) == review_entries
+            and int(review_metadata.get("snapshot_replies", -1))
+            == review_snapshot_replies
             and int(review_metadata.get("course_highlights", -1))
             + int(review_metadata.get("teacher_highlights", -1)) == review_highlights
             and int(review_metadata.get("course_aliases", -1))
@@ -259,6 +264,7 @@ def check_database_health() -> dict:
         "integrity": review_integrity,
         "threads": review_threads,
         "entries": review_entries,
+        "snapshot_replies": review_snapshot_replies,
         "highlights": review_highlights,
         "snapshot_date": review_metadata.get("snapshot_date", ""),
     }
@@ -1284,7 +1290,7 @@ def get_review_meta():
 
     integer_keys = (
         "source_shards", "source_posts", "source_replies", "matched_threads",
-        "matched_entries", "matched_replies", "catalog_courses",
+        "matched_entries", "matched_replies", "snapshot_replies", "catalog_courses",
         "uncachedReplyDifference", "highlighted_entries", "course_highlights",
         "teacher_highlights", "course_aliases", "teacher_aliases",
         "course_alias_highlights", "teacher_alias_highlights",
@@ -1303,6 +1309,38 @@ def get_review_meta():
         metadata.get("cachedReplyCoveragePercent", 0)
     )
     return payload
+
+
+@app.get("/api/reviews/{pid}")
+def get_review_thread(pid: int):
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid < 1:
+        raise HTTPException(status_code=422, detail="Invalid review thread id")
+
+    with get_reviews_db() as conn:
+        thread = conn.execute(
+            "SELECT pid, source_month, posted_at, content, source_url, post_kind "
+            "FROM threads WHERE pid=?",
+            (pid,),
+        ).fetchone()
+        if thread is None:
+            raise HTTPException(status_code=404, detail="Review thread not found")
+        rows = conn.execute(
+            "SELECT cid, floor, posted_at, content "
+            "FROM thread_replies WHERE pid=? ORDER BY ordinal",
+            (pid,),
+        ).fetchall()
+
+    replies = [dict(row) for row in rows]
+    return {
+        "pid": thread["pid"],
+        "source_month": thread["source_month"],
+        "posted_at": thread["posted_at"],
+        "content": thread["content"],
+        "source_url": thread["source_url"],
+        "post_kind": thread["post_kind"],
+        "reply_count": len(replies),
+        "replies": replies,
+    }
 
 
 # Static files ------------------------------------------------------------------

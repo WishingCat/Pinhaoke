@@ -148,11 +148,17 @@ html[data-theme="dark"] .review-nav-link { color: #0F1917; background: linear-gr
 .result-title { margin: 0; font-size: 1.05rem; font-weight: 750; }
 .results { display: grid; gap: 14px; margin-top: 14px; }
 
-.thread { position: relative; min-width: 0; overflow: hidden; padding: 20px 22px 20px 25px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 1px 2px rgba(16, 22, 26, 0.03); animation: enter 0.28s ease-out both; transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s; }
-.thread::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, #D7A72F, #92610A); }
-.thread-review::before { background: linear-gradient(180deg, #35C6A7, #08766B); }
-.thread-discussion::before { background: linear-gradient(180deg, #818CF8, #4F46E5); }
-.thread:hover { border-color: var(--border-strong); box-shadow: var(--shadow); transform: translateY(-1px); }
+.thread { --thread-c: var(--accent); position: relative; min-width: 0; overflow: hidden; padding: 20px 22px; border: 1.5px solid var(--border); border-color: color-mix(in srgb, var(--thread-c) 38%, var(--border)); border-radius: 8px; background: var(--surface); box-shadow: 0 1px 2px rgba(16, 22, 26, 0.03); cursor: pointer; animation: enter 0.28s ease-out both; transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s; }
+.thread[data-color="0"] { --thread-c: #08766B; }
+.thread[data-color="1"] { --thread-c: #5146A5; }
+.thread[data-color="2"] { --thread-c: #A12E68; }
+.thread[data-color="3"] { --thread-c: #1769AA; }
+.thread[data-color="4"] { --thread-c: #4E7B43; }
+.thread[data-color="5"] { --thread-c: #A45A21; }
+.thread:hover { border-color: color-mix(in srgb, var(--thread-c) 82%, var(--border)); box-shadow: 0 8px 24px color-mix(in srgb, var(--thread-c) 18%, transparent), 0 2px 6px rgba(16, 18, 23, 0.05); transform: translateY(-1px); }
+.thread:focus-visible { outline: 0; border-color: var(--thread-c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--thread-c) 18%, transparent), var(--shadow); }
+html[data-theme="dark"] .thread { border-color: color-mix(in srgb, var(--thread-c) 52%, var(--border)); }
+html[data-theme="dark"] .thread:hover { border-color: color-mix(in srgb, var(--thread-c) 88%, var(--border)); box-shadow: 0 8px 26px color-mix(in srgb, var(--thread-c) 28%, transparent), 0 2px 6px rgba(0, 0, 0, 0.42); }
 .thread-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .thread-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; color: var(--ink-3); font-size: 0.76rem; }
 .pid { color: var(--source); font-family: var(--mono); font-weight: 750; }
@@ -209,9 +215,38 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
 .skeleton { height: 210px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; position: relative; }
 .skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 5%, transparent), transparent); transform: translateX(-100%); animation: shimmer 1.2s infinite; }
 
+.thread-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(8, 9, 12, 0.62); animation: overlay-in 0.18s ease-out both; }
+.thread-modal { width: min(820px, 100%); max-height: min(88vh, 880px); max-height: min(88dvh, 880px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 24px 70px rgba(7, 12, 16, 0.28); animation: modal-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.thread-modal-head { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.thread-modal-heading { min-width: 0; }
+.thread-modal-title { margin: 0; color: var(--ink); font-size: 1.22rem; line-height: 1.35; font-weight: 750; overflow-wrap: anywhere; }
+.thread-modal-summary { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 5px; color: var(--ink-3); font-size: 0.74rem; }
+.thread-modal-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.thread-modal-source, .thread-modal-close { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink-2); text-decoration: none; cursor: pointer; }
+.thread-modal-source { gap: 6px; padding: 6px 10px; font-size: 0.76rem; font-weight: 700; }
+.thread-modal-close { width: 34px; padding: 0; }
+.thread-modal-source:hover, .thread-modal-close:hover { border-color: var(--border-strong); color: var(--ink); }
+.thread-modal-source:focus-visible, .thread-modal-close:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.thread-modal-source svg, .thread-modal-close svg { width: 16px; height: 16px; }
+.thread-modal-body { min-height: 180px; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px 28px; }
+.thread-modal-note { margin: 0 0 18px; color: var(--ink-3); font-size: 0.76rem; }
+.full-section + .full-section { margin-top: 24px; }
+.full-section-title { margin: 0 0 12px; color: var(--ink); font-size: 0.9rem; font-weight: 750; }
+.full-post { margin: 0; padding: 15px 16px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 7px; background: color-mix(in srgb, var(--accent-soft) 42%, var(--surface)); color: var(--ink-2); font-size: 0.94rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.full-replies { border-top: 1px solid var(--border); }
+.full-reply { padding: 15px 2px; border-bottom: 1px solid var(--border); }
+.full-reply-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--ink-3); font-size: 0.72rem; }
+.full-reply-floor { color: var(--source); font-family: var(--mono); font-weight: 700; }
+.full-reply-content { margin: 7px 0 0; color: var(--ink-2); font-size: 0.88rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread-modal-state { min-height: 180px; display: grid; place-items: center; padding: 24px; color: var(--ink-3); text-align: center; }
+.thread-modal-state strong { color: var(--ink); }
+.thread-modal-state.error strong { color: var(--danger); }
+
 .footnote { margin: 38px 0 0; padding-top: 18px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 0.75rem; }
 @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes ambient-shift { from { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; } to { transform: translate3d(0, 14px, 0) scale(1.05); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; }
@@ -230,6 +265,10 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   .thread-head { align-items: flex-start; }
   .source-link span { display: none; }
   .source-link { width: 30px; height: 30px; justify-content: center; border: 1px solid var(--border); border-radius: 6px; }
+  .thread-modal-overlay { align-items: flex-end; padding: 12px; }
+  .thread-modal { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+  .thread-modal-head { padding: 16px 16px 13px; }
+  .thread-modal-body { padding: 17px 16px 22px; }
 }
 
 @media (max-width: 390px) {
@@ -247,6 +286,13 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   .stat + .stat { padding-left: 12px; }
   .stat-value { font-size: 0.85rem; }
   .thread { padding: 15px 13px; }
+  .thread-modal-overlay { padding: 6px; }
+  .thread-modal { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); }
+  .thread-modal-head { gap: 10px; padding: 14px 12px 11px; }
+  .thread-modal-body { padding: 15px 12px 20px; }
+  .thread-modal-source { width: 34px; padding: 0; }
+  .thread-modal-source span { display: none; }
+  .full-post { padding: 13px 12px; }
 }
 
 @media (max-width: 320px) {
@@ -341,6 +387,27 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   <p class="footnote">仅保留与课程评测相关的主帖和回复；联系方式已自动隐藏。自动筛选可能存在遗漏。</p>
 </main>
 
+<div class="thread-modal-overlay" id="threadModalOverlay" hidden>
+  <section class="thread-modal" role="dialog" aria-modal="true" aria-labelledby="threadModalTitle" aria-describedby="threadModalSummary">
+    <header class="thread-modal-head">
+      <div class="thread-modal-heading">
+        <h2 class="thread-modal-title" id="threadModalTitle">完整树洞</h2>
+        <div class="thread-modal-summary" id="threadModalSummary"></div>
+      </div>
+      <div class="thread-modal-actions">
+        <a class="thread-modal-source" id="threadModalSource" target="_blank" rel="noopener noreferrer" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+          <span>原树洞</span>
+        </a>
+        <button class="thread-modal-close" id="threadModalClose" type="button" aria-label="关闭完整树洞" title="关闭完整树洞">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="thread-modal-body" id="threadModalBody" tabindex="0"></div>
+  </section>
+</div>
+
 <script>
 const PAGE_SIZE = 20;
 const state = {
@@ -354,6 +421,8 @@ const state = {
   popularController: null,
   popularCourses: null,
   searchTimer: null,
+  modalController: null,
+  modalReturnFocus: null,
 };
 
 const searchInput = document.getElementById('searchInput');
@@ -362,6 +431,12 @@ const popularCoursesEl = document.getElementById('popularCourses');
 const resultsEl = document.getElementById('results');
 const loadMoreButton = document.getElementById('loadMore');
 const clearSearchButton = document.getElementById('clearSearch');
+const threadModalOverlay = document.getElementById('threadModalOverlay');
+const threadModalTitle = document.getElementById('threadModalTitle');
+const threadModalSummary = document.getElementById('threadModalSummary');
+const threadModalSource = document.getElementById('threadModalSource');
+const threadModalClose = document.getElementById('threadModalClose');
+const threadModalBody = document.getElementById('threadModalBody');
 
 function getTheme() {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -453,6 +528,148 @@ function safeSourceUrl(value, pid) {
   return `https://treehole.pku.edu.cn/ch/web/pc/postDetail?pid=${encodeURIComponent(pid)}`;
 }
 
+function setThreadModalBackgroundInert(inert) {
+  [document.querySelector('.topbar'), document.querySelector('main')].forEach(element => {
+    if (element) element.inert = inert;
+  });
+}
+
+function renderThreadModalState(title, detail, isError = false) {
+  const wrapper = makeElement('div', `thread-modal-state${isError ? ' error' : ''}`);
+  wrapper.setAttribute('role', isError ? 'alert' : 'status');
+  const content = makeElement('div');
+  content.append(makeElement('strong', '', title));
+  if (detail) content.appendChild(makeElement('div', '', detail));
+  wrapper.appendChild(content);
+  threadModalBody.replaceChildren(wrapper);
+}
+
+function closeThreadModal() {
+  if (threadModalOverlay.hidden) return;
+  if (state.modalController) state.modalController.abort();
+  state.modalController = null;
+  threadModalOverlay.hidden = true;
+  document.body.style.overflow = '';
+  setThreadModalBackgroundInert(false);
+  const returnTarget = state.modalReturnFocus;
+  state.modalReturnFocus = null;
+  if (returnTarget && returnTarget.isConnected) {
+    requestAnimationFrame(() => {
+      if (threadModalOverlay.hidden && returnTarget.isConnected) returnTarget.focus();
+    });
+  }
+}
+
+function trapThreadModalFocus(event) {
+  if (event.key !== 'Tab') return;
+  const focusable = Array.from(
+    threadModalOverlay.querySelectorAll('a[href], button:not([disabled]), [tabindex="0"]'),
+  ).filter(element => !element.hidden && element.offsetParent !== null);
+  if (!focusable.length) {
+    event.preventDefault();
+    threadModalClose.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function renderFullThread(thread) {
+  const replies = Array.isArray(thread.replies) ? thread.replies : [];
+  threadModalTitle.textContent = `树洞 #${thread.pid}`;
+  threadModalSummary.replaceChildren(
+    makeElement('time', '', formatTimestamp(thread.posted_at)),
+    makeElement('span', '', `来源月份 ${thread.source_month || '未知'}`),
+    makeElement('span', '', `${formatNumber(replies.length)} 条快照回复`),
+  );
+  threadModalSource.href = safeSourceUrl(thread.source_url, thread.pid);
+  threadModalSource.setAttribute('aria-label', `在新窗口查看原树洞 ${thread.pid}`);
+  threadModalSource.hidden = false;
+
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(makeElement(
+    'p',
+    'thread-modal-note',
+    '以下为数据快照中保存的完整主帖与全部回复；联系方式已隐藏。',
+  ));
+
+  const postSection = makeElement('section', 'full-section');
+  postSection.append(
+    makeElement('h3', 'full-section-title', '主帖'),
+    makeElement('p', 'full-post', thread.content || ''),
+  );
+  fragment.appendChild(postSection);
+
+  const repliesSection = makeElement('section', 'full-section');
+  repliesSection.appendChild(makeElement(
+    'h3',
+    'full-section-title',
+    `快照内全部回复（${formatNumber(replies.length)}）`,
+  ));
+  if (!replies.length) {
+    repliesSection.appendChild(makeElement('div', 'thread-modal-state', '该快照中没有保存回复'));
+  } else {
+    const repliesBox = makeElement('div', 'full-replies');
+    replies.forEach((reply, index) => {
+      const item = makeElement('article', 'full-reply');
+      const meta = makeElement('div', 'full-reply-meta');
+      const floor = Number.isInteger(reply.floor) ? `${reply.floor} 楼` : `回复 ${index + 1}`;
+      meta.appendChild(makeElement('span', 'full-reply-floor', floor));
+      if (Number.isInteger(reply.cid)) {
+        meta.appendChild(makeElement('span', '', `评论 #${reply.cid}`));
+      }
+      meta.appendChild(makeElement('time', '', formatTimestamp(reply.posted_at)));
+      item.append(meta, makeElement('p', 'full-reply-content', reply.content || ''));
+      repliesBox.appendChild(item);
+    });
+    repliesSection.appendChild(repliesBox);
+  }
+  fragment.appendChild(repliesSection);
+  threadModalBody.replaceChildren(fragment);
+  threadModalBody.scrollTop = 0;
+}
+
+async function openThreadModal(pid, returnFocus) {
+  if (state.modalController) state.modalController.abort();
+  const controller = new AbortController();
+  state.modalController = controller;
+  state.modalReturnFocus = returnFocus;
+  threadModalTitle.textContent = `树洞 #${pid}`;
+  threadModalSummary.replaceChildren(makeElement('span', '', '正在读取快照'));
+  threadModalSource.hidden = true;
+  threadModalSource.removeAttribute('href');
+  renderThreadModalState('正在加载完整树洞', '');
+  threadModalOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  setThreadModalBackgroundInert(true);
+  requestAnimationFrame(() => threadModalClose.focus());
+
+  try {
+    const response = await fetch(`/api/reviews/${encodeURIComponent(pid)}`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const thread = await response.json();
+    if (controller.signal.aborted || state.modalController !== controller) return;
+    if (Number(thread.pid) !== Number(pid)) throw new Error('Invalid thread response');
+    renderFullThread(thread);
+  } catch (error) {
+    if (error.name !== 'AbortError' && state.modalController === controller) {
+      threadModalSummary.replaceChildren();
+      renderThreadModalState('完整树洞加载失败', '请稍后重试。', true);
+    }
+  } finally {
+    if (state.modalController === controller) state.modalController = null;
+  }
+}
+
 function syncUrl() {
   const params = new URLSearchParams();
   if (state.query) params.set('q', state.query);
@@ -516,6 +733,12 @@ function renderReply(entry, hidden) {
 
 function renderThread(thread, index) {
   const article = makeElement('article', `thread thread-${thread.post_kind}`);
+  article.dataset.color = String(index % 6);
+  article.tabIndex = 0;
+  article.setAttribute(
+    'aria-label',
+    `树洞 ${thread.pid}，可打开快照中的完整主帖与全部回复`,
+  );
   article.style.animationDelay = `${Math.min(index * 24, 180)}ms`;
   const head = makeElement('div', 'thread-head');
   const meta = makeElement('div', 'thread-meta');
@@ -577,6 +800,17 @@ function renderThread(thread, index) {
       article.appendChild(toggle);
     }
   }
+  article.addEventListener('click', event => {
+    if (event.target.closest('a, button')) return;
+    const selection = window.getSelection();
+    if (selection && selection.toString()) return;
+    openThreadModal(thread.pid, article);
+  });
+  article.addEventListener('keydown', event => {
+    if (event.target !== article || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    openThreadModal(thread.pid, article);
+  });
   return article;
 }
 
@@ -734,6 +968,19 @@ loadMoreButton.addEventListener('click', async () => {
 });
 document.addEventListener('click', event => {
   if (!event.target.closest('.popular-control')) hidePopularCourses();
+});
+threadModalClose.addEventListener('click', closeThreadModal);
+threadModalOverlay.addEventListener('click', event => {
+  if (event.target === threadModalOverlay) closeThreadModal();
+});
+document.addEventListener('keydown', event => {
+  if (threadModalOverlay.hidden) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeThreadModal();
+    return;
+  }
+  trapThreadModalFocus(event);
 });
 
 async function loadMeta() {

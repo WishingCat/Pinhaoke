@@ -264,6 +264,7 @@ if contract == "health":
     assert isinstance(reviews, dict) and reviews.get("integrity") == "ok"
     assert isinstance(reviews.get("threads"), int) and reviews["threads"] > 0
     assert isinstance(reviews.get("entries"), int) and reviews["entries"] > 0
+    assert isinstance(reviews.get("snapshot_replies"), int) and reviews["snapshot_replies"] > 0
     assert isinstance(reviews.get("highlights"), int) and reviews["highlights"] > 0
 elif contract == "filters":
     assert isinstance(data, dict)
@@ -280,6 +281,17 @@ elif contract == "reviews":
     assert isinstance(threads, list) and len(threads) == 1
     assert isinstance(threads[0], dict) and threads[0].get("pid")
     assert isinstance(threads[0].get("entries"), list) and threads[0]["entries"]
+elif contract == "review-thread":
+    assert isinstance(data.get("pid"), int) and data["pid"] > 0
+    assert isinstance(data.get("content"), str) and data["content"]
+    assert isinstance(data.get("reply_count"), int) and data["reply_count"] >= 0
+    replies = data.get("replies")
+    assert isinstance(replies, list) and len(replies) == data["reply_count"]
+    assert all(
+        isinstance(reply, dict)
+        and set(reply) == {"cid", "floor", "posted_at", "content"}
+        for reply in replies
+    )
 else:
     raise AssertionError(f"unknown smoke contract: {contract}")
 PY
@@ -445,6 +457,17 @@ main() {
     smoke_request filters "http://127.0.0.1:8000/api/filters?term=fall"
     smoke_request courses "http://127.0.0.1:8000/api/courses?term=fall&page_size=1"
     smoke_request reviews "http://127.0.0.1:8000/api/reviews?page_size=1"
+    local review_pid
+    review_pid=$(python3 - "$STAGE_DIR/smoke-reviews.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as response:
+    print(json.load(response)["threads"][0]["pid"])
+PY
+    )
+    [[ "$review_pid" =~ ^[1-9][0-9]*$ ]]
+    smoke_request review-thread "http://127.0.0.1:8000/api/reviews/$review_pid"
 
     DEPLOY_SUCCEEDED=1
     ACTIVATION_STARTED=0

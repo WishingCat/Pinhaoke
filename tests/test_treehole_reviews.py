@@ -11,6 +11,7 @@ from 数据库构建脚本.build_treehole_reviews import (
     analyze_thread,
     build_review_database,
     enrich_existing_database,
+    enrich_thread_replies_database,
     mine_entity_aliases,
     sanitize_text,
 )
@@ -211,6 +212,10 @@ class ReviewClassificationTests(unittest.TestCase):
         self.assertEqual(result["courses"], ["博弈论"])
         self.assertEqual([entry["entry_key"] for entry in result["entries"]], ["p100", "c101"])
         self.assertEqual(result["entries"][1]["courses"], ["博弈论"])
+        self.assertEqual(
+            [reply["content"] for reply in result["all_replies"]],
+            ["老师讲得不错，作业不多，期末闭卷，给分很好", "蹲蹲，同问"],
+        )
 
     def test_reply_requires_evaluation_information_not_only_a_follow_up(self):
         result = analyze_thread(
@@ -471,6 +476,19 @@ class ReviewClassificationTests(unittest.TestCase):
         self.assertNotIn("\x00", sanitize_text("博弈论\x00给分很好"))
         self.assertIn("[联系方式已隐藏]", cleaned)
 
+    def test_invalid_comment_container_fails_instead_of_losing_snapshot_replies(self):
+        with self.assertRaisesRegex(ValueError, "invalid comments for treehole 400"):
+            analyze_thread(
+                {
+                    "pid": 400,
+                    "text": "求测评博弈论，想知道作业量和给分",
+                    "timestamp": 1_700_000_000,
+                    "comments": {},
+                },
+                self.matcher,
+                "2023-11",
+            )
+
 
 class ReviewDatabaseTests(unittest.TestCase):
     def test_tiny_shard_builds_privacy_minimized_search_database(self):
@@ -502,7 +520,7 @@ class ReviewDatabaseTests(unittest.TestCase):
                         {
                             "cid": 101,
                             "floor": 1,
-                            "text": "老师讲得不错，作业少，给分很好",
+                            "text": "老师讲得不错，作业少，给分很好，微信 course_helper88",
                             "timestamp": 1_700_000_100,
                             "replyTo": None,
                             "authorTag": "also-private",
@@ -558,6 +576,10 @@ class ReviewDatabaseTests(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0], 2)
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0], 4)
                 self.assertEqual(
+                    conn.execute("SELECT COUNT(*) FROM thread_replies").fetchone()[0],
+                    3,
+                )
+                self.assertEqual(
                     conn.execute(
                         "SELECT GROUP_CONCAT(course_name, ',') FROM thread_courses WHERE pid=100"
                     ).fetchone()[0],
@@ -565,6 +587,12 @@ class ReviewDatabaseTests(unittest.TestCase):
                 )
                 stored = "\n".join(
                     row[0] for row in conn.execute("SELECT content FROM entries ORDER BY entry_key")
+                )
+                snapshot_replies = "\n".join(
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT content FROM thread_replies ORDER BY pid, ordinal"
+                    )
                 )
                 metadata = dict(conn.execute("SELECT key, value FROM metadata"))
                 highlights = conn.execute(
@@ -574,11 +602,131 @@ class ReviewDatabaseTests(unittest.TestCase):
         self.assertNotIn("must-not-leak", stored)
         self.assertNotIn("also-private", stored)
         self.assertNotIn("蹲，同问", stored)
+        self.assertIn("蹲，同问", snapshot_replies)
+        self.assertNotIn("course_helper88", snapshot_replies)
+        self.assertIn("[联系方式已隐藏]", snapshot_replies)
         self.assertEqual(metadata["snapshot_date"], "2026-07-13")
         self.assertEqual(metadata["matched_threads"], "2")
         self.assertEqual(metadata["matched_entries"], "4")
+        self.assertEqual(metadata["snapshot_replies"], "3")
         self.assertEqual(dict(highlights)["course"], 2)
         self.assertEqual(metadata["course_highlights"], "2")
+
+    def test_existing_thread_set_can_gain_all_snapshot_replies_without_reclassification(self):
+        matcher = CourseMatcher.from_rows([("00100001", "博弈论")])
+        shard = {
+            "version": 2,
+            "key": "2023-11",
+            "posts": {
+                "100": {
+                    "pid": 100,
+                    "text": "求测评博弈论，想知道作业量和给分",
+                    "timestamp": 1_700_000_000,
+                    "comments": [
+                        {
+                            "cid": 101,
+                            "floor": 1,
+                            "text": "老师讲得不错，作业少，给分很好",
+                            "timestamp": 1_700_000_100,
+                        },
+                        {
+                            "cid": 102,
+                            "floor": 2,
+                            "text": "蹲，同问",
+                            "timestamp": 1_700_000_200,
+                        },
+                    ],
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            shards = source / "shards"
+            shards.mkdir(parents=True)
+            shard_path = shards / "2023-11.json"
+            shard_path.write_text(json.dumps(shard, ensure_ascii=False), encoding="utf-8")
+            (source / "manifest.json").write_text(
+                json.dumps({"snapshotDate": "2026-07-13"}),
+                encoding="utf-8",
+            )
+            target = Path(tmp) / "reviews.db"
+            build_review_database(
+                shard_paths=[shard_path],
+                target=target,
+                matcher=matcher,
+                snapshot_date="2026-07-13",
+            )
+            with closing(sqlite3.connect(target)) as conn:
+                before_entries = conn.execute(
+                    "SELECT entry_key, content FROM entries ORDER BY entry_key"
+                ).fetchall()
+                conn.execute("DROP TABLE thread_replies")
+                conn.execute("DELETE FROM metadata WHERE key='snapshot_replies'")
+                conn.commit()
+
+            stats = enrich_thread_replies_database(source, target)
+            with closing(sqlite3.connect(target)) as conn:
+                after_entries = conn.execute(
+                    "SELECT entry_key, content FROM entries ORDER BY entry_key"
+                ).fetchall()
+                snapshot_replies = conn.execute(
+                    "SELECT content FROM thread_replies ORDER BY ordinal"
+                ).fetchall()
+                metadata = dict(conn.execute("SELECT key, value FROM metadata"))
+
+        self.assertEqual(stats, {"threads": 1, "snapshot_replies": 2})
+        self.assertEqual(before_entries, after_entries)
+        self.assertEqual(
+            snapshot_replies,
+            [
+                ("老师讲得不错，作业少，给分很好",),
+                ("蹲，同问",),
+            ],
+        )
+        self.assertEqual(metadata["snapshot_replies"], "2")
+
+    def test_snapshot_reply_enrichment_failure_keeps_existing_database_bytes(self):
+        matcher = CourseMatcher.from_rows([("00100001", "博弈论")])
+        shard = {
+            "version": 2,
+            "key": "2023-11",
+            "posts": {
+                "100": {
+                    "pid": 100,
+                    "text": "求测评博弈论，想知道作业量和给分",
+                    "timestamp": 1_700_000_000,
+                    "comments": [],
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            shards = source / "shards"
+            shards.mkdir(parents=True)
+            shard_path = shards / "2023-11.json"
+            shard_path.write_text(json.dumps(shard, ensure_ascii=False), encoding="utf-8")
+            (source / "manifest.json").write_text(
+                json.dumps({"snapshotDate": "2026-07-13"}),
+                encoding="utf-8",
+            )
+            target = Path(tmp) / "reviews.db"
+            build_review_database(
+                shard_paths=[shard_path],
+                target=target,
+                matcher=matcher,
+                snapshot_date="2026-07-13",
+            )
+            before = target.read_bytes()
+            shard["posts"] = {}
+            shard_path.write_text(json.dumps(shard, ensure_ascii=False), encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "missing 1 review threads"):
+                enrich_thread_replies_database(source, target)
+
+            self.assertEqual(target.read_bytes(), before)
+            self.assertEqual(list(target.parent.glob(f".{target.name}.*.tmp")), [])
 
     def test_existing_database_can_be_atomically_enriched(self):
         matcher = CourseMatcher.from_rows([("00100001", "普通生物学(C)")])

@@ -78,7 +78,7 @@ http://127.0.0.1:8000/api/courses?term=fall&page_size=1
 http://127.0.0.1:8000/api/reviews?page_size=1
 ```
 
-健康检查必须报告五个课程库、五个 ID 前缀、树洞评测库、实体高亮数量及完整性；filters 必须返回六个列表字段；courses 必须返回正整数 total 和一条带 ID 的课程；reviews 必须返回正整数 total 和一条带树洞号及条目列表的主题。HTTP 200 但 JSON 不符合契约也视为失败。
+健康检查必须报告五个课程库、五个 ID 前缀、树洞评测库、快照回复数、实体高亮数量及完整性；filters 必须返回六个列表字段；courses 必须返回正整数 total 和一条带 ID 的课程；reviews 必须返回正整数 total 和一条带树洞号及条目列表的主题，`/api/reviews/{pid}` 必须返回对应主帖和快照内全部回复。HTTP 200 但 JSON 不符合契约也视为失败。
 
 ## 自动回滚语义
 

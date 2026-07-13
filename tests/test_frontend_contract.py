@@ -107,6 +107,7 @@ class FrontendContractTests(unittest.TestCase):
     def test_review_page_uses_read_only_apis_and_safe_text_rendering(self):
         for endpoint in ("/api/reviews?", "/api/review-courses?", "/api/reviews/meta"):
             self.assertIn(endpoint, REVIEWS_HTML)
+        self.assertIn("`/api/reviews/${encodeURIComponent(pid)}`", REVIEWS_HTML)
         self.assertIn("requestId !== state.requestId", REVIEWS_HTML)
         self.assertIn("textContent = text", REVIEWS_HTML)
         self.assertIn("function renderHighlightedText", REVIEWS_HTML)
@@ -119,6 +120,28 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("entity-color-5", REVIEWS_HTML)
         self.assertIn("url.hostname === 'treehole.pku.edu.cn'", REVIEWS_HTML)
         self.assertNotIn("addToPlan.do", REVIEWS_HTML)
+
+    def test_review_cards_use_full_tinted_borders_and_open_snapshot_modal(self):
+        self.assertIn("border: 1.5px solid var(--border);", REVIEWS_HTML)
+        self.assertIn(
+            "border-color: color-mix(in srgb, var(--thread-c) 38%, var(--border));",
+            REVIEWS_HTML,
+        )
+        for color in range(6):
+            self.assertIn(f'.thread[data-color="{color}"]', REVIEWS_HTML)
+        self.assertNotIn(".thread::before", REVIEWS_HTML)
+        self.assertNotIn(".thread-review::before", REVIEWS_HTML)
+        self.assertNotIn(".thread-discussion::before", REVIEWS_HTML)
+        self.assertIn('role="dialog" aria-modal="true"', REVIEWS_HTML)
+        self.assertIn('id="threadModalOverlay" hidden', REVIEWS_HTML)
+        self.assertIn("openThreadModal(thread.pid, article)", REVIEWS_HTML)
+        self.assertIn("event.target.closest('a, button')", REVIEWS_HTML)
+        self.assertIn("setThreadModalBackgroundInert(true)", REVIEWS_HTML)
+        self.assertIn("trapThreadModalFocus(event)", REVIEWS_HTML)
+        self.assertIn("threadModalOverlay.hidden && returnTarget.isConnected", REVIEWS_HTML)
+        self.assertIn("threadModalBody.replaceChildren(fragment)", REVIEWS_HTML)
+        self.assertIn("快照内全部回复", REVIEWS_HTML)
+        self.assertIn(".thread-modal-overlay { align-items: flex-end; padding: 12px; }", REVIEWS_HTML)
 
     def test_review_page_keeps_review_entry_separate_and_mobile_friendly(self):
         term_nav = REVIEWS_HTML.index('class="term-nav"')
