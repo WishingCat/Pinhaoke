@@ -18,7 +18,7 @@
 
 - 发布目录通常为 `root:www-data`，目录 `0750`，文件 `0640`
 - `venv` 为 `root:root`，目录 `0755`，普通文件 `0644`，`bin/` 可执行文件 `0755`
-- 数据库由应用以 SQLite `mode=ro` 和 `PRAGMA query_only = ON` 打开
+- 五个课程数据库和一个树洞评测数据库均由应用以 SQLite `mode=ro` 和 `PRAGMA query_only = ON` 打开
 - systemd 使用 `ProtectSystem=strict`、`ReadOnlyPaths=/opt/pinhaoke`、`NoNewPrivileges=true`、私有临时目录、空 capability 和 `UMask=0027`
 
 不要对 `/opt/pinhaoke` 执行递归 `chown www-data`。更新脚本会避开 `.git`、staging、备份/诊断 venv 和活动 venv，使用 symlink-safe 的权限处理。
@@ -69,7 +69,7 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 3. 安装目标 commit 的 systemd unit。
 4. 仅在候选 venv 已构建时原子交换 venv。
 5. 使用活动 Python 执行 `python -m uvicorn --version`，应用只读权限，reload unit 并启动服务。
-6. 对三个本机 API 执行带重试、超时和 JSON 契约检查的烟测。
+6. 对四个本机 API 执行带重试、超时和 JSON 契约检查的烟测。
 
 烟测目标：
 
@@ -77,9 +77,10 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 http://127.0.0.1:8000/api/health
 http://127.0.0.1:8000/api/filters?term=fall
 http://127.0.0.1:8000/api/courses?term=fall&page_size=1
+http://127.0.0.1:8000/api/reviews?page_size=1
 ```
 
-健康检查必须报告五库、五个 ID 前缀和完整性；filters 必须返回六个列表字段；courses 必须返回正整数 total 和一条带 ID 的课程。HTTP 200 但 JSON 不符合契约也视为失败。
+健康检查必须报告五个课程库、五个 ID 前缀、树洞评测库、实体高亮数量及完整性；filters 必须返回六个列表字段；courses 必须返回正整数 total 和一条带 ID 的课程；reviews 必须返回正整数 total 和一条带树洞号及条目列表的主题。HTTP 200 但 JSON 不符合契约也视为失败。
 
 ## 自动回滚语义
 
@@ -111,6 +112,7 @@ journalctl -u pinhaoke --since '2026-07-11 00:00:00' --no-pager
 curl --fail --silent http://127.0.0.1:8000/api/health
 curl --fail --silent 'http://127.0.0.1:8000/api/filters?term=fall'
 curl --fail --silent 'http://127.0.0.1:8000/api/courses?term=fall&page_size=1'
+curl --fail --silent 'http://127.0.0.1:8000/api/reviews?page_size=1'
 ```
 
 外部检查：
@@ -129,7 +131,7 @@ curl --head https://www.pinhaoke.love/
 3. 停止服务，恢复该 commit，执行对应 LFS checkout/fsck。
 4. 恢复该 commit 的 `deploy/pinhaoke.service` 并运行 `systemctl daemon-reload`。
 5. 检查 `/opt/pinhaoke/venv/bin/python -m uvicorn --version`。只有日志证明 venv 已发生交换时，才依据 `.venv-backup-*` / `.venv-failed-*` 现场状态恢复；禁止无条件替换活动 venv。
-6. 恢复 root 所有权与只读权限，启动服务，依次通过 health、filters、courses 三项烟测。
+6. 恢复 root 所有权与只读权限，启动服务，依次通过 health、filters、courses、reviews 四项烟测。
 7. 保存失败诊断目录，完成原因分析后再清理。
 
 手工恢复不是常规发布方式。故障处理后应先修复仓库脚本与测试，再重新使用唯一更新命令。

@@ -28,6 +28,7 @@ import re
 import sqlite3
 import threading
 import time
+import unicodedata
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -40,6 +41,7 @@ GR_DB = DB_DIR / "2026春季学期研究生课程.db"
 SUMMER_DB = DB_DIR / "2026暑期本科生课程.db"
 FALL_UG_DB = DB_DIR / "2026秋季学期本科生课程.db"
 FALL_GR_DB = DB_DIR / "2026秋季学期研究生课程.db"
+REVIEWS_DB = DB_DIR / "树洞课程评测.db"
 
 # (alias, path, id_prefix)
 TERM_DBS = {
@@ -64,6 +66,10 @@ VALID_SORTS = frozenset({
     "credits_asc", "credits_desc", "time_asc", "random",
 })
 COURSE_ID_RE = re.compile(r"^[ugsar][1-9][0-9]*$")
+REVIEW_QUERY_MAX_LENGTH = 120
+_REVIEW_SEARCH_STRIP_RE = re.compile(
+    r"[\s\u200b\u200c\u200d·•・_—–\-:：,，.。/\\《》<>\[\]【】'\"]+"
+)
 
 app = FastAPI(title="Pinhaoke")
 
@@ -89,6 +95,19 @@ def get_db(term: str = "fall"):
         conn.execute("PRAGMA query_only = ON")
         for alias, path, _ in config[1:]:
             conn.execute(f"ATTACH DATABASE ? AS {alias}", (_readonly_uri(path),))
+        yield conn
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@contextmanager
+def get_reviews_db():
+    conn = None
+    try:
+        conn = sqlite3.connect(_readonly_uri(REVIEWS_DB), uri=True)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only = ON")
         yield conn
     finally:
         if conn is not None:
@@ -151,7 +170,99 @@ def check_database_health() -> dict:
                     "detail": detail,
                 }
             )
-    return {"status": "ok", "databases": databases}
+
+    conn = sqlite3.connect(_readonly_uri(REVIEWS_DB), uri=True)
+    try:
+        review_tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        review_threads = conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0]
+        review_entries = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+        review_posts = conn.execute(
+            "SELECT COUNT(*) FROM entries WHERE kind='post'"
+        ).fetchone()[0]
+        review_highlights = conn.execute(
+            "SELECT COUNT(*) FROM entry_highlights"
+        ).fetchone()[0]
+        review_aliases = dict(
+            conn.execute(
+                "SELECT entity_type, COUNT(DISTINCT normalized_alias) "
+                "FROM entity_aliases GROUP BY entity_type"
+            )
+        )
+        invalid_review_highlight = False
+        previous_highlight_key = None
+        previous_highlight_end = 0
+        for entry_key, content, start, end in conn.execute(
+            """
+            SELECT h.entry_key, e.content, h.start_offset, h.end_offset
+            FROM entry_highlights h
+            JOIN entries e ON e.entry_key=h.entry_key
+            ORDER BY h.entry_key, h.start_offset, h.end_offset
+            """
+        ):
+            if entry_key != previous_highlight_key:
+                previous_highlight_key = entry_key
+                previous_highlight_end = 0
+            if (
+                start < previous_highlight_end
+                or start < 0
+                or end <= start
+                or end > len(content)
+            ):
+                invalid_review_highlight = True
+                break
+            previous_highlight_end = end
+        review_metadata = dict(conn.execute("SELECT key, value FROM metadata"))
+        review_foreign_key_violation = conn.execute(
+            "PRAGMA foreign_key_check"
+        ).fetchone()
+        review_integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+    finally:
+        conn.close()
+    required_review_tables = {
+        "metadata", "threads", "entries", "thread_courses",
+        "entry_courses", "course_catalog", "entity_aliases", "entry_highlights",
+    }
+    try:
+        review_metadata_matches = (
+            int(review_metadata.get("matched_threads", -1)) == review_threads
+            and int(review_metadata.get("matched_entries", -1)) == review_entries
+            and int(review_metadata.get("course_highlights", -1))
+            + int(review_metadata.get("teacher_highlights", -1)) == review_highlights
+            and int(review_metadata.get("course_aliases", -1))
+            == review_aliases.get("course", 0)
+            and int(review_metadata.get("teacher_aliases", -1))
+            == review_aliases.get("teacher", 0)
+            and int(review_metadata.get("course_alias_highlights", -1))
+            <= int(review_metadata.get("course_highlights", -1))
+            and int(review_metadata.get("teacher_alias_highlights", -1))
+            <= int(review_metadata.get("teacher_highlights", -1))
+            and review_metadata.get("highlight_version") == "2"
+        )
+    except (TypeError, ValueError):
+        review_metadata_matches = False
+    if (
+        not required_review_tables.issubset(review_tables)
+        or review_threads != review_posts
+        or review_entries < review_threads
+        or not review_metadata_matches
+        or invalid_review_highlight
+        or review_foreign_key_violation is not None
+        or review_integrity != "ok"
+    ):
+        raise RuntimeError(f"Unhealthy database: {REVIEWS_DB.name}")
+
+    reviews = {
+        "file": REVIEWS_DB.name,
+        "integrity": review_integrity,
+        "threads": review_threads,
+        "entries": review_entries,
+        "highlights": review_highlights,
+        "snapshot_date": review_metadata.get("snapshot_date", ""),
+    }
+    return {"status": "ok", "databases": databases, "reviews": reviews}
 
 
 def get_cached_database_health() -> dict:
@@ -967,6 +1078,225 @@ def get_course_detail(
     return out
 
 
+# ---- Treehole course reviews -------------------------------------------------
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _normalize_review_query(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").lower()
+    return _REVIEW_SEARCH_STRIP_RE.sub("", normalized)
+
+
+def _validate_review_query(q: str) -> str:
+    if not isinstance(q, str) or len(q) > REVIEW_QUERY_MAX_LENGTH:
+        raise HTTPException(status_code=422, detail="Invalid review query parameter")
+    return q.strip()
+
+
+def _validate_review_pagination(page: int, page_size: int) -> None:
+    if (
+        isinstance(page, bool)
+        or not isinstance(page, int)
+        or not 1 <= page <= 10000
+        or isinstance(page_size, bool)
+        or not isinstance(page_size, int)
+        or not 1 <= page_size <= 100
+    ):
+        raise HTTPException(status_code=422, detail="Invalid review query parameter")
+
+
+def _review_search_where(query: str):
+    if not query:
+        return "", []
+    raw_pattern = f"%{_escape_like(query)}%"
+    conditions = [
+        "t.content LIKE ? ESCAPE '\\'",
+        "EXISTS (SELECT 1 FROM entries se WHERE se.pid=t.pid "
+        "AND se.content LIKE ? ESCAPE '\\')",
+    ]
+    params = [raw_pattern, raw_pattern]
+    normalized = _normalize_review_query(query)
+    if normalized:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM thread_courses stc WHERE stc.pid=t.pid "
+            "AND stc.search_name LIKE ? ESCAPE '\\')"
+        )
+        params.append(f"%{_escape_like(normalized)}%")
+    return "WHERE " + " OR ".join(conditions), params
+
+
+def _load_review_threads(conn, rows):
+    if not rows:
+        return []
+    pids = [row["pid"] for row in rows]
+    placeholders = ",".join("?" for _ in pids)
+    courses_by_pid = {pid: [] for pid in pids}
+    for course in conn.execute(
+        f"SELECT pid, course_name FROM thread_courses "
+        f"WHERE pid IN ({placeholders}) ORDER BY pid, course_name",
+        pids,
+    ):
+        courses_by_pid[course["pid"]].append(course["course_name"])
+
+    entries_by_pid = {pid: [] for pid in pids}
+    entry_by_key = {}
+    for entry in conn.execute(
+        f"SELECT entry_key, pid, kind, cid, floor, posted_at, content "
+        f"FROM entries WHERE pid IN ({placeholders}) "
+        "ORDER BY pid, CASE kind WHEN 'post' THEN 0 ELSE 1 END, floor, cid",
+        pids,
+    ):
+        item = {
+            "kind": entry["kind"],
+            "cid": entry["cid"],
+            "floor": entry["floor"],
+            "posted_at": entry["posted_at"],
+            "content": entry["content"],
+            "courses": [],
+            "highlights": [],
+        }
+        entries_by_pid[entry["pid"]].append(item)
+        entry_by_key[entry["entry_key"]] = item
+
+    entry_keys = list(entry_by_key)
+    entry_placeholders = ",".join("?" for _ in entry_keys)
+    for course in conn.execute(
+        f"SELECT entry_key, course_name FROM entry_courses "
+        f"WHERE entry_key IN ({entry_placeholders}) ORDER BY entry_key, course_name",
+        entry_keys,
+    ):
+        entry_by_key[course["entry_key"]]["courses"].append(course["course_name"])
+
+    for highlight in conn.execute(
+        f"SELECT entry_key, start_offset, end_offset, entity_type, match_kind "
+        f"FROM entry_highlights WHERE entry_key IN ({entry_placeholders}) "
+        "ORDER BY entry_key, start_offset, end_offset",
+        entry_keys,
+    ):
+        entry_by_key[highlight["entry_key"]]["highlights"].append(
+            {
+                "start_offset": highlight["start_offset"],
+                "end_offset": highlight["end_offset"],
+                "entity_type": highlight["entity_type"],
+                "match_kind": highlight["match_kind"],
+            }
+        )
+
+    results = []
+    for row in rows:
+        entries = entries_by_pid[row["pid"]]
+        post_entry = next(entry for entry in entries if entry["kind"] == "post")
+        results.append({
+            "pid": row["pid"],
+            "source_month": row["source_month"],
+            "posted_at": row["posted_at"],
+            "content": row["content"],
+            "highlights": post_entry["highlights"],
+            "source_url": row["source_url"],
+            "post_kind": row["post_kind"],
+            "relevant_reply_count": row["relevant_reply_count"],
+            "courses": courses_by_pid[row["pid"]],
+            "entries": entries,
+        })
+    return results
+
+
+@app.get("/api/reviews")
+def list_reviews(
+    q: str = Query("", max_length=REVIEW_QUERY_MAX_LENGTH),
+    page: int = Query(1, ge=1, le=10000),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    query = _validate_review_query(q)
+    _validate_review_pagination(page, page_size)
+    where, params = _review_search_where(query)
+    offset = (page - 1) * page_size
+    with get_reviews_db() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM threads t {where}", params
+        ).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT t.* FROM threads t {where} "
+            "ORDER BY t.posted_at DESC, t.pid DESC LIMIT ? OFFSET ?",
+            [*params, page_size, offset],
+        ).fetchall()
+        threads = _load_review_threads(conn, rows)
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "query": query,
+        "threads": threads,
+    }
+
+
+@app.get("/api/review-courses")
+def list_review_courses(
+    q: str = Query("", max_length=REVIEW_QUERY_MAX_LENGTH),
+    limit: int = Query(12, ge=1, le=50),
+):
+    query = _validate_review_query(q)
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
+        raise HTTPException(status_code=422, detail="Invalid review query parameter")
+
+    normalized = _normalize_review_query(query)
+    where = ""
+    params = []
+    if query:
+        raw_pattern = f"%{_escape_like(query)}%"
+        conditions = ["course_name LIKE ? ESCAPE '\\'"]
+        params = [raw_pattern]
+        if normalized:
+            conditions.append("search_name LIKE ? ESCAPE '\\'")
+            params.append(f"%{_escape_like(normalized)}%")
+        where = "WHERE " + " OR ".join(conditions)
+
+    with get_reviews_db() as conn:
+        rows = conn.execute(
+            "SELECT course_name, course_codes, thread_count, entry_count "
+            f"FROM course_catalog {where} "
+            "ORDER BY thread_count DESC, entry_count DESC, course_name LIMIT ?",
+            [*params, limit],
+        ).fetchall()
+    return [
+        {
+            "course_name": row["course_name"],
+            "course_codes": [code for code in row["course_codes"].split(",") if code],
+            "thread_count": row["thread_count"],
+            "entry_count": row["entry_count"],
+        }
+        for row in rows
+    ]
+
+
+@app.get("/api/reviews/meta")
+def get_review_meta():
+    with get_reviews_db() as conn:
+        metadata = dict(conn.execute("SELECT key, value FROM metadata"))
+
+    integer_keys = (
+        "source_shards", "source_posts", "source_replies", "matched_threads",
+        "matched_entries", "matched_replies", "catalog_courses",
+        "uncachedReplyDifference", "highlighted_entries", "course_highlights",
+        "teacher_highlights", "course_aliases", "teacher_aliases",
+        "course_alias_highlights", "teacher_alias_highlights",
+    )
+    payload = {
+        "snapshot_date": metadata.get("snapshot_date", ""),
+        "classifier_version": metadata.get("classifier_version", ""),
+        "highlight_version": metadata.get("highlight_version", ""),
+    }
+    for key in integer_keys:
+        output_key = re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower()
+        payload[output_key] = int(metadata.get(key, 0))
+    payload["cached_reply_coverage_percent"] = float(
+        metadata.get("cachedReplyCoveragePercent", 0)
+    )
+    return payload
+
+
 # Static files ------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -984,3 +1314,8 @@ app.mount("/Images", StaticFiles(directory=str(BASE_DIR / "Images")), name="imag
 @app.get("/")
 def root():
     return FileResponse(BASE_DIR / "index.html")
+
+
+@app.get("/reviews", include_in_schema=False)
+def reviews_page():
+    return FileResponse(BASE_DIR / "reviews.html")

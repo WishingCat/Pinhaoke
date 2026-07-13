@@ -59,6 +59,15 @@ class DocumentationTests(unittest.TestCase):
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
         self.assertLess(text.index("2026 暑期"), text.index("2026 秋季"))
         self.assertIn("秋季为默认学期", text)
+        self.assertIn("树洞课程评测", text)
+        self.assertIn("独立入口", text)
+        self.assertIn("手机端", text)
+        self.assertIn("课程名、教师名", text)
+        self.assertIn("高置信缩写会加粗彩色高亮", text)
+        self.assertIn("查看热门课程", text)
+        self.assertIn("不显示输入联想", text)
+        self.assertIn("评测数据量 `62716`", text)
+        self.assertIn("`31642` 个主题加 `31074` 条相关回复", text)
         self.assertRegex(
             text,
             r'wechat_sponsor\.jpg"[^>]*alt="微信赞助码"[^\n]*微信赞助码',
@@ -82,6 +91,18 @@ class DocumentationTests(unittest.TestCase):
             "fall=4421",
             "spring=3701",
             "summer=160",
+            "GET /api/reviews",
+            "GET /api/review-courses",
+            "查看热门课程",
+            "树洞课程评测.db",
+            "31642",
+            "62716",
+            "entry_highlights",
+            "entity_aliases",
+            "96555",
+            "60294",
+            "26892",
+            "36560",
             "python3 -m unittest discover -s tests -v",
             "atomic_database",
             "addToPlan.do",
@@ -139,6 +160,18 @@ class DocumentationTests(unittest.TestCase):
             "basic_info",
             "detail_info",
             "translations",
+            "3561472",
+            "15245822",
+            "95.24%",
+            "31642",
+            "62716",
+            "course_catalog",
+            "entry_highlights",
+            "entity_aliases",
+            "96555",
+            "60294",
+            "26892",
+            "36560",
         ):
             self.assertIn(fact, text)
 
@@ -151,6 +184,7 @@ class DocumentationTests(unittest.TestCase):
             "自动回滚",
             "journalctl -u pinhaoke",
             "/api/health",
+            "/api/reviews?page_size=1",
             "本次任务未部署生产",
         ):
             self.assertIn(fact, deploy)

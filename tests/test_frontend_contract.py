@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 HTML = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")
+REVIEWS_HTML = (Path(__file__).resolve().parents[1] / "reviews.html").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 
 
@@ -78,6 +79,91 @@ class FrontendContractTests(unittest.TestCase):
             capture_output=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_treehole_reviews_is_adjacent_to_ordered_term_controls(self):
+        spring = HTML.index('id="termSpringBtn"')
+        summer = HTML.index('id="termSummerBtn"')
+        fall = HTML.index('id="termFallBtn"')
+        reviews = HTML.index('id="reviewHubLink"')
+        self.assertLess(spring, summer)
+        self.assertLess(summer, fall)
+        self.assertLess(fall, reviews)
+        self.assertIn('href="/reviews"', HTML[reviews:reviews + 180])
+
+    def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
+        self.assertEqual(HTML.count("VX 联系方式："), 2)
+        self.assertEqual(HTML.count("tuzengji"), 2)
+        self.assertEqual(HTML.count("如果有问题或需求 欢迎联系！"), 2)
+        self.assertIn('class="about-contact"', HTML)
+        self.assertIn('class="footer-contact"', HTML)
+
+    def test_review_page_uses_read_only_apis_and_safe_text_rendering(self):
+        for endpoint in ("/api/reviews?", "/api/review-courses?", "/api/reviews/meta"):
+            self.assertIn(endpoint, REVIEWS_HTML)
+        self.assertIn("requestId !== state.requestId", REVIEWS_HTML)
+        self.assertIn("textContent = text", REVIEWS_HTML)
+        self.assertIn("function renderHighlightedText", REVIEWS_HTML)
+        self.assertIn("document.createTextNode", REVIEWS_HTML)
+        self.assertIn("Array.from(value)", REVIEWS_HTML)
+        self.assertIn("entity-course", REVIEWS_HTML)
+        self.assertIn("entity-teacher", REVIEWS_HTML)
+        self.assertIn("function stableEntityColor", REVIEWS_HTML)
+        self.assertIn("item.match_kind === 'alias'", REVIEWS_HTML)
+        self.assertIn("entity-color-5", REVIEWS_HTML)
+        self.assertIn("url.hostname === 'treehole.pku.edu.cn'", REVIEWS_HTML)
+        self.assertNotIn("addToPlan.do", REVIEWS_HTML)
+
+    def test_review_page_keeps_review_entry_separate_and_mobile_friendly(self):
+        term_nav = REVIEWS_HTML.index('class="term-nav"')
+        term_nav_end = REVIEWS_HTML.index('</div>', term_nav)
+        review_shell = REVIEWS_HTML.index('class="review-nav-shell"')
+        review_link = REVIEWS_HTML.index('class="review-nav-link"')
+        self.assertLess(term_nav_end, review_shell)
+        self.assertLess(term_nav_end, review_link)
+        self.assertLess(review_shell, review_link)
+        self.assertIn('.term-nav, .review-nav-shell {', REVIEWS_HTML)
+        self.assertIn('.term-nav a, .review-nav-link { padding: 6px 14px;', REVIEWS_HTML)
+        self.assertIn('.review-nav-shell { width: 100%;', REVIEWS_HTML)
+        self.assertIn('.review-nav-link { width: 100%;', REVIEWS_HTML)
+        self.assertIn('.term-nav a { flex-basis: 100%;', REVIEWS_HTML)
+
+    def test_review_page_shows_only_snapshot_date_and_combined_review_count(self):
+        self.assertEqual(REVIEWS_HTML.count('class="stat"'), 2)
+        self.assertIn("数据截至", REVIEWS_HTML)
+        self.assertIn('id="statDate"', REVIEWS_HTML)
+        self.assertIn("评测数据量", REVIEWS_HTML)
+        self.assertIn('id="statTotal"', REVIEWS_HTML)
+        self.assertIn(
+            "Number(meta.matched_threads) + Number(meta.matched_replies)",
+            REVIEWS_HTML,
+        )
+        for removed_id in ("statThreads", "statReplies", "statCoverage"):
+            self.assertNotIn(removed_id, REVIEWS_HTML)
+        self.assertNotIn('id="resultCount"', REVIEWS_HTML)
+        self.assertNotIn("个相关树洞", REVIEWS_HTML)
+        self.assertNotIn(".result-count", REVIEWS_HTML)
+
+    def test_review_search_placeholder_mentions_courses_and_teachers(self):
+        self.assertIn(
+            'placeholder="可以搜索课程、老师，例如 YQF，马原……"',
+            REVIEWS_HTML,
+        )
+
+    def test_review_search_matches_course_search_and_gates_popular_courses(self):
+        self.assertIn('class="search-controls"', REVIEWS_HTML)
+        self.assertIn('class="search-form" id="searchForm"', REVIEWS_HTML)
+        self.assertIn('padding: 14px 20px;', REVIEWS_HTML)
+        self.assertIn('border-radius: 14px;', REVIEWS_HTML)
+        self.assertIn('id="popularButton"', REVIEWS_HTML)
+        self.assertIn('<span>查看热门课程</span>', REVIEWS_HTML)
+        self.assertIn('aria-controls="popularCourses"', REVIEWS_HTML)
+        self.assertIn("fetch('/api/review-courses?q=&limit=12'", REVIEWS_HTML)
+        self.assertIn("searchInput.addEventListener('input', scheduleSearch)", REVIEWS_HTML)
+        self.assertIn("setTimeout(() => runSearch(searchInput.value), 300)", REVIEWS_HTML)
+        self.assertNotIn('class="submit-search"', REVIEWS_HTML)
+        self.assertNotIn('id="suggestions"', REVIEWS_HTML)
+        self.assertNotIn('role="combobox"', REVIEWS_HTML)
+        self.assertNotIn("searchInput.addEventListener('focus'", REVIEWS_HTML)
 
     def test_load_more_guards_before_next_page_and_commits_after_success(self):
         body = function_body("loadMore")
@@ -602,6 +688,24 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("@media (max-width: 390px)", HTML)
         self.assertIn("@media (max-width: 320px)", HTML)
         self.assertRegex(HTML, r"\.term-toggle\s*\{[^}]*flex-wrap:\s*wrap")
+
+    def test_mobile_filter_toggle_is_centered_wide_and_prominent(self):
+        match = re.search(
+            r"@media \(max-width: 720px\) \{\s*\.filters-toggle \{([^}]*)\}",
+            HTML,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        rules = match.group(1)
+        self.assertIn("display: flex", rules)
+        self.assertIn("justify-content: center", rules)
+        self.assertIn("width: min(280px, 78%)", rules)
+        self.assertIn("min-height: 44px", rules)
+        self.assertIn("margin: 0 auto 14px", rules)
+        self.assertIn("background: var(--surface)", rules)
+        self.assertNotIn("gradient", rules)
+        self.assertIn("font-size: 0.94rem", rules)
+        self.assertIn("font-weight: 700", rules)
         self.assertRegex(HTML, r"\.container\s*\{[^}]*min-width:\s*0")
 
     def test_privacy_and_dead_font_cleanup(self):

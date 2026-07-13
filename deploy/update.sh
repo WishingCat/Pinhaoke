@@ -246,10 +246,15 @@ with open(response_path, encoding="utf-8") as response:
 
 if contract == "health":
     databases = data.get("databases")
+    reviews = data.get("reviews")
     assert data.get("status") == "ok"
     assert isinstance(databases, list) and len(databases) == 5
     assert {item.get("prefix") for item in databases} == {"a", "r", "u", "g", "s"}
     assert all(item.get("integrity") == "ok" for item in databases)
+    assert isinstance(reviews, dict) and reviews.get("integrity") == "ok"
+    assert isinstance(reviews.get("threads"), int) and reviews["threads"] > 0
+    assert isinstance(reviews.get("entries"), int) and reviews["entries"] > 0
+    assert isinstance(reviews.get("highlights"), int) and reviews["highlights"] > 0
 elif contract == "filters":
     assert isinstance(data, dict)
     for key in ("course_types", "categories", "departments", "credits", "gradings", "weekdays"):
@@ -259,6 +264,12 @@ elif contract == "courses":
     courses = data.get("courses")
     assert isinstance(courses, list) and len(courses) == 1
     assert isinstance(courses[0], dict) and courses[0].get("id")
+elif contract == "reviews":
+    assert isinstance(data.get("total"), int) and data["total"] > 0
+    threads = data.get("threads")
+    assert isinstance(threads, list) and len(threads) == 1
+    assert isinstance(threads[0], dict) and threads[0].get("pid")
+    assert isinstance(threads[0].get("entries"), list) and threads[0]["entries"]
 else:
     raise AssertionError(f"unknown smoke contract: {contract}")
 PY
@@ -424,6 +435,7 @@ main() {
     smoke_request health "http://127.0.0.1:8000/api/health"
     smoke_request filters "http://127.0.0.1:8000/api/filters?term=fall"
     smoke_request courses "http://127.0.0.1:8000/api/courses?term=fall&page_size=1"
+    smoke_request reviews "http://127.0.0.1:8000/api/reviews?page_size=1"
 
     DEPLOY_SUCCEEDED=1
     ACTIVATION_STARTED=0

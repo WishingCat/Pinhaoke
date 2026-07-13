@@ -4,23 +4,25 @@
 
 ## 项目定位
 
-拼好课 V2 是北京大学课程搜索单页应用：
+拼好课 V2 是北京大学课程搜索与树洞课程评测应用：
 
-- `app.py`：FastAPI 后端，按学期只读查询五个 SQLite 数据库。
-- `index.html`：无构建步骤的单文件 SPA，通过 `/api/*` 获取数据。
+- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库。
+- `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
+- 树洞课程评测作为学期控件旁的独立入口，在手机窄屏下单独占行。评测搜索框输入即搜，不显示联想下拉；课程热榜只由右侧“查看热门课程”按钮展开。
 
 ## 目录职责
 
 ```text
 app.py                          唯一后端模块
-index.html                      唯一前端入口
+index.html                      课程搜索入口
+reviews.html                    树洞课程评测入口
 requirements.txt               固定版本的生产依赖
 Images/                         `/Images/` 公共资源，文件名属于公开 URL
-数据库/                         五个正式 SQLite 数据库
+数据库/                         五个课程库与一个树洞评测正式库
 课程数据/                       七份源 JSON 与数据说明
-数据库构建脚本/                 共享解析、原子构建、春季建库
+数据库构建脚本/                 共享解析、原子构建、春季及树洞评测建库
 北京大学选课网数据抓取/          页面内脚本、接收器、暑期/秋季建库
 北京大学课程数据翻译/            七语翻译任务
 deploy/                         更新脚本、systemd unit、Nginx 模板
@@ -39,7 +41,7 @@ python3 -m venv /tmp/pinhaoke-dev
 /tmp/pinhaoke-dev/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-访问 `http://127.0.0.1:8000/`，不要直接打开本地 `index.html`。
+访问 `http://127.0.0.1:8000/` 和 `http://127.0.0.1:8000/reviews`，不要直接打开本地 HTML 文件。
 
 完整测试：
 
@@ -70,7 +72,7 @@ git diff --check
 
 `get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写数据库。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
 
-`GET /api/health` 检查五库可读性、`basic_info` / `detail_info` / `translations` 表、详情行数、两表 ID 集合与唯一性、`PRAGMA foreign_key_check` 和 `PRAGMA integrity_check`。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
+`get_reviews_db()` 以相同的 SQLite URI `mode=ro` 和 `PRAGMA query_only = ON` 打开 `树洞课程评测.db`。`GET /api/health` 检查五个课程库的表、详情行数、ID 集合、外键与完整性，同时检查评测库的必需表、元数据行数、外键和完整性。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
 
 ## API 契约
 
@@ -79,7 +81,10 @@ git diff --check
 | `GET /api/filters` | 参数 `term=fall\|spring\|summer`，默认 `fall`。返回 `course_types`、`categories`、`departments`、`credits`、`gradings`、`weekdays`。 |
 | `GET /api/courses` | 返回 `{total, page, page_size, courses}`。支持搜索、筛选、排序、语言和分页。 |
 | `GET /api/courses/{id}` | 前缀已包含学期与学段，不接受 `term`；支持 `lang`。 |
-| `GET /api/health` | 返回五库健康状态；异常时为 503。 |
+| `GET /api/reviews` | 返回 `{total, page, page_size, query, threads}`，按时间倒序检索评测主题及相关回复。 |
+| `GET /api/review-courses` | 返回按热度排序且可按 `q` 过滤的课程名、课程号、主题数和条目数；评测页用它填充“查看热门课程”菜单。 |
+| `GET /api/reviews/meta` | 返回树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
+| `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
 
@@ -93,6 +98,14 @@ git diff --check
 - `page`：1 到 10000；`page_size`：1 到 200
 
 非法学期、语言、星期、排序、学分、页码或 canonical ID 必须返回 422/404，不得把未经允许的值拼进 SQL。
+
+树洞评测 API 参数：
+
+- `GET /api/reviews`：`q` 最长 120 字符，`page` 为 1 到 10000，`page_size` 为 1 到 100。
+- `GET /api/review-courses`：`q` 最长 120 字符，`limit` 为 1 到 50。
+- 搜索同时匹配主帖、保留回复和规范化课程名；`LIKE` 通配符必须转义。
+- 页面统计区只显示快照日期和评测数据量；评测数据量等于 `matched_threads + matched_replies`，也就是 `matched_entries`。
+- API 只返回树洞号、评论号、楼层、时间、来源月份、原帖链接、正文、课程标签和课程/教师高亮区间，不得暴露作者标识或回复关系。高亮区间采用 Unicode 码点偏移，前端必须通过文本节点安全分段，不得把正文拼入 `innerHTML`。
 
 ## 课程 ID
 
@@ -130,7 +143,7 @@ API ID 是带命名空间的字符串，不是整数：
 
 ## 建库与数据安全
 
-五个建库入口：
+五个课程建库入口：
 
 ```bash
 python3 数据库构建脚本/build_undergrad_db.py
@@ -140,11 +153,26 @@ python3 北京大学选课网数据抓取/build_undergrad_2627_fall_db.py
 python3 北京大学选课网数据抓取/build_graduate_2627_fall_db.py
 ```
 
+树洞评测建库入口：
+
+```bash
+python3 数据库构建脚本/build_treehole_reviews.py \
+  --source /Users/wishingcat/LovingHeart/树洞全量数据截止20260713
+```
+
+评测构建脚本完整扫描 44 个月度分片，以五个课程数据库生成课程名与课程号词典，筛选课程评价主帖和评价相关回复，并清除电话号码、邮箱、微信与 QQ 联系方式。输出 `数据库/树洞课程评测.db` 包含 31642 个主题、62716 个条目，其中 31074 条为相关回复。源缓存包含 15245822 条回复，覆盖率为 95.24%；未缓存的 761165 条回复不在输入快照中。
+
+课程与教师高亮来自五个课程库。课程名只在条目已有课程标签时匹配；教师名必须与条目课程的任课关系一致，或出现在“老师”“教授”等教师上下文中。构建器从全称与短写同现的目录行提取高置信别名，以复现次数、课程关键字重合和全库教师首字母关系过滤噪声。`entity_aliases` 保存 813 个课程缩写和 1047 个教师缩写，`entry_highlights` 保存不重叠的 Unicode 码点区间及 `full` / `alias` 类型；正式库含 96555 处课程实体和 60294 处教师实体高亮，其中缩写分别为 26892 和 36560 处。缩写在前端从可读配色中按文本稳定分配颜色。只刷新别名与高亮而不重扫树洞源数据时运行：
+
+```bash
+python3 数据库构建脚本/build_treehole_reviews.py --enrich-existing
+```
+
 `数据库构建脚本/build_atomic.py` 是唯一共享原子构建实现。各入口先完整解析源 JSON，严格检查必填字段、学分和冲突键，再通过 `atomic_database` 在目标同目录构建临时库。只有表、视图、外键、行数、1:1 详情和完整性检查全部通过后才 `os.replace` 正式库，并立即 fsync 目标父目录。替换前失败时正式文件不变；替换后的目录同步失败会明确报错，说明新目录项尚未确认持久化。替换沿用正式文件原权限模式。
 
 重建会创建空 `translations` 表，等同于删除该库既有译文。运行建库前必须备份正式库或明确接受后续重新翻译。不要复制第二份 `build_common.py`。
 
-正式数据库和七份源 JSON 属于受保护数据：普通代码修复不得修改、重建、格式化或提交这些文件。测试使用临时文件和临时数据库。
+六个正式数据库和七份源 JSON 属于受保护数据：普通代码修复不得修改、重建或格式化这些文件。课程数据修复不得提交它们；树洞评测功能的数据更新只有在用户明确要求重新提取时才可提交。测试使用临时文件和临时数据库。
 
 ## 抓取边界
 

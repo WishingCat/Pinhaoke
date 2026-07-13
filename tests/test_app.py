@@ -48,6 +48,9 @@ class DatabaseConnectionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(Path(result.stdout.strip()), app.BASE_DIR / "index.html")
 
+    def test_reviews_page_resolves_from_project_directory(self):
+        self.assertEqual(Path(app.reviews_page().path), app.BASE_DIR / "reviews.html")
+
     def test_attach_failure_closes_main_connection(self):
         fake = app.sqlite3.connect(":memory:")
         missing_db = Path("missing.db")
@@ -70,6 +73,9 @@ class DatabaseConnectionTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(len(payload["databases"]), 5)
         self.assertTrue(all(item["integrity"] == "ok" for item in payload["databases"]))
+        self.assertEqual(payload["reviews"]["integrity"], "ok")
+        self.assertEqual(payload["reviews"]["threads"], 31642)
+        self.assertEqual(payload["reviews"]["highlights"], 156849)
 
     def test_health_endpoint_disables_caching(self):
         response = self.health_endpoint()()
@@ -117,6 +123,7 @@ class DatabaseConnectionTests(unittest.TestCase):
                 response = self.health_endpoint()()
 
             self.assert_unhealthy_response(response, tmp)
+
 
     def test_health_endpoint_hides_basic_detail_count_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -214,6 +221,139 @@ class DatabaseConnectionTests(unittest.TestCase):
                     response = self.health_endpoint()()
 
             self.assert_unhealthy_response(response, tmp)
+
+
+class ReviewApiTests(unittest.TestCase):
+    def call(self, **overrides):
+        args = {"q": "", "page": 1, "page_size": 20}
+        args.update(overrides)
+        return app.list_reviews(**args)
+
+    def test_reviews_database_is_query_only(self):
+        with app.get_reviews_db() as conn:
+            self.assertEqual(conn.execute("PRAGMA query_only").fetchone()[0], 1)
+            with self.assertRaises(sqlite3.OperationalError):
+                conn.execute("CREATE TABLE forbidden_write(id INTEGER)")
+
+    def test_review_metadata_matches_full_extraction(self):
+        metadata = app.get_review_meta()
+        self.assertEqual(metadata["snapshot_date"], "2026-07-13")
+        self.assertEqual(metadata["highlight_version"], "2")
+        self.assertEqual(metadata["matched_threads"], 31642)
+        self.assertEqual(metadata["matched_entries"], 62716)
+        self.assertEqual(metadata["matched_replies"], 31074)
+        self.assertEqual(
+            metadata["matched_threads"] + metadata["matched_replies"],
+            metadata["matched_entries"],
+        )
+        self.assertEqual(metadata["source_shards"], 44)
+        self.assertEqual(metadata["cached_reply_coverage_percent"], 95.24)
+        self.assertEqual(metadata["highlighted_entries"], 39873)
+        self.assertEqual(metadata["course_highlights"], 96555)
+        self.assertEqual(metadata["teacher_highlights"], 60294)
+        self.assertEqual(metadata["course_aliases"], 813)
+        self.assertEqual(metadata["teacher_aliases"], 1047)
+        self.assertEqual(metadata["course_alias_highlights"], 26892)
+        self.assertEqual(metadata["teacher_alias_highlights"], 36560)
+
+    def test_course_name_search_returns_grouped_threads_and_entries(self):
+        result = self.call(q="博弈论", page_size=10)
+        self.assertGreater(result["total"], 0)
+        self.assertEqual(result["page"], 1)
+        self.assertLessEqual(len(result["threads"]), 10)
+        for thread in result["threads"]:
+            searchable = "\n".join(
+                [thread["content"], *thread["courses"]]
+                + [entry["content"] for entry in thread["entries"]]
+            )
+            self.assertIn("博弈论", searchable)
+            self.assertEqual(thread["entries"][0]["kind"], "post")
+            for entry in thread["entries"]:
+                self.assertIsInstance(entry["highlights"], list)
+                for highlight in entry["highlights"]:
+                    self.assertIn(highlight["entity_type"], {"course", "teacher"})
+                    self.assertIn(highlight["match_kind"], {"full", "alias"})
+                    self.assertGreater(highlight["end_offset"], highlight["start_offset"])
+            self.assertNotIn("authorTag", repr(thread))
+            self.assertNotIn("replyTo", repr(thread))
+
+    def test_review_api_returns_course_and_teacher_highlights(self):
+        with app.get_reviews_db() as conn:
+            row = conn.execute(
+                """
+                SELECT t.*
+                FROM threads t
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM entries e
+                    JOIN entry_highlights h ON h.entry_key=e.entry_key
+                    WHERE e.pid=t.pid AND h.entity_type='teacher'
+                )
+                  AND EXISTS (
+                    SELECT 1
+                    FROM entries e
+                    JOIN entry_highlights h ON h.entry_key=e.entry_key
+                    WHERE e.pid=t.pid AND h.entity_type='course'
+                )
+                ORDER BY t.pid
+                LIMIT 1
+                """
+            ).fetchone()
+            thread = app._load_review_threads(conn, [row])[0]
+
+        highlights = [
+            highlight
+            for entry in thread["entries"]
+            for highlight in entry["highlights"]
+        ]
+        self.assertIn("course", {item["entity_type"] for item in highlights})
+        self.assertIn("teacher", {item["entity_type"] for item in highlights})
+        self.assertNotIn("entry_key", repr(thread))
+
+    def test_review_pagination_is_stable_and_non_overlapping(self):
+        first = self.call(page=1, page_size=17)
+        second = self.call(page=2, page_size=17)
+        first_ids = [thread["pid"] for thread in first["threads"]]
+        second_ids = [thread["pid"] for thread in second["threads"]]
+        self.assertEqual(len(first_ids), 17)
+        self.assertEqual(len(second_ids), 17)
+        self.assertFalse(set(first_ids) & set(second_ids))
+        self.assertEqual(first_ids, [thread["pid"] for thread in self.call(page_size=17)["threads"]])
+
+    def test_review_course_suggestions_are_ranked_and_searchable(self):
+        suggestions = app.list_review_courses(q="博弈", limit=10)
+        self.assertTrue(suggestions)
+        self.assertTrue(any("博弈" in item["course_name"] for item in suggestions))
+        self.assertTrue(all(item["thread_count"] > 0 for item in suggestions))
+
+    def test_review_query_validation_rejects_unsafe_shapes(self):
+        invalid = (
+            {"q": 1},
+            {"q": "x" * 121},
+            {"page": 0},
+            {"page": 10001},
+            {"page_size": 0},
+            {"page_size": 101},
+        )
+        for values in invalid:
+            with self.subTest(values=values):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    self.call(**values)
+                self.assertEqual(ctx.exception.status_code, 422)
+
+        invalid_suggestions = (
+            {"q": 1, "limit": 10},
+            {"q": "x" * 121, "limit": 10},
+            {"q": "", "limit": 0},
+        )
+        for values in invalid_suggestions:
+            with self.subTest(values=values):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.list_review_courses(**values)
+                self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_like_wildcards_are_escaped(self):
+        self.assertEqual(app._escape_like(r"50%_done\\"), r"50\%\_done\\\\")
 
 
 class CourseListTests(unittest.TestCase):

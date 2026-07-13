@@ -240,11 +240,12 @@ class DeployContractTests(unittest.TestCase):
             self.assertIn("lfs fsck --objects old", git_calls)
             self.assertFalse(systemctl_log.exists())
 
-    def test_update_smoke_tests_all_three_api_contracts_with_bounded_retries(self):
+    def test_update_smoke_tests_all_four_api_contracts_with_bounded_retries(self):
         for endpoint in (
             "/api/health",
             "/api/filters?term=fall",
             "/api/courses?term=fall&page_size=1",
+            "/api/reviews?page_size=1",
         ):
             self.assertIn(endpoint, self.update)
         self.assertIn(
@@ -253,7 +254,7 @@ class DeployContractTests(unittest.TestCase):
         )
         self.assertNotIn("$(seq", self.update)
         self.assertIn('curl --silent --show-error --max-time', self.update)
-        for invariant in ('"status"', '"databases"', '"courses"'):
+        for invariant in ('"status"', '"databases"', '"reviews"', '"courses"', '"threads"', '"highlights"'):
             self.assertIn(invariant, self.update)
         self.assertNotIn('== 4421', self.update)
         self.assertRegex(self.update, r'isinstance\(data\.get\("total"\), int\)')

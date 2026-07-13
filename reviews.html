@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>树洞课程评测 | 拼好课</title>
+<meta name="description" content="在拼好课检索北京大学树洞中的课程评测主帖与相关回复。">
+<meta name="theme-color" content="#F7F7F8">
+<link rel="icon" type="image/png" sizes="192x192" href="/Images/favicon-192.png">
+<link rel="apple-touch-icon" href="/Images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+<script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark')t='light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--bg); color-scheme: light; scroll-behavior: smooth; }
+html[data-theme="dark"] { color-scheme: dark; }
+body { margin: 0; min-width: 0; min-height: 100vh; background: transparent; color: var(--ink); font-family: var(--sans); line-height: 1.65; letter-spacing: 0; font-feature-settings: "kern" 1, "palt" 1; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+body::before { content: ''; position: fixed; inset: 0 0 auto; height: 520px; z-index: -1; pointer-events: none; background: linear-gradient(118deg, rgba(53, 198, 167, 0.10), transparent 34%, rgba(79, 70, 229, 0.055) 66%, transparent 92%); animation: ambient-shift 24s ease-in-out infinite alternate; }
+button, input { font: inherit; letter-spacing: 0; }
+button { color: inherit; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+
+:root {
+  --bg: #F7F7F8;
+  --surface: #FFFFFF;
+  --surface-muted: #F1F2F4;
+  --ink: #101217;
+  --ink-2: #3F444D;
+  --ink-3: #5D636D;
+  --border: #E4E6EA;
+  --border-strong: #CFD3D9;
+  --accent: #08766B;
+  --accent-deep: #075F57;
+  --accent-soft: #E4F5F1;
+  --source: #92610A;
+  --source-soft: #FFF6D8;
+  --danger: #A33A48;
+  --sans: 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --shadow-xs: 0 1px 2px rgba(16, 18, 23, 0.04);
+  --shadow: 0 8px 24px rgba(18, 28, 33, 0.07);
+}
+
+html[data-theme="dark"] {
+  --bg: #0F1114;
+  --surface: #171A1E;
+  --surface-muted: #20242A;
+  --ink: #F1F3F4;
+  --ink-2: #C5CBD0;
+  --ink-3: #9199A1;
+  --border: #2A2F35;
+  --border-strong: #3C434B;
+  --accent: #48D5B8;
+  --accent-deep: #6CE0C6;
+  --accent-soft: rgba(72, 213, 184, 0.13);
+  --source: #F1C75B;
+  --source-soft: rgba(241, 199, 91, 0.12);
+  --danger: #FF93A0;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+html[data-theme="dark"] body::before { background: linear-gradient(118deg, rgba(70, 214, 184, 0.12), transparent 34%, rgba(115, 150, 242, 0.075) 68%, transparent 94%); }
+
+::selection { background: var(--accent); color: #FFFFFF; }
+.topbar { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(14px); }
+.topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 40%, transparent), color-mix(in srgb, var(--accent) 12%, transparent) 40%, transparent 78%); }
+.topbar-inner { width: min(1120px, 100%); height: 58px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
+.brand img { width: 30px; height: 30px; flex: 0 0 auto; }
+.brand-name { font-weight: 750; font-size: 1.03rem; white-space: nowrap; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.top-link, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink-2); text-decoration: none; cursor: pointer; }
+.top-link { padding: 6px 11px; font-size: 0.8rem; font-weight: 650; }
+.icon-button { width: 34px; padding: 0; }
+.top-link:hover, .icon-button:hover { color: var(--ink); border-color: var(--border-strong); }
+.top-link svg, .icon-button svg { width: 16px; height: 16px; }
+.theme-moon { display: none; }
+html[data-theme="dark"] .theme-sun { display: none; }
+html[data-theme="dark"] .theme-moon { display: block; }
+
+.page { width: min(1120px, 100%); margin: 0 auto; padding: 48px 28px 80px; }
+.page-head { display: block; text-align: center; animation: enter 0.35s ease-out both; }
+.eyebrow { margin: 0 0 7px; color: var(--source); font-family: var(--mono); font-size: 0.73rem; font-weight: 700; text-transform: uppercase; }
+h1 { margin: 0; font-size: 3.15rem; line-height: 1.15; font-weight: 750; letter-spacing: 0; background-image: linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html[data-theme="dark"] h1 { background-image: linear-gradient(118deg, #5CE8C6 8%, #35C6A7 58%, #27A68E 94%); }
+.scope { max-width: 620px; margin: 12px auto 0; color: var(--ink-3); font-size: 0.93rem; }
+
+.view-switcher { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; max-width: 100%; margin-top: 20px; }
+.term-nav, .review-nav-shell { display: inline-flex; justify-content: center; max-width: 100%; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); padding: 4px; box-shadow: 0 1px 2px rgba(16, 18, 23, 0.04); }
+.term-nav { flex-wrap: wrap; gap: 2px; }
+.term-nav a, .review-nav-link { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; color: var(--ink-3); font-size: 0.8rem; font-weight: 600; text-align: center; text-decoration: none; white-space: nowrap; }
+.term-nav a, .review-nav-link { padding: 6px 14px; border-radius: 999px; }
+.term-nav a:hover { color: var(--ink); background: var(--surface-muted); }
+.review-nav-link { gap: 7px; background: linear-gradient(135deg, #08766B, #075F57); color: #FFFFFF; }
+.review-nav-link svg { width: 16px; height: 16px; }
+.review-nav-link:hover { filter: brightness(1.06); }
+html[data-theme="dark"] .review-nav-link { color: #0F1917; background: linear-gradient(135deg, #4FE0BE, #2BB593); box-shadow: none; }
+
+.search-area { position: relative; z-index: 30; margin: 26px 0 18px; animation: enter 0.35s 0.05s ease-out both; }
+.search-area:focus-within { z-index: 60; }
+.search-controls { display: flex; align-items: stretch; gap: 10px; min-width: 0; }
+.search-form { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 14px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-xs); transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.search-form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent), var(--shadow); }
+.search-icon { width: 18px; height: 18px; flex: 0 0 auto; color: var(--ink-3); }
+.search-input { flex: 1 1 auto; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 1rem; }
+.search-input::placeholder { color: var(--ink-3); }
+.clear-search { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-muted); color: var(--ink-3); cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.clear-search:hover { color: var(--ink); background: var(--border); }
+.clear-search svg { width: 15px; height: 15px; }
+.popular-control { position: relative; flex: 0 0 auto; }
+.popular-button { height: 100%; min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--ink-2); box-shadow: var(--shadow-xs); font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; }
+.popular-button:hover, .popular-button[aria-expanded="true"] { border-color: color-mix(in srgb, var(--accent) 48%, var(--border)); background: var(--accent-soft); color: var(--accent-deep); }
+.popular-button:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
+.popular-button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.popular-courses { position: absolute; z-index: 20; top: calc(100% + 7px); right: 0; width: min(380px, calc(100vw - 32px)); max-height: 330px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); padding: 6px; }
+.popular-course { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.popular-course:hover, .popular-course:focus-visible { outline: 0; background: var(--surface-muted); }
+.popular-course-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
+.popular-course-count { color: var(--ink-3); font-family: var(--mono); font-size: 0.72rem; white-space: nowrap; }
+.popular-status { padding: 18px 14px; color: var(--ink-3); font-size: 0.8rem; text-align: center; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 26px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); animation: enter 0.35s 0.1s ease-out both; }
+.stat { min-width: 0; padding: 16px 18px; }
+.stat + .stat { border-left: 1px solid var(--border); }
+.stat-label { color: var(--ink-3); font-size: 0.75rem; }
+.stat-value { margin-top: 2px; color: var(--ink); font-family: var(--mono); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+
+.result-toolbar { margin-top: 30px; }
+.result-title { margin: 0; font-size: 1.05rem; font-weight: 750; }
+.results { display: grid; gap: 14px; margin-top: 14px; }
+
+.thread { position: relative; min-width: 0; overflow: hidden; padding: 20px 22px 20px 25px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 1px 2px rgba(16, 22, 26, 0.03); animation: enter 0.28s ease-out both; transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s; }
+.thread::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, #D7A72F, #92610A); }
+.thread-review::before { background: linear-gradient(180deg, #35C6A7, #08766B); }
+.thread-discussion::before { background: linear-gradient(180deg, #818CF8, #4F46E5); }
+.thread:hover { border-color: var(--border-strong); box-shadow: var(--shadow); transform: translateY(-1px); }
+.thread-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.thread-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; color: var(--ink-3); font-size: 0.76rem; }
+.pid { color: var(--source); font-family: var(--mono); font-weight: 750; }
+.kind { padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--source) 28%, var(--border)); border-radius: 999px; background: var(--source-soft); color: var(--source); font-size: 0.7rem; font-weight: 700; }
+.kind-review { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: var(--accent-soft); color: var(--accent-deep); }
+.kind-discussion { border-color: color-mix(in srgb, #6366F1 28%, var(--border)); background: color-mix(in srgb, #EEF2FF 55%, var(--surface)); color: #4F46E5; }
+.source-link { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: var(--ink-3); font-size: 0.75rem; font-weight: 650; text-decoration: none; }
+.source-link:hover { color: var(--accent); }
+.source-link svg { width: 14px; height: 14px; }
+.course-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+.course-tag { max-width: 100%; padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 999px; background: var(--accent-soft); color: var(--accent-deep); font-size: 0.72rem; font-weight: 700; overflow-wrap: anywhere; cursor: pointer; }
+.course-tag:hover { border-color: var(--accent); }
+.post-content, .reply-content { margin: 14px 0 0; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.entity-highlight { font-weight: 800; }
+.entity-course { color: var(--accent-deep); }
+.entity-teacher { color: #5B4AB8; }
+html[data-theme="dark"] .entity-course { color: #63E4C8; }
+html[data-theme="dark"] .entity-teacher { color: #B9B2FF; }
+.entity-alias.entity-color-0 { color: #08766B; }
+.entity-alias.entity-color-1 { color: #5146A5; }
+.entity-alias.entity-color-2 { color: #A12E68; }
+.entity-alias.entity-color-3 { color: #1769AA; }
+.entity-alias.entity-color-4 { color: #39733B; }
+.entity-alias.entity-color-5 { color: #A34A16; }
+html[data-theme="dark"] .entity-alias.entity-color-0 { color: #63E4C8; }
+html[data-theme="dark"] .entity-alias.entity-color-1 { color: #B9B2FF; }
+html[data-theme="dark"] .entity-alias.entity-color-2 { color: #FF9CC8; }
+html[data-theme="dark"] .entity-alias.entity-color-3 { color: #8CCBFF; }
+html[data-theme="dark"] .entity-alias.entity-color-4 { color: #9DDB94; }
+html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
+.post-content { font-size: 0.94rem; }
+.post-content.collapsed { max-height: 17em; overflow: hidden; }
+.text-toggle, .replies-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; padding: 4px 0; border: 0; background: transparent; color: var(--accent); font-size: 0.76rem; font-weight: 700; cursor: pointer; }
+.text-toggle:hover, .replies-toggle:hover { color: var(--accent-deep); }
+.text-toggle svg, .replies-toggle svg { width: 14px; height: 14px; transition: transform 0.16s; }
+.text-toggle.expanded svg, .replies-toggle.expanded svg { transform: rotate(180deg); }
+.replies { display: grid; gap: 0; margin-top: 17px; border-top: 1px solid var(--border); }
+.reply { min-width: 0; padding: 14px 0 14px 16px; border-left: 2px solid color-mix(in srgb, var(--source) 48%, var(--border)); }
+.reply + .reply { border-top: 1px solid var(--border); }
+.reply-meta { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--ink-3); font-size: 0.72rem; }
+.floor { color: var(--source); font-family: var(--mono); font-weight: 700; }
+.reply-content { margin-top: 6px; font-size: 0.88rem; }
+
+.load-row { display: flex; justify-content: center; margin-top: 24px; }
+.load-more { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 150px; min-height: 42px; padding: 8px 18px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface); color: var(--ink-2); font-weight: 700; cursor: pointer; }
+.load-more:hover { color: var(--ink); border-color: var(--accent); }
+.load-more:disabled { cursor: wait; opacity: 0.62; }
+.load-more svg { width: 16px; height: 16px; }
+
+.state { padding: 54px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--ink-3); text-align: center; }
+.state strong { display: block; color: var(--ink); font-size: 1rem; }
+.state span { display: block; margin-top: 6px; font-size: 0.84rem; }
+.state.error strong { color: var(--danger); }
+.skeleton { height: 210px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; position: relative; }
+.skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 5%, transparent), transparent); transform: translateX(-100%); animation: shimmer 1.2s infinite; }
+
+.footnote { margin: 38px 0 0; padding-top: 18px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 0.75rem; }
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes ambient-shift { from { transform: translateY(0); opacity: 0.85; } to { transform: translateY(14px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; } }
+
+@media (max-width: 640px) {
+  .topbar-inner { height: 52px; padding: 0 16px; }
+  .page { padding: 30px 16px 60px; }
+  h1 { font-size: 2.25rem; }
+  .scope { font-size: 0.86rem; }
+  .search-area { margin: 20px 0 14px; }
+  .search-form { padding: 12px 16px; }
+  .popular-button { min-height: 46px; padding-left: 12px; padding-right: 12px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .thread { padding: 17px 16px; }
+  .thread-head { align-items: flex-start; }
+  .source-link span { display: none; }
+  .source-link { width: 30px; height: 30px; justify-content: center; border: 1px solid var(--border); border-radius: 6px; }
+}
+
+@media (max-width: 390px) {
+  .top-link span { display: none; }
+  .top-link { width: 34px; padding: 0; }
+  .page { padding-left: 12px; padding-right: 12px; }
+  .term-nav { width: 100%; border-radius: 8px; }
+  .term-nav a { flex: 1 1 30%; min-width: 0; padding-left: 8px; padding-right: 8px; border-radius: 6px; white-space: normal; overflow-wrap: anywhere; }
+  .review-nav-shell { width: 100%; border-radius: 8px; }
+  .review-nav-link { width: 100%; border-radius: 6px; }
+  .search-controls { gap: 8px; }
+  .search-form { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .popular-button { gap: 6px; padding-left: 10px; padding-right: 10px; font-size: 0.75rem; }
+  .stat { padding: 13px 10px; }
+  .thread { padding: 15px 13px; }
+}
+
+@media (max-width: 320px) {
+  .term-nav a { flex-basis: 100%; }
+  .brand-name { font-size: 0.92rem; }
+  .search-form { padding-left: 10px; padding-right: 10px; }
+  .popular-button { padding-left: 8px; padding-right: 8px; }
+  .popular-button svg { display: none; }
+  .search-input { font-size: 0.9rem; }
+  .stat-value { font-size: 0.88rem; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/" aria-label="返回拼好课课程搜索">
+      <img src="/Images/favicon-192.png" alt="拼好课">
+      <span class="brand-name">拼好课</span>
+    </a>
+    <div class="top-actions">
+      <a class="top-link" href="/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span>课程搜索</span>
+      </a>
+      <button class="icon-button" id="themeButton" type="button" aria-label="切换深色或浅色模式" title="切换深色或浅色模式">
+        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.42"/></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">PKU TREEHOLE ARCHIVE</p>
+      <h1>树洞课程评测</h1>
+      <p class="scope">搜索课程名，查看课程评测主帖及其中有实际评价信息的回复。</p>
+    </div>
+    <nav class="view-switcher" aria-label="课程数据视图">
+      <div class="term-nav">
+        <a href="/?term=spring">2026春季学期</a>
+        <a href="/?term=summer">2026暑期学期</a>
+        <a href="/">2026秋季学期</a>
+      </div>
+      <div class="review-nav-shell">
+        <a class="review-nav-link" href="/reviews" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>树洞课程评测</span>
+        </a>
+      </div>
+    </nav>
+  </div>
+
+  <section class="search-area" aria-label="课程评测搜索">
+    <div class="search-controls">
+      <form class="search-form" id="searchForm" role="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="search-input" id="searchInput" type="search" maxlength="120" autocomplete="off" aria-label="搜索课程或老师" placeholder="可以搜索课程、老师，例如 YQF，马原……">
+        <button class="clear-search" id="clearSearch" type="button" aria-label="清空搜索" title="清空搜索" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </form>
+      <div class="popular-control">
+        <button class="popular-button" id="popularButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="popularCourses">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+          <span>查看热门课程</span>
+        </button>
+        <div class="popular-courses" id="popularCourses" role="listbox" aria-label="热门课程" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats" id="stats" aria-label="数据范围">
+    <div class="stat"><div class="stat-label">数据截至</div><div class="stat-value" id="statDate">-</div></div>
+    <div class="stat"><div class="stat-label">评测数据量</div><div class="stat-value" id="statTotal">-</div></div>
+  </section>
+
+  <section aria-labelledby="resultsHeading">
+    <div class="result-toolbar">
+      <h2 class="result-title" id="resultsHeading">最新课程评测</h2>
+    </div>
+    <div class="results" id="results"></div>
+    <div class="load-row">
+      <button class="load-more" id="loadMore" type="button" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        <span>加载更多</span>
+      </button>
+    </div>
+  </section>
+
+  <p class="footnote">仅保留与课程评测相关的主帖和回复；联系方式已自动隐藏。自动筛选可能存在遗漏。</p>
+</main>
+
+<script>
+const PAGE_SIZE = 20;
+const state = {
+  query: '',
+  page: 1,
+  total: 0,
+  loaded: 0,
+  loading: false,
+  requestId: 0,
+  fetchController: null,
+  popularController: null,
+  popularCourses: null,
+  searchTimer: null,
+};
+
+const searchInput = document.getElementById('searchInput');
+const popularButton = document.getElementById('popularButton');
+const popularCoursesEl = document.getElementById('popularCourses');
+const resultsEl = document.getElementById('results');
+const loadMoreButton = document.getElementById('loadMore');
+const clearSearchButton = document.getElementById('clearSearch');
+
+function getTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function applyThemeMeta() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = getTheme() === 'dark' ? '#0F1114' : '#F7F7F8';
+}
+
+document.getElementById('themeButton').addEventListener('click', () => {
+  const next = getTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('pinhaoke_theme', next); } catch (error) {}
+  applyThemeMeta();
+});
+
+function makeElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function stableEntityColor(text, type) {
+  let hash = 2166136261;
+  const key = `${type}:${String(text || '').normalize('NFKC').toLowerCase()}`;
+  for (const character of Array.from(key)) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 6;
+}
+
+function renderHighlightedText(element, text, highlights = []) {
+  const value = String(text || '');
+  const characters = Array.from(value);
+  let cursor = 0;
+  for (const item of highlights) {
+    const start = Number(item.start_offset);
+    const end = Number(item.end_offset);
+    const type = item.entity_type;
+    if (
+      !Number.isInteger(start) || !Number.isInteger(end)
+      || start < cursor || end <= start || end > characters.length
+      || (type !== 'course' && type !== 'teacher')
+    ) continue;
+    if (start > cursor) element.appendChild(document.createTextNode(characters.slice(cursor, start).join('')));
+    const highlightedText = characters.slice(start, end).join('');
+    const matchKind = item.match_kind === 'alias' ? 'alias' : 'full';
+    const aliasClass = matchKind === 'alias'
+      ? ` entity-alias entity-color-${stableEntityColor(highlightedText, type)}`
+      : '';
+    const highlight = makeElement(
+      'strong',
+      `entity-highlight entity-${type}${aliasClass}`,
+      highlightedText,
+    );
+    element.appendChild(highlight);
+    cursor = end;
+  }
+  if (cursor < characters.length) element.appendChild(document.createTextNode(characters.slice(cursor).join('')));
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('zh-CN').format(Number(value) || 0);
+}
+
+const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return '时间未知';
+  return dateFormatter.format(new Date(timestamp * 1000)).replaceAll('/', '-');
+}
+
+function safeSourceUrl(value, pid) {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' && url.hostname === 'treehole.pku.edu.cn') return url.href;
+  } catch (error) {}
+  return `https://treehole.pku.edu.cn/ch/web/pc/postDetail?pid=${encodeURIComponent(pid)}`;
+}
+
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (state.query) params.set('q', state.query);
+  const suffix = params.toString();
+  history.replaceState(null, '', suffix ? `/reviews?${suffix}` : '/reviews');
+}
+
+function setSearchValue(value) {
+  searchInput.value = value;
+  clearSearchButton.hidden = !value;
+}
+
+function renderSkeletons() {
+  resultsEl.replaceChildren();
+  for (let index = 0; index < 3; index += 1) {
+    resultsEl.appendChild(makeElement('div', 'skeleton'));
+  }
+}
+
+function renderState(title, detail, isError = false) {
+  const wrapper = makeElement('div', `state${isError ? ' error' : ''}`);
+  wrapper.append(makeElement('strong', '', title), makeElement('span', '', detail));
+  resultsEl.replaceChildren(wrapper);
+}
+
+function courseTag(name) {
+  const button = makeElement('button', 'course-tag', name);
+  button.type = 'button';
+  button.addEventListener('click', () => runSearch(name));
+  return button;
+}
+
+function chevronIcon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'm6 9 6 6 6-6');
+  svg.appendChild(path);
+  return svg;
+}
+
+function renderReply(entry, hidden) {
+  const reply = makeElement('div', 'reply');
+  reply.hidden = hidden;
+  const meta = makeElement('div', 'reply-meta');
+  meta.append(
+    makeElement('span', 'floor', `${entry.floor} 楼`),
+    makeElement('time', '', formatTimestamp(entry.posted_at)),
+  );
+  const content = makeElement('p', 'reply-content');
+  renderHighlightedText(content, entry.content, entry.highlights);
+  reply.append(meta, content);
+  return reply;
+}
+
+function renderThread(thread, index) {
+  const article = makeElement('article', `thread thread-${thread.post_kind}`);
+  article.style.animationDelay = `${Math.min(index * 24, 180)}ms`;
+  const head = makeElement('div', 'thread-head');
+  const meta = makeElement('div', 'thread-meta');
+  const kindLabels = { request: '求测评', review: '课程评测', discussion: '课程讨论' };
+  meta.append(
+    makeElement('span', 'pid', `#${thread.pid}`),
+    makeElement('time', '', formatTimestamp(thread.posted_at)),
+    makeElement('span', `kind kind-${thread.post_kind}`, kindLabels[thread.post_kind] || '课程评测'),
+  );
+  const source = makeElement('a', 'source-link');
+  source.href = safeSourceUrl(thread.source_url, thread.pid);
+  source.target = '_blank';
+  source.rel = 'noopener noreferrer';
+  source.title = '查看原树洞';
+  source.setAttribute('aria-label', `查看树洞 ${thread.pid}`);
+  source.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span>原树洞</span>';
+  head.append(meta, source);
+  article.appendChild(head);
+
+  if (thread.courses.length) {
+    const tags = makeElement('div', 'course-tags');
+    thread.courses.forEach(name => tags.appendChild(courseTag(name)));
+    article.appendChild(tags);
+  }
+
+  const content = makeElement('p', 'post-content');
+  renderHighlightedText(content, thread.content, thread.highlights);
+  article.appendChild(content);
+  if (thread.content.length > 680) {
+    content.classList.add('collapsed');
+    const toggle = makeElement('button', 'text-toggle');
+    toggle.type = 'button';
+    toggle.append(makeElement('span', '', '展开主帖'), chevronIcon());
+    toggle.addEventListener('click', () => {
+      const expanded = content.classList.toggle('collapsed') === false;
+      toggle.classList.toggle('expanded', expanded);
+      toggle.querySelector('span').textContent = expanded ? '收起主帖' : '展开主帖';
+    });
+    article.appendChild(toggle);
+  }
+
+  const replies = thread.entries.filter(entry => entry.kind === 'reply');
+  if (replies.length) {
+    const repliesBox = makeElement('div', 'replies');
+    const replyNodes = replies.map((entry, replyIndex) => renderReply(entry, replyIndex >= 3));
+    replyNodes.forEach(node => repliesBox.appendChild(node));
+    article.appendChild(repliesBox);
+    if (replies.length > 3) {
+      const toggle = makeElement('button', 'replies-toggle');
+      toggle.type = 'button';
+      toggle.append(makeElement('span', '', `展开其余 ${replies.length - 3} 条回复`), chevronIcon());
+      let expanded = false;
+      toggle.addEventListener('click', () => {
+        expanded = !expanded;
+        replyNodes.slice(3).forEach(node => { node.hidden = !expanded; });
+        toggle.classList.toggle('expanded', expanded);
+        toggle.querySelector('span').textContent = expanded ? '收起回复' : `展开其余 ${replies.length - 3} 条回复`;
+      });
+      article.appendChild(toggle);
+    }
+  }
+  return article;
+}
+
+function updateResultHeader() {
+  document.getElementById('resultsHeading').textContent = state.query
+    ? `“${state.query}”的课程评测`
+    : '最新课程评测';
+}
+
+function updateLoadMore() {
+  loadMoreButton.hidden = state.loaded >= state.total || state.total === 0;
+  loadMoreButton.disabled = state.loading;
+  loadMoreButton.querySelector('span').textContent = state.loading ? '加载中' : '加载更多';
+}
+
+async function fetchReviews({ reset = false } = {}) {
+  if (state.loading && !reset) return;
+  if (reset && state.fetchController) state.fetchController.abort();
+  const requestId = ++state.requestId;
+  const controller = new AbortController();
+  state.fetchController = controller;
+  state.loading = true;
+  if (reset) {
+    state.page = 1;
+    state.loaded = 0;
+    renderSkeletons();
+  }
+  updateResultHeader();
+  updateLoadMore();
+  const params = new URLSearchParams({
+    q: state.query,
+    page: String(state.page),
+    page_size: String(PAGE_SIZE),
+  });
+  try {
+    const response = await fetch(`/api/reviews?${params}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (requestId !== state.requestId || controller.signal.aborted) return;
+    const fragment = document.createDocumentFragment();
+    data.threads.forEach((thread, index) => fragment.appendChild(renderThread(thread, index)));
+    if (reset) resultsEl.replaceChildren(fragment);
+    else resultsEl.appendChild(fragment);
+    state.total = data.total;
+    state.loaded += data.threads.length;
+    if (state.total === 0) renderState('没有找到相关评测', '可以尝试课程全名或更短的关键词。');
+  } catch (error) {
+    if (error.name !== 'AbortError' && requestId === state.requestId) {
+      renderState('评测加载失败', '请稍后重试。', true);
+    }
+  } finally {
+    if (requestId === state.requestId) {
+      state.loading = false;
+      state.fetchController = null;
+      updateResultHeader();
+      updateLoadMore();
+    }
+  }
+}
+
+function runSearch(value = searchInput.value) {
+  const next = String(value || '').trim().slice(0, 120);
+  clearTimeout(state.searchTimer);
+  state.query = next;
+  setSearchValue(next);
+  hidePopularCourses();
+  syncUrl();
+  fetchReviews({ reset: true });
+}
+
+function hidePopularCourses() {
+  popularCoursesEl.hidden = true;
+  popularButton.setAttribute('aria-expanded', 'false');
+}
+
+function renderPopularCourses(items) {
+  popularCoursesEl.replaceChildren();
+  items.forEach(item => {
+    const button = makeElement('button', 'popular-course');
+    button.type = 'button';
+    button.setAttribute('role', 'option');
+    button.append(
+      makeElement('span', 'popular-course-name', item.course_name),
+      makeElement('span', 'popular-course-count', `${formatNumber(item.thread_count)} 个主题`),
+    );
+    button.addEventListener('mousedown', event => event.preventDefault());
+    button.addEventListener('click', () => {
+      runSearch(item.course_name);
+      searchInput.focus();
+    });
+    popularCoursesEl.appendChild(button);
+  });
+  if (!items.length) {
+    popularCoursesEl.appendChild(makeElement('div', 'popular-status', '暂时没有热门课程'));
+  }
+}
+
+async function fetchPopularCourses() {
+  if (state.popularCourses) {
+    renderPopularCourses(state.popularCourses);
+    popularCoursesEl.hidden = false;
+    return;
+  }
+  if (state.popularController) state.popularController.abort();
+  const controller = new AbortController();
+  state.popularController = controller;
+  popularCoursesEl.replaceChildren(makeElement('div', 'popular-status', '正在加载热门课程…'));
+  popularCoursesEl.hidden = false;
+  try {
+    const response = await fetch('/api/review-courses?q=&limit=12', { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const items = await response.json();
+    if (controller.signal.aborted || popularButton.getAttribute('aria-expanded') !== 'true') return;
+    state.popularCourses = items;
+    renderPopularCourses(items);
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      popularCoursesEl.replaceChildren(makeElement('div', 'popular-status', '热门课程加载失败，请稍后重试'));
+    }
+  } finally {
+    if (state.popularController === controller) state.popularController = null;
+  }
+}
+
+function scheduleSearch() {
+  clearTimeout(state.searchTimer);
+  clearSearchButton.hidden = !searchInput.value;
+  state.searchTimer = setTimeout(() => runSearch(searchInput.value), 300);
+}
+
+document.getElementById('searchForm').addEventListener('submit', event => {
+  event.preventDefault();
+  runSearch();
+});
+searchInput.addEventListener('input', scheduleSearch);
+searchInput.addEventListener('keydown', event => {
+  if (event.key === 'Escape') hidePopularCourses();
+});
+popularButton.addEventListener('click', () => {
+  const shouldOpen = popularButton.getAttribute('aria-expanded') !== 'true';
+  hidePopularCourses();
+  if (!shouldOpen) return;
+  popularButton.setAttribute('aria-expanded', 'true');
+  fetchPopularCourses();
+});
+clearSearchButton.addEventListener('click', () => {
+  setSearchValue('');
+  runSearch('');
+  searchInput.focus();
+});
+loadMoreButton.addEventListener('click', async () => {
+  if (state.loading || state.loaded >= state.total) return;
+  state.page += 1;
+  await fetchReviews();
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('.popular-control')) hidePopularCourses();
+});
+
+async function loadMeta() {
+  try {
+    const response = await fetch('/api/reviews/meta');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const meta = await response.json();
+    const total = Number(meta.matched_threads) + Number(meta.matched_replies);
+    if (!Number.isSafeInteger(total) || total < 0) throw new Error('Invalid review count');
+    document.getElementById('statDate').textContent = meta.snapshot_date || '-';
+    document.getElementById('statTotal').textContent = formatNumber(total);
+  } catch (error) {
+    document.getElementById('stats').hidden = true;
+  }
+}
+
+function init() {
+  applyThemeMeta();
+  const query = new URLSearchParams(location.search).get('q') || '';
+  state.query = query.slice(0, 120).trim();
+  setSearchValue(state.query);
+  loadMeta();
+  fetchReviews({ reset: true });
+}
+
+init();
+</script>
+</body>
+</html>
