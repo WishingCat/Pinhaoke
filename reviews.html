@@ -123,11 +123,11 @@ html[data-theme="dark"] .review-nav-link { color: #0F1917; background: linear-gr
 .popular-course-count { color: var(--ink-3); font-family: var(--mono); font-size: 0.72rem; white-space: nowrap; }
 .popular-status { padding: 18px 14px; color: var(--ink-3); font-size: 0.8rem; text-align: center; }
 
-.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 26px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); animation: enter 0.35s 0.1s ease-out both; }
+.stats { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; margin-top: 26px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); animation: enter 0.35s 0.1s ease-out both; }
 .stat { min-width: 0; padding: 16px 18px; }
-.stat + .stat { border-left: 1px solid var(--border); }
+.stat + .stat { padding-left: 28px; text-align: right; }
 .stat-label { color: var(--ink-3); font-size: 0.75rem; }
-.stat-value { margin-top: 2px; color: var(--ink); font-family: var(--mono); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.stat-value { margin-top: 2px; color: var(--ink); font-family: var(--mono); font-size: 1rem; font-weight: 700; white-space: nowrap; }
 
 .result-toolbar { margin-top: 30px; }
 .result-title { margin: 0; font-size: 1.05rem; font-weight: 750; }
@@ -208,7 +208,6 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   .search-area { margin: 20px 0 14px; }
   .search-form { padding: 12px 16px; }
   .popular-button { min-height: 46px; padding-left: 12px; padding-right: 12px; }
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .thread { padding: 17px 16px; }
   .thread-head { align-items: flex-start; }
   .source-link span { display: none; }
@@ -227,6 +226,8 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   .search-form { gap: 8px; padding-left: 12px; padding-right: 12px; }
   .popular-button { gap: 6px; padding-left: 10px; padding-right: 10px; font-size: 0.75rem; }
   .stat { padding: 13px 10px; }
+  .stat + .stat { padding-left: 12px; }
+  .stat-value { font-size: 0.85rem; }
   .thread { padding: 15px 13px; }
 }
 
@@ -237,7 +238,7 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   .popular-button { padding-left: 8px; padding-right: 8px; }
   .popular-button svg { display: none; }
   .search-input { font-size: 0.9rem; }
-  .stat-value { font-size: 0.88rem; }
+  .stat-value { font-size: 0.78rem; }
 }
 </style>
 </head>
@@ -266,7 +267,7 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
     <div>
       <p class="eyebrow">PKU TREEHOLE ARCHIVE</p>
       <h1>树洞课程评测</h1>
-      <p class="scope">搜索课程名，查看课程评测主帖及其中有实际评价信息的回复。</p>
+      <p class="scope">数据全部来自北大树洞大家的真实回复</p>
     </div>
     <nav class="view-switcher" aria-label="课程数据视图">
       <div class="term-nav">
@@ -303,7 +304,7 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
   </section>
 
   <section class="stats" id="stats" aria-label="数据范围">
-    <div class="stat"><div class="stat-label">数据截至</div><div class="stat-value" id="statDate">-</div></div>
+    <div class="stat"><div class="stat-label">数据范围</div><div class="stat-value" id="statDateRange">-</div></div>
     <div class="stat"><div class="stat-label">评测数据量</div><div class="stat-value" id="statTotal">-</div></div>
   </section>
 
@@ -725,7 +726,11 @@ async function loadMeta() {
     const meta = await response.json();
     const total = Number(meta.matched_threads) + Number(meta.matched_replies);
     if (!Number.isSafeInteger(total) || total < 0) throw new Error('Invalid review count');
-    document.getElementById('statDate').textContent = meta.snapshot_date || '-';
+    const startDate = String(meta.start_date || '').trim();
+    const endDate = String(meta.end_date || '').trim();
+    document.getElementById('statDateRange').textContent = startDate && endDate
+      ? `${startDate} 至 ${endDate}`
+      : startDate || endDate || '-';
     document.getElementById('statTotal').textContent = formatNumber(total);
   } catch (error) {
     document.getElementById('stats').hidden = true;

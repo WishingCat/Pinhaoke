@@ -1275,6 +1275,12 @@ def list_review_courses(
 def get_review_meta():
     with get_reviews_db() as conn:
         metadata = dict(conn.execute("SELECT key, value FROM metadata"))
+        date_range = conn.execute(
+            "SELECT "
+            "date(MIN(posted_at), 'unixepoch', '+8 hours') AS start_date, "
+            "date(MAX(posted_at), 'unixepoch', '+8 hours') AS end_date "
+            "FROM entries"
+        ).fetchone()
 
     integer_keys = (
         "source_shards", "source_posts", "source_replies", "matched_threads",
@@ -1285,6 +1291,8 @@ def get_review_meta():
     )
     payload = {
         "snapshot_date": metadata.get("snapshot_date", ""),
+        "start_date": date_range["start_date"] or "",
+        "end_date": date_range["end_date"] or "",
         "classifier_version": metadata.get("classifier_version", ""),
         "highlight_version": metadata.get("highlight_version", ""),
     }

@@ -127,10 +127,11 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('.review-nav-link { width: 100%;', REVIEWS_HTML)
         self.assertIn('.term-nav a { flex-basis: 100%;', REVIEWS_HTML)
 
-    def test_review_page_shows_only_snapshot_date_and_combined_review_count(self):
+    def test_review_page_shows_date_range_and_combined_review_count(self):
         self.assertEqual(REVIEWS_HTML.count('class="stat"'), 2)
-        self.assertIn("数据截至", REVIEWS_HTML)
-        self.assertIn('id="statDate"', REVIEWS_HTML)
+        self.assertIn("数据范围", REVIEWS_HTML)
+        self.assertIn('id="statDateRange"', REVIEWS_HTML)
+        self.assertIn("`${startDate} 至 ${endDate}`", REVIEWS_HTML)
         self.assertIn("评测数据量", REVIEWS_HTML)
         self.assertIn('id="statTotal"', REVIEWS_HTML)
         self.assertIn(
@@ -142,6 +143,11 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn('id="resultCount"', REVIEWS_HTML)
         self.assertNotIn("个相关树洞", REVIEWS_HTML)
         self.assertNotIn(".result-count", REVIEWS_HTML)
+
+    def test_review_page_uses_requested_source_copy_and_right_aligned_total(self):
+        self.assertIn("数据全部来自北大树洞大家的真实回复", REVIEWS_HTML)
+        self.assertIn(".stat + .stat { padding-left: 28px; text-align: right; }", REVIEWS_HTML)
+        self.assertNotIn("搜索课程名，查看课程评测主帖及其中有实际评价信息的回复。", REVIEWS_HTML)
 
     def test_review_search_placeholder_mentions_courses_and_teachers(self):
         self.assertIn(

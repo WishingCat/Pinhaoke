@@ -83,7 +83,7 @@ git diff --check
 | `GET /api/courses/{id}` | 前缀已包含学期与学段，不接受 `term`；支持 `lang`。 |
 | `GET /api/reviews` | 返回 `{total, page, page_size, query, threads}`，按时间倒序检索评测主题及相关回复。 |
 | `GET /api/review-courses` | 返回按热度排序且可按 `q` 过滤的课程名、课程号、主题数和条目数；评测页用它填充“查看热门课程”菜单。 |
-| `GET /api/reviews/meta` | 返回树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
+| `GET /api/reviews/meta` | 返回保留条目的起止日期、树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
@@ -104,7 +104,7 @@ git diff --check
 - `GET /api/reviews`：`q` 最长 120 字符，`page` 为 1 到 10000，`page_size` 为 1 到 100。
 - `GET /api/review-courses`：`q` 最长 120 字符，`limit` 为 1 到 50。
 - 搜索同时匹配主帖、保留回复和规范化课程名；`LIKE` 通配符必须转义。
-- 页面统计区只显示快照日期和评测数据量；评测数据量等于 `matched_threads + matched_replies`，也就是 `matched_entries`。
+- 页面统计区只显示保留条目的日期范围和评测数据量；日期范围来自 `entries.posted_at` 的最小值与最大值，评测数据量等于 `matched_threads + matched_replies`，也就是 `matched_entries`。
 - API 只返回树洞号、评论号、楼层、时间、来源月份、原帖链接、正文、课程标签和课程/教师高亮区间，不得暴露作者标识或回复关系。高亮区间采用 Unicode 码点偏移，前端必须通过文本节点安全分段，不得把正文拼入 `innerHTML`。
 
 ## 课程 ID

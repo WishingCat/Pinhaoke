@@ -66,6 +66,7 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("高置信缩写会加粗彩色高亮", text)
         self.assertIn("查看热门课程", text)
         self.assertIn("不显示输入联想", text)
+        self.assertIn("数据范围 `2022-12-21` 至 `2026-07-13`", text)
         self.assertIn("评测数据量 `62716`", text)
         self.assertIn("`31642` 个主题加 `31074` 条相关回复", text)
         self.assertRegex(

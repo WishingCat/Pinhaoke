@@ -238,6 +238,8 @@ class ReviewApiTests(unittest.TestCase):
     def test_review_metadata_matches_full_extraction(self):
         metadata = app.get_review_meta()
         self.assertEqual(metadata["snapshot_date"], "2026-07-13")
+        self.assertEqual(metadata["start_date"], "2022-12-21")
+        self.assertEqual(metadata["end_date"], "2026-07-13")
         self.assertEqual(metadata["highlight_version"], "2")
         self.assertEqual(metadata["matched_threads"], 31642)
         self.assertEqual(metadata["matched_entries"], 62716)
