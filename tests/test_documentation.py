@@ -185,9 +185,10 @@ class DocumentationTests(unittest.TestCase):
             "journalctl -u pinhaoke",
             "/api/health",
             "/api/reviews?page_size=1",
-            "本次任务未部署生产",
         ):
             self.assertIn(fact, deploy)
+        self.assertNotIn("本次任务未部署生产", deploy)
+        self.assertNotIn("也没有 push", deploy)
         archive = read("归档/README.md")
         self.assertIn("V1", archive)
         self.assertIn("只读参考", archive)

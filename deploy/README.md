@@ -2,8 +2,6 @@
 
 生产站点是 [https://www.pinhaoke.love](https://www.pinhaoke.love)。Nginx 负责 HTTPS 和静态图片，`pinhaoke.service` 以 `www-data` 运行 Uvicorn，应用目录固定为 `/opt/pinhaoke`。
 
-> 文档合并任务只更新仓库说明，**本次任务未部署生产**，也没有 push。
-
 ## 组件边界
 
 - `deploy/update.sh`：唯一应用更新入口，部署精确 `origin/main`。
