@@ -47,10 +47,14 @@ class DocumentationTests(unittest.TestCase):
                     f"broken link in {relative_path}: {target}",
                 )
 
-    def test_claude_is_a_short_pointer(self):
+    def test_claude_is_a_short_project_pointer(self):
         text = read("CLAUDE.md")
         self.assertLess(len(text.splitlines()), 12)
         self.assertIn("AGENTS.md", text)
+        self.assertIn("README.md", text)
+        self.assertIn("FastAPI", text)
+        self.assertIn("无构建步骤", text)
+        self.assertIn("五个课程 SQLite 数据库和一个树洞评测数据库", text)
         self.assertNotIn("## API", text)
 
     def test_readme_has_https_terms_and_correct_sponsor_labels(self):
@@ -72,6 +76,13 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("`31642` 个主题加 `31074` 条相关回复", text)
         self.assertIn("点击卡片", text)
         self.assertIn("145738", text)
+        self.assertIn("## 技术架构", text)
+        self.assertIn("## 网页设计", text)
+        self.assertIn("无构建步骤", text)
+        self.assertIn("最大内容宽度为 `1120px`", text)
+        self.assertIn("prefers-reduced-motion", text)
+        self.assertIn("AbortController", text)
+        self.assertIn("完整树洞仅指输入快照", text)
         self.assertRegex(
             text,
             r'wechat_sponsor\.jpg"[^>]*alt="微信赞助码"[^\n]*微信赞助码',
@@ -111,6 +122,16 @@ class DocumentationTests(unittest.TestCase):
             "60294",
             "26892",
             "36560",
+            "## 前端与网页设计契约",
+            "1120px",
+            "1.5px",
+            "不使用左侧彩条",
+            "AbortController",
+            "textContent",
+            "inert",
+            "1440px",
+            "390px",
+            "320px",
             "python3 -m unittest discover -s tests -v",
             "atomic_database",
             "addToPlan.do",
@@ -183,6 +204,9 @@ class DocumentationTests(unittest.TestCase):
             "60294",
             "26892",
             "36560",
+            "## 页面呈现口径",
+            "GET /api/reviews/{pid}",
+            "不加入页面评测数据量",
         ):
             self.assertIn(fact, text)
 
@@ -197,6 +221,8 @@ class DocumentationTests(unittest.TestCase):
             "/api/health",
             "/api/reviews?page_size=1",
             "/api/reviews/{pid}",
+            "五类本机 API 契约",
+            "review-detail 五类烟测",
         ):
             self.assertIn(fact, deploy)
         self.assertNotIn("本次任务未部署生产", deploy)
