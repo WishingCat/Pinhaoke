@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -159,8 +160,12 @@ class DeployContractTests(unittest.TestCase):
     def test_update_materializes_lfs_and_sets_read_only_service_permissions(self):
         self.assertIn('git lfs checkout', self.update)
         self.assertGreaterEqual(self.update.count('git lfs fsck --objects "$TARGET_COMMIT"'), 2)
-        self.assertIn('GIT_INDEX_FILE="$TARGET_INDEX" git read-tree "$TARGET_COMMIT"', self.update)
-        self.assertIn('GIT_INDEX_FILE="$TARGET_INDEX" git checkout-index', self.update)
+        self.assertIn(
+            'materialize_release_tree "$TARGET_COMMIT" "$TARGET_TREE" "$TARGET_INDEX"',
+            self.update,
+        )
+        self.assertIn('GIT_INDEX_FILE="$index" git read-tree "$commit"', self.update)
+        self.assertIn('GIT_ATTR_SOURCE="$commit" GIT_INDEX_FILE="$index"', self.update)
         self.assertIn('verify_materialized_lfs "$TARGET_TREE" "$TARGET_COMMIT"', self.update)
         self.assertLess(
             self.main.index('verify_materialized_lfs "$TARGET_TREE" "$TARGET_COMMIT"'),
@@ -185,11 +190,79 @@ class DeployContractTests(unittest.TestCase):
         for fragment in (
             'git lfs fetch origin "$commit"',
             'git lfs fsck --objects "$commit"',
-            'GIT_INDEX_FILE="$index" git read-tree "$commit"',
-            'GIT_INDEX_FILE="$index" git checkout-index',
+            'materialize_release_tree "$commit" "$tree" "$index"',
             'verify_materialized_lfs "$tree" "$commit"',
         ):
             self.assertIn(fragment, self.update)
+
+    @unittest.skipUnless(shutil.which("git-lfs"), "git-lfs is unavailable")
+    def test_materialized_tree_uses_target_attributes_for_new_lfs_paths(self):
+        git_version = subprocess.run(
+            ["git", "version"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        match = re.search(r"(\d+)\.(\d+)", git_version)
+        if not match or tuple(map(int, match.groups())) < (2, 42):
+            self.skipTest("GIT_ATTR_SOURCE requires Git 2.42 or newer")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            tree = Path(tmp) / "target-tree"
+            index = Path(tmp) / "target-index"
+            repo.mkdir()
+
+            def git(*args):
+                return subprocess.run(
+                    ["git", *args],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+            git("init")
+            git("config", "user.name", "Deploy Test")
+            git("config", "user.email", "deploy-test@example.invalid")
+            git("lfs", "install", "--local")
+            (repo / ".gitattributes").write_text("", encoding="utf-8")
+            git("add", ".gitattributes")
+            git("commit", "-m", "old release")
+            old_commit = git("rev-parse", "HEAD").stdout.strip()
+
+            payload = b"new target lfs payload\n" * 1024
+            (repo / ".gitattributes").write_text(
+                "new.bin filter=lfs diff=lfs merge=lfs -text\n",
+                encoding="utf-8",
+            )
+            (repo / "new.bin").write_bytes(payload)
+            git("add", ".gitattributes", "new.bin")
+            git("commit", "-m", "target release")
+            target_commit = git("rev-parse", "HEAD").stdout.strip()
+            pointer = git("show", f"{target_commit}:new.bin").stdout
+            self.assertTrue(pointer.startswith("version https://git-lfs.github.com/spec/v1"))
+
+            git("reset", "--hard", old_commit)
+            command = textwrap.dedent(
+                f"""
+                set -euo pipefail
+                source {shlex.quote(str(ROOT / 'deploy/update.sh'))}
+                materialize_release_tree \
+                    {shlex.quote(target_commit)} \
+                    {shlex.quote(str(tree))} \
+                    {shlex.quote(str(index))}
+                """
+            )
+            result = subprocess.run(
+                ["bash", "-c", command],
+                cwd=repo,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((tree / "new.bin").read_bytes(), payload)
 
     def test_missing_previous_lfs_object_fails_before_service_stop(self):
         with tempfile.TemporaryDirectory() as tmp:

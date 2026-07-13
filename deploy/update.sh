@@ -55,6 +55,18 @@ verify_materialized_lfs() {
     done < <(git lfs ls-files --name-only "$commit")
 }
 
+materialize_release_tree() {
+    local commit=$1
+    local tree=$2
+    local index=$3
+
+    mkdir -p "$tree"
+    GIT_INDEX_FILE="$index" git read-tree "$commit"
+    # Attribute rules must come from the release being expanded, not the live checkout.
+    GIT_ATTR_SOURCE="$commit" GIT_INDEX_FILE="$index" \
+        git checkout-index --all --force --prefix="$tree/"
+}
+
 preflight_previous_lfs_release() {
     local commit=$1
     local tree=${2:-$PREVIOUS_TREE}
@@ -71,9 +83,7 @@ preflight_previous_lfs_release() {
     git lfs install --local
     git lfs fetch origin "$commit"
     git lfs fsck --objects "$commit"
-    mkdir -p "$tree"
-    GIT_INDEX_FILE="$index" git read-tree "$commit"
-    GIT_INDEX_FILE="$index" git checkout-index --all --force --prefix="$tree/"
+    materialize_release_tree "$commit" "$tree" "$index"
     git lfs fsck --objects "$commit"
     verify_materialized_lfs "$tree" "$commit"
 }
@@ -381,8 +391,7 @@ main() {
     fi
 
     echo "==> Materializing target release before downtime"
-    GIT_INDEX_FILE="$TARGET_INDEX" git read-tree "$TARGET_COMMIT"
-    GIT_INDEX_FILE="$TARGET_INDEX" git checkout-index --all --force --prefix="$TARGET_TREE/"
+    materialize_release_tree "$TARGET_COMMIT" "$TARGET_TREE" "$TARGET_INDEX"
     if [[ "$TARGET_USES_LFS" -eq 1 ]]; then
         git lfs fsck --objects "$TARGET_COMMIT"
         verify_materialized_lfs "$TARGET_TREE" "$TARGET_COMMIT"

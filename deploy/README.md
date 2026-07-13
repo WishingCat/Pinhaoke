@@ -25,7 +25,7 @@
 
 ## 前置依赖
 
-服务器需要：Git、Git LFS、Python 3、`venv`、`curl`、`flock`、`sha256sum`、systemd，以及可访问 Git remote 和 Python 包源的网络。
+服务器需要：Git 2.42 或更高版本、Git LFS、Python 3、`venv`、`curl`、`flock`、`sha256sum`、systemd，以及可访问 Git remote 和 Python 包源的网络。Git 2.42 是候选目录通过 `GIT_ATTR_SOURCE` 按目标 commit 的 `.gitattributes` 物化新增 LFS 路径所需的最低版本。
 
 首次配置前检查：
 
@@ -54,7 +54,7 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 1. fetch 并解析精确 `origin/main` commit，同时记录旧 commit、旧 unit 和服务活动状态。
 2. 如果旧提交使用 Git LFS，检查 `git-lfs`，fetch 旧对象并运行 LFS fsck；再用独立临时 Git index 展开旧提交，确认旧 LFS 文件已经物化而不是 pointer。
 3. 如果目标提交使用 Git LFS，同样 fetch 目标对象并运行 LFS fsck。
-4. 用另一份临时 Git index 把目标 commit 展开到 `.deploy-stage.*`，确认目标 LFS 文件已经物化而不是 pointer。
+4. 用另一份临时 Git index 把目标 commit 展开到 `.deploy-stage.*`；展开时通过 `GIT_ATTR_SOURCE` 强制读取目标 commit 自身的 `.gitattributes`，确保该版本新增加的 LFS 路径也能物化，再确认所有 LFS 文件均不是 pointer。
 5. 从 staged target 的 `requirements.txt` 计算 SHA-256。
 6. 仅在活动 venv 缺失或 requirements 哈希变化时构建候选 venv，执行 `python -m pip install`、`pip check` 和依赖导入检查。
 
