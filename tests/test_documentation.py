@@ -7,7 +7,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_MARKDOWN = {
     "README.md",
-    "AGENTS.md",
     "CLAUDE.md",
     "deploy/README.md",
     "北京大学选课网数据抓取/README.md",
@@ -47,15 +46,19 @@ class DocumentationTests(unittest.TestCase):
                     f"broken link in {relative_path}: {target}",
                 )
 
-    def test_claude_is_a_short_project_pointer(self):
+    def test_claude_is_the_engineering_contract(self):
         text = read("CLAUDE.md")
-        self.assertLess(len(text.splitlines()), 12)
-        self.assertIn("AGENTS.md", text)
+        self.assertIn(
+            "This file provides guidance to Claude Code (claude.ai/code)", text
+        )
         self.assertIn("README.md", text)
         self.assertIn("FastAPI", text)
         self.assertIn("无构建步骤", text)
         self.assertIn("五个课程 SQLite 数据库和一个树洞评测数据库", text)
-        self.assertNotIn("## API", text)
+        self.assertIn("## API 契约", text)
+        self.assertIn("## 文档所有权", text)
+        self.assertIn("七份 tracked Markdown", text)
+        self.assertNotIn("AGENTS.md", text)
 
     def test_readme_has_https_terms_and_correct_sponsor_labels(self):
         text = read("README.md")
@@ -92,8 +95,8 @@ class DocumentationTests(unittest.TestCase):
             r'alipay_sponsor\.jpg"[^>]*alt="支付宝赞助码"[^\n]*支付宝赞助码',
         )
 
-    def test_agents_matches_engineering_contracts(self):
-        text = read("AGENTS.md")
+    def test_claude_matches_engineering_contracts(self):
+        text = read("CLAUDE.md")
         for fact in (
             "GET /api/health",
             "mode=ro",
