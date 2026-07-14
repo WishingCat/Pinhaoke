@@ -80,7 +80,7 @@ class FrontendContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def test_treehole_reviews_is_adjacent_to_ordered_term_controls(self):
+    def test_treehole_reviews_entry_is_adjacent_but_hidden_while_delisted(self):
         spring = HTML.index('id="termSpringBtn"')
         summer = HTML.index('id="termSummerBtn"')
         fall = HTML.index('id="termFallBtn"')
@@ -88,7 +88,10 @@ class FrontendContractTests(unittest.TestCase):
         self.assertLess(spring, summer)
         self.assertLess(summer, fall)
         self.assertLess(fall, reviews)
-        self.assertIn('href="/reviews"', HTML[reviews:reviews + 180])
+        anchor = HTML[reviews:reviews + 180]
+        self.assertIn('href="/reviews"', anchor)
+        self.assertIn(" hidden>", anchor)
+        self.assertIn(".review-hub-link[hidden] { display: none; }", HTML)
 
     def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
         self.assertEqual(HTML.count("VX 联系方式："), 2)
