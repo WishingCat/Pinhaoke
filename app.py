@@ -244,7 +244,7 @@ def check_database_health() -> dict:
             <= int(review_metadata.get("course_highlights", -1))
             and int(review_metadata.get("teacher_alias_highlights", -1))
             <= int(review_metadata.get("teacher_highlights", -1))
-            and review_metadata.get("highlight_version") == "2"
+            and review_metadata.get("highlight_version") == "3"
         )
     except (TypeError, ValueError):
         review_metadata_matches = False

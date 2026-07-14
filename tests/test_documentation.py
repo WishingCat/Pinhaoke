@@ -67,15 +67,15 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("独立入口", text)
         self.assertIn("手机端", text)
         self.assertIn("课程名、教师名", text)
-        self.assertIn("高置信缩写会加粗彩色高亮", text)
+        self.assertIn("教师姓名拼音首字母都会加粗彩色高亮", text)
         self.assertIn("热度最高的 `24` 门课程", text)
         self.assertIn("“热门课程”", text)
         self.assertIn("不显示输入联想", text)
         self.assertIn("数据范围 `2022-12-21` 至 `2026-07-13`", text)
-        self.assertIn("评测数据量 `62716`", text)
-        self.assertIn("`31642` 个主题加 `31074` 条相关回复", text)
+        self.assertIn("评测数据量 `90880`", text)
+        self.assertIn("`47843` 个主题加 `43037` 条相关回复", text)
         self.assertIn("点击卡片", text)
-        self.assertIn("145738", text)
+        self.assertIn("210570", text)
         self.assertIn("## 技术架构", text)
         self.assertIn("## 网页设计", text)
         self.assertIn("无构建步骤", text)
@@ -111,17 +111,17 @@ class DocumentationTests(unittest.TestCase):
             "GET /api/review-courses",
             "热门课程",
             "树洞课程评测.db",
-            "31642",
-            "62716",
-            "145738",
+            "47843",
+            "90880",
+            "210570",
             "thread_replies",
             "--enrich-thread-replies",
             "entry_highlights",
             "entity_aliases",
-            "96555",
-            "60294",
-            "26892",
-            "36560",
+            "135241",
+            "53518",
+            "56168",
+            "27962",
             "## 前端与网页设计契约",
             "1120px",
             "1.5px",
@@ -192,18 +192,18 @@ class DocumentationTests(unittest.TestCase):
             "3561472",
             "15245822",
             "95.24%",
-            "31642",
-            "62716",
-            "145738",
+            "47843",
+            "90880",
+            "210570",
             "thread_replies",
             "--enrich-thread-replies",
             "course_catalog",
             "entry_highlights",
             "entity_aliases",
-            "96555",
-            "60294",
-            "26892",
-            "36560",
+            "135241",
+            "53518",
+            "56168",
+            "27962",
             "## 页面呈现口径",
             "GET /api/reviews/{pid}",
             "不加入页面评测数据量",

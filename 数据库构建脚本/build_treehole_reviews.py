@@ -13,6 +13,7 @@ import tempfile
 import unicodedata
 from collections import Counter, defaultdict
 from contextlib import closing, suppress
+from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -30,8 +31,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGET = PROJECT_ROOT / "数据库" / "树洞课程评测.db"
 COURSE_DB_DIR = PROJECT_ROOT / "数据库"
 COURSE_DB_GLOB = "2026*课程.db"
-CLASSIFIER_VERSION = "1"
-HIGHLIGHT_VERSION = "2"
+PINYIN_INITIALS_PATH = Path(__file__).resolve().parent / "汉字拼音首字母.json"
+CLASSIFIER_VERSION = "2"
+HIGHLIGHT_VERSION = "3"
 
 HIGHLIGHT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS entry_highlights (
@@ -142,6 +144,7 @@ _COURSE_CODE_RE = re.compile(r"(?<!\d)(\d{8})(?!\d)")
 _MATCH_CONTEXT_TERMS = (
     "课", "课程", "老师", "教授", "给分", "作业", "考试", "考核", "点名", "签到",
     "学分", "选修", "必修", "教材", "难度", "推荐", "避雷", "修读", "旁听",
+    "测评", "评测", "学期", "大一", "大二", "大三", "大四",
 )
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 _PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
@@ -187,6 +190,136 @@ _COURSE_ALIAS_NOISE_RE = re.compile(
 _TEACHER_INITIAL_RE = re.compile(
     r"^[\s/／,，、;；:：()（）\[\]【】<>《》\-—]*([A-Za-z]{2,8})(?![A-Za-z0-9])"
 )
+
+# 人工核定的高频课程别称。每项为（规范课名, 库内变体子串, 别称元组）：
+# 规范课名若不在课程库中（思政公共课等）则作为虚拟课名参与打标与检索；
+# 变体子串把库内"高等数学 (B) (一)"这类同族课名并入同一别称的高亮词典。
+_CURATED_COURSE_FAMILIES = (
+    ("思想道德与法治", None, ("思修", "思想道德与法治", "思想道德修养与法律基础")),
+    ("军事理论", None, ("军理", "军事理论")),
+    ("形势与政策", None, ("形策", "形势与政策")),
+    ("马克思主义基本原理", "马克思主义基本原理", ("马原", "马克思主义基本原理")),
+    ("习近平新时代中国特色社会主义思想概论", None, ("习概",)),
+    ("中国近现代史纲要", None, ("史纲", "中国近现代史纲要", "近现代史纲要")),
+    ("毛泽东思想和中国特色社会主义理论体系概论", "毛泽东思想和中国特色社会主义理论体系概论", ("毛概",)),
+    ("人工智能引论", "人工智能引论", ("AI引论", "人智引论")),
+    ("程序设计实习", "程序设计实习", ("程设",)),
+    ("程序设计实习(实验班)", "程序设计实习(实验班)", ("程设实验班",)),
+    ("计算概论", "计算概论", ("计概", "计算概论")),
+    ("数据结构与算法", "数据结构与算法", ("数算", "数据结构与算法")),
+    ("高等数学", "高等数学", ("高数", "高等数学")),
+    ("线性代数", "线性代数", ("线代", "线性代数")),
+    ("数学分析", "数学分析", ("数分", "数学分析")),
+    ("高等代数", "高等代数", ("高代",)),
+    ("概率统计", "概率统计", ("概统",)),
+    ("普通物理", "普通物理", ("普物", "普通物理")),
+    ("普通化学", "普通化学", ("普化",)),
+    ("普通生物学", "普通生物学", ("普生",)),
+    ("普通心理学", "普通心理学", ("普心",)),
+)
+
+# 树洞常用拼音缩写与网络用语：不得作为教师姓名首字母匹配
+_PINYIN_ALIAS_EXCLUSIONS = frozenset({
+    "lz", "ls", "dz", "bz", "gg", "jj", "mm", "dd", "cc", "hh", "xs", "js",
+    "ky", "bd", "nb", "sb", "tm", "md", "jw", "bt", "cs", "ee", "pe", "hr",
+    "xswl", "yyds", "nsdd", "awsl", "tql", "dbq", "xdm", "plmm", "zqsg",
+    "yysy", "bdjw", "szd", "gkd", "ssfd", "cnm", "nmd", "emo", "zzz",
+    "hhh", "hhhh", "xjtu", "thu", "cmu", "mit", "nlp", "gpt", "llm",
+})
+
+# 二字课程别称的跨词边界否决：命中位置的前/后邻字落入下表时放弃匹配，
+# 阻止"课程设置"→程设、"分数分布"→数分、"提高数学成绩"→高数这类误报
+_CURATED_ALIAS_VETO = {
+    "程设": ("课工流过进历", "置施"),
+    "高数": ("提最更增", ""),
+    "数分": ("分次人总时位学基", "布配"),
+    "线代": ("", "替表码"),
+    "高代": ("", "价表码理"),
+    "概统": ("大", ""),
+    "数算": ("次", ""),
+}
+
+
+def _curated_alias_vetoed(normalized: str, index: int, alias: str) -> bool:
+    veto = _CURATED_ALIAS_VETO.get(alias)
+    if veto is None:
+        return False
+    before, after = veto
+    prev_char = normalized[index - 1] if index else ""
+    next_char = normalized[index + len(alias):index + len(alias) + 1]
+    return bool(
+        (prev_char and prev_char in before)
+        or (next_char and next_char in after)
+    )
+
+
+@lru_cache(maxsize=1)
+def _pinyin_initials_table():
+    try:
+        with PINYIN_INITIALS_PATH.open(encoding="utf-8") as stream:
+            return {
+                character: tuple(initials)
+                for character, initials in json.load(stream).items()
+            }
+    except FileNotFoundError:
+        return {}
+
+
+def _teacher_pinyin_initials(name: str) -> set[str]:
+    """Return every plausible initials abbreviation for a 2-4 character name."""
+    table = _pinyin_initials_table()
+    if not table or not re.fullmatch(r"[㐀-鿿]{2,4}", name):
+        return set()
+    combos = {""}
+    for character in name:
+        initials = table.get(character)
+        if not initials:
+            return set()
+        combos = {prefix + initial for prefix in combos for initial in initials}
+        if len(combos) > 16:
+            return set()
+    return {
+        combo
+        for combo in combos
+        if combo not in _ASCII_ALIAS_EXCLUSIONS
+        and combo not in _PINYIN_ALIAS_EXCLUSIONS
+    }
+
+
+def _resolve_curated_courses(course_names):
+    """Resolve curated nicknames against the catalog.
+
+    Returns (tagging, highlight, kinds, variant_canonicals): the last maps a
+    catalog variant (高等数学 (B) (一) 等) to its curated canonical names so
+    teacher associations can bridge onto virtual family courses.
+    """
+    names = set(course_names)
+    tagging = defaultdict(set)
+    highlight = defaultdict(set)
+    kinds = {}
+    variant_canonicals = defaultdict(set)
+    for canonical, variant_pattern, aliases in _CURATED_COURSE_FAMILIES:
+        variants = (
+            {name for name in names if variant_pattern in name}
+            if variant_pattern
+            else set()
+        )
+        highlight_names = variants | {canonical}
+        for variant in variants:
+            if variant != canonical:
+                variant_canonicals[variant].add(canonical)
+        canonical_normalized = normalize_search_text(canonical)
+        for alias in aliases:
+            normalized = normalize_search_text(alias)
+            if len(normalized) < 2:
+                continue
+            tagging[normalized].add(canonical)
+            highlight[normalized].update(highlight_names)
+            kinds.setdefault(
+                normalized,
+                "full" if normalized == canonical_normalized else "alias",
+            )
+    return tagging, highlight, kinds, variant_canonicals
 
 _EXPLICIT_REVIEW_RE = re.compile(
     r"(?:(?:课程|选课|修课|上课)[^\n。！？]{0,6}(?:测评|评测|评价|体验)|"
@@ -348,7 +481,7 @@ def sanitize_text(value: str) -> str:
 
 
 class CourseMatcher:
-    def __init__(self, alias_names, code_names, canonical_codes):
+    def __init__(self, alias_names, code_names, canonical_codes, curated_aliases=None):
         self._alias_names = {
             alias: frozenset(names) for alias, names in alias_names.items()
         }
@@ -358,13 +491,14 @@ class CourseMatcher:
         self.canonical_codes = {
             name: tuple(sorted(codes)) for name, codes in canonical_codes.items()
         }
+        self._curated = frozenset(curated_aliases or ())
         self._prefixes = defaultdict(list)
         for alias in sorted(self._alias_names, key=lambda item: (-len(item), item)):
             if len(alias) >= 2:
                 self._prefixes[alias[:2]].append(alias)
 
     @classmethod
-    def from_rows(cls, rows):
+    def from_rows(cls, rows, curated_tagging=None):
         alias_names = defaultdict(set)
         code_names = defaultdict(set)
         canonical_codes = defaultdict(set)
@@ -385,7 +519,14 @@ class CourseMatcher:
                 canonical_codes[name].add(code)
             else:
                 canonical_codes.setdefault(name, set())
-        return cls(alias_names, code_names, canonical_codes)
+        for alias, names in (curated_tagging or {}).items():
+            alias_names[alias].update(names)
+            for name in names:
+                canonical_codes.setdefault(name, set())
+        return cls(
+            alias_names, code_names, canonical_codes,
+            curated_aliases=(curated_tagging or {}).keys(),
+        )
 
     @property
     def course_count(self):
@@ -393,14 +534,36 @@ class CourseMatcher:
 
     def _alias_matches(self, normalized: str, allow_short: bool):
         matches = []
+        pending_short = []
+        long_positions = []
         for index in range(max(len(normalized) - 1, 0)):
             for alias in self._prefixes.get(normalized[index:index + 2], ()):
-                if len(alias) <= 3 and not allow_short:
+                curated = alias in self._curated
+                if len(alias) <= 3 and not allow_short and not curated:
                     continue
-                if len(alias) == 2 and normalized[index + len(alias):index + len(alias) + 1] != "课":
+                if curated and _curated_alias_vetoed(normalized, index, alias):
                     continue
-                if normalized.startswith(alias, index):
-                    matches.append((index, index + len(alias), alias))
+                if not normalized.startswith(alias, index):
+                    continue
+                if len(alias) == 2 and not curated:
+                    pending_short.append((index, alias))
+                    continue
+                matches.append((index, index + len(alias), alias))
+                if len(alias) >= 4 or curated:
+                    long_positions.append(index)
+        for index, alias in pending_short:
+            # 二字课名（游泳、舞蹈等）本身是常用词：要求后跟"课"、
+            # 近旁出现课程语境词，或处于其他课程命中构成的合集列表附近
+            accepted = normalized[index + 2:index + 3] == "课"
+            if not accepted:
+                window = normalized[max(0, index - 12):index + 14]
+                accepted = any(term in window for term in _MATCH_CONTEXT_TERMS)
+            if not accepted:
+                accepted = any(
+                    abs(position - index) <= 30 for position in long_positions
+                )
+            if accepted:
+                matches.append((index, index + 2, alias))
 
         occupied = set()
         selected = []
@@ -530,21 +693,51 @@ class EntityHighlighter:
         teacher_alias_courses = defaultdict(set)
         teacher_alias_names = defaultdict(set)
         teacher_name_courses = defaultdict(set)
+        course_kinds = {}
+        teacher_kinds = {}
+        course_names = set()
         for raw_name, raw_teachers in rows:
             course_name = str(raw_name or "").strip()
             if not course_name:
                 continue
+            course_names.add(course_name)
             for alias in _course_name_aliases(course_name):
                 course_alias_names[alias].add(course_name)
             for alias, teacher_name in _teacher_name_records(raw_teachers):
                 teacher_alias_courses[alias].add(course_name)
                 teacher_alias_names[alias].add(teacher_name)
                 teacher_name_courses[teacher_name].add(course_name)
+                # 教师姓名拼音首字母（ZZJ、lsj 等）：无需语料共现证据即可高亮，
+                # 精度由课程关联或教师称谓语境闸门保证
+                for initials in _teacher_pinyin_initials(teacher_name):
+                    teacher_alias_courses[initials].add(course_name)
+                    teacher_alias_names[initials].add(teacher_name)
+                    teacher_kinds.setdefault(initials, "pinyin")
+        _tagging, curated_highlight, curated_kinds, variant_canonicals = (
+            _resolve_curated_courses(course_names)
+        )
+        for alias, names in curated_highlight.items():
+            course_alias_names[alias].update(names)
+            course_kinds.setdefault(alias, curated_kinds[alias])
+        # 教师关联桥接：条目可能只带虚拟族课名（高等数学、计算概论 等），
+        # 把变体课的任课教师同时关联到虚拟规范名，保证"计概 LG"能通过课程闸门
+        for courses in teacher_alias_courses.values():
+            extra = set()
+            for course in courses:
+                extra.update(variant_canonicals.get(course, ()))
+            courses.update(extra)
+        for courses in teacher_name_courses.values():
+            extra = set()
+            for course in courses:
+                extra.update(variant_canonicals.get(course, ()))
+            courses.update(extra)
         return cls(
             course_alias_names,
             teacher_alias_courses,
             teacher_alias_names=teacher_alias_names,
             teacher_name_courses=teacher_name_courses,
+            course_alias_kinds=course_kinds,
+            teacher_alias_kinds=teacher_kinds,
         )
 
     def with_alias_records(self, records):
@@ -613,6 +806,8 @@ class EntityHighlighter:
                     continue
                 if not self._course_alias_names[alias].intersection(known_courses):
                     continue
+                if _curated_alias_vetoed(normalized, index, alias):
+                    continue
                 start_offset = offsets[index][0]
                 end_offset = offsets[end - 1][1]
                 if self._course_alias_kinds[alias] == "full":
@@ -637,6 +832,11 @@ class EntityHighlighter:
                 end_offset = offsets[end - 1][1]
                 if not self._ascii_boundary_is_valid(text, start_offset, end_offset, alias):
                     continue
+                kind = self._teacher_alias_kinds[alias]
+                if kind == "pinyin" and len(alias) == 2:
+                    # 二位拼音首字母极易与常用缩写撞车：只认原文全大写的写法
+                    if not text[start_offset:end_offset].isupper():
+                        continue
                 associated = self._teacher_alias_courses[alias].intersection(known_courses)
                 context = text[max(0, start_offset - 8):min(len(text), end_offset + 8)]
                 if not associated and not _TEACHER_CONTEXT_RE.search(context):
@@ -646,7 +846,7 @@ class EntityHighlighter:
                         start_offset,
                         end_offset,
                         "teacher",
-                        self._teacher_alias_kinds[alias],
+                        "alias" if kind == "pinyin" else kind,
                     )
                 )
 
@@ -777,6 +977,10 @@ def _line_alias_candidates(line: str, course_names, highlighter: EntityHighlight
     teacher_mentions = []
     known_courses = set(course_names)
     for item in highlights:
+        # 缩写只能从全名共现中挖掘：curated/拼音别称提及不作为锚点，
+        # 否则"普生"会抢占"普生C"所在的挖掘区域
+        if item["match_kind"] != "full":
+            continue
         names = set(
             highlighter.canonical_names_for_span(
                 line,
@@ -1014,7 +1218,10 @@ def load_course_matcher(database_paths) -> CourseMatcher:
                     "WHERE TRIM(COALESCE(course_name, '')) != ''"
                 )
             )
-    return CourseMatcher.from_rows(rows)
+    course_names = {str(name or "").strip() for _code, name in rows}
+    course_names.discard("")
+    curated_tagging, _highlight, _kinds, _variants = _resolve_curated_courses(course_names)
+    return CourseMatcher.from_rows(rows, curated_tagging=curated_tagging)
 
 
 def load_entity_highlighter(database_paths) -> EntityHighlighter:

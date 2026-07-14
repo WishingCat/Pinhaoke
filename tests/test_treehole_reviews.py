@@ -8,6 +8,8 @@ from pathlib import Path
 from 数据库构建脚本.build_treehole_reviews import (
     CourseMatcher,
     EntityHighlighter,
+    _resolve_curated_courses,
+    _teacher_pinyin_initials,
     analyze_thread,
     build_review_database,
     enrich_existing_database,
@@ -56,6 +58,110 @@ class CourseMatcherTests(unittest.TestCase):
         self.assertEqual(
             self.matcher.match_contextual("统计学这门课作业量和给分怎么样"),
             {"统计学"},
+        )
+
+
+class CuratedAliasAndPinyinInitialTests(unittest.TestCase):
+    """课程别称词典与教师姓名拼音首字母的覆盖与精度契约。"""
+
+    def setUp(self):
+        rows = [
+            ("00100001", "人工智能引论"),
+            ("00100002", "程序设计实习"),
+            ("00100003", "程序设计实习(实验班)"),
+            ("00100004", "游泳"),
+        ]
+        names = {name for _code, name in rows}
+        curated_tagging, _highlight, _kinds, _variants = _resolve_curated_courses(names)
+        self.matcher = CourseMatcher.from_rows(rows, curated_tagging=curated_tagging)
+        self.highlighter = EntityHighlighter.from_rows(
+            [
+                ("人工智能引论", "张牧涵(助理教授)"),
+                ("程序设计实习(实验班)", "姜少峰(助理教授)"),
+                ("游泳", "李伟(教练)"),
+            ]
+        )
+
+    def highlighted_text(self, text, courses):
+        return [
+            (text[item["start_offset"]:item["end_offset"]],
+             item["entity_type"], item["match_kind"])
+            for item in self.highlighter.match(text, courses)
+        ]
+
+    def test_curated_nicknames_tag_catalog_and_virtual_courses(self):
+        self.assertEqual(self.matcher.match("AI引论这门课怎么样"), {"人工智能引论"})
+        self.assertEqual(
+            self.matcher.match("程设实验班给分如何"), {"程序设计实习(实验班)"}
+        )
+        self.assertEqual(self.matcher.match("军理水课，签到给分"), {"军事理论"})
+        self.assertEqual(self.matcher.match("ZZJ思修课点名吗"), {"思想道德与法治"})
+        self.assertEqual(self.matcher.match("这学期马原推荐谁"), {"马克思主义基本原理"})
+
+    def test_two_char_course_name_accepts_nearby_course_context(self):
+        self.assertEqual(
+            self.matcher.match("游泳老师人很好强推", allow_short=True), {"游泳"}
+        )
+        self.assertEqual(
+            self.matcher.match("昨天下午去游泳放松了一下", allow_short=True), set()
+        )
+
+    def test_two_char_course_name_accepts_review_collection_lists(self):
+        text = "测评合集\n– 人工智能引论 ZMH\n– 游泳 ZZJ"
+        self.assertEqual(
+            self.matcher.match(text, allow_short=True),
+            {"人工智能引论", "游泳"},
+        )
+
+    def test_cross_word_boundaries_do_not_trigger_curated_nicknames(self):
+        self.assertEqual(self.matcher.match("这门课的课程设置全无用处"), set())
+        self.assertEqual(self.matcher.match("期末考试的分数分布怎么样"), set())
+        self.assertEqual(self.matcher.match("怎么提高数学成绩求指点"), set())
+        self.assertEqual(
+            self.highlighter.match("课程设置不太合理", {"程序设计实习(实验班)"}), []
+        )
+
+    def test_pinyin_initials_generation_and_exclusions(self):
+        self.assertEqual(_teacher_pinyin_initials("张牧涵"), {"zmh"})
+        self.assertEqual(_teacher_pinyin_initials("姜少峰"), {"jsf"})
+        # "楼主" 等树洞常用缩写不作为教师首字母
+        self.assertEqual(_teacher_pinyin_initials("李智"), set())
+        self.assertEqual(_teacher_pinyin_initials("外教Smith"), set())
+
+    def test_teacher_initials_highlight_with_course_or_context_gate(self):
+        self.assertEqual(
+            self.highlighted_text("AI引论 ZMH 讲得好", {"人工智能引论"}),
+            [("AI引论", "course", "alias"), ("ZMH", "teacher", "alias")],
+        )
+        self.assertEqual(
+            self.highlighted_text("程设实验班JSF给分高", {"程序设计实习(实验班)"}),
+            [("程设实验班", "course", "alias"), ("JSF", "teacher", "alias")],
+        )
+        # 无课程关联且无教师称谓语境时不得高亮
+        self.assertEqual(self.highlighted_text("ZMH 讲得好", set()), [])
+        self.assertEqual(
+            self.highlighted_text("ZMH老师人很好", set()),
+            [("ZMH", "teacher", "alias")],
+        )
+
+    def test_two_letter_initials_require_uppercase_surface(self):
+        self.assertEqual(
+            self.highlighted_text("游泳 LW 老师人很好", {"游泳"}),
+            [("游泳", "course", "full"), ("LW", "teacher", "alias")],
+        )
+        self.assertEqual(
+            self.highlighted_text("游泳 lw 老师人很好", {"游泳"}),
+            [("游泳", "course", "full")],
+        )
+
+    def test_virtual_course_nickname_highlights_without_catalog_entry(self):
+        self.assertEqual(
+            self.highlighted_text("思修给分还不错", {"思想道德与法治"}),
+            [("思修", "course", "alias")],
+        )
+        self.assertEqual(
+            self.highlighted_text("军事理论就是听讲座", {"军事理论"}),
+            [("军事理论", "course", "full")],
         )
 
 
@@ -798,7 +904,7 @@ class ReviewDatabaseTests(unittest.TestCase):
                 ("lsj", "lsj", "teacher", "罗述金", 2),
             ],
         )
-        self.assertEqual(metadata["highlight_version"], "2")
+        self.assertEqual(metadata["highlight_version"], "3")
         self.assertEqual(metadata["teacher_alias_highlights"], "2")
 
 
