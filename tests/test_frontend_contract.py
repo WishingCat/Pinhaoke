@@ -173,12 +173,26 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("border-radius: 14px; background: var(--surface)", REVIEWS_HTML)
         self.assertIn('class="site-footer"', REVIEWS_HTML)
         self.assertIn('class="footer-contact"', REVIEWS_HTML)
-        self.assertIn("tuzengji", REVIEWS_HTML)
         self.assertIn('id="backTop"', REVIEWS_HTML)
         self.assertIn("window.scrollY > 600", REVIEWS_HTML)
+        # 顶栏右侧与课程页一致：主题、关于悬浮卡、GitHub、赞助悬浮卡
+        self.assertIn('class="tip-wrap about-wrap"', REVIEWS_HTML)
+        self.assertIn('class="tip-card about-tip"', REVIEWS_HTML)
+        self.assertIn(".about-wrap:hover::after", REVIEWS_HTML)
+        self.assertIn("user-select: text;", REVIEWS_HTML)
+        self.assertIn('class="top-link sponsor-btn"', REVIEWS_HTML)
+        self.assertIn('aria-label="GitHub"', REVIEWS_HTML)
+        self.assertNotIn(">课程搜索</span>", REVIEWS_HTML)
+        # 关于卡与页脚各保留一份联系方式
+        self.assertEqual(REVIEWS_HTML.count("tuzengji"), 2)
+        self.assertEqual(REVIEWS_HTML.count("如果有问题或需求 欢迎联系！"), 2)
 
     def test_review_page_shows_date_range_and_combined_review_count(self):
-        self.assertEqual(REVIEWS_HTML.count('class="stat"'), 2)
+        # 统计信息以小字备注显示在结果标题右侧，不再是独立统计区
+        self.assertNotIn('class="stat"', REVIEWS_HTML)
+        self.assertNotIn('class="stats"', REVIEWS_HTML)
+        self.assertIn('class="result-meta" id="stats"', REVIEWS_HTML)
+        self.assertIn(".result-meta { margin: 0; color: var(--ink-3); font-size: 0.72rem; }", REVIEWS_HTML)
         self.assertIn("数据范围", REVIEWS_HTML)
         self.assertIn('id="statDateRange"', REVIEWS_HTML)
         self.assertIn("`${startDate} 至 ${endDate}`", REVIEWS_HTML)
@@ -196,7 +210,7 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_review_page_uses_requested_source_copy_and_right_aligned_total(self):
         self.assertIn("数据全部来自北大树洞大家的真实回复", REVIEWS_HTML)
-        self.assertIn(".stat + .stat { padding-left: 28px; text-align: right; }", REVIEWS_HTML)
+        self.assertIn('<p class="result-meta" id="stats" aria-label="数据范围">', REVIEWS_HTML)
         self.assertNotIn("搜索课程名，查看课程评测主帖及其中有实际评价信息的回复。", REVIEWS_HTML)
 
     def test_review_page_uses_distinct_two_color_ambient_glow(self):
@@ -212,8 +226,9 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("radial-gradient(40% 55% at 67% 46%", REVIEWS_HTML)
         self.assertIn("body::before { animation: none !important; }", REVIEWS_HTML)
         self.assertNotIn("linear-gradient(118deg, rgba(53, 198, 167, 0.10)", REVIEWS_HTML)
-        # 页面环境光晕（body::before）与标题光晕不得回退到课程页的薄荷绿/靛蓝
-        ambient = REVIEWS_HTML[REVIEWS_HTML.index("body::before"):REVIEWS_HTML.index(".page-head::before")]
+        # 页面环境光晕（body::before 浅色与深色两段）不得回退到课程页的薄荷绿/靛蓝
+        ambient = REVIEWS_HTML[REVIEWS_HTML.index("body::before"):REVIEWS_HTML.index("::selection")]
+        self.assertIn('html[data-theme="dark"] body::before', ambient)
         self.assertNotIn("rgba(53, 198, 167", ambient)
         self.assertNotIn("rgba(79, 70, 229", ambient)
 

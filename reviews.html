@@ -109,9 +109,37 @@ html[data-theme="dark"] body::before {
 .icon-button:active { transform: scale(0.95); }
 .top-link svg { width: 15px; height: 15px; }
 .icon-button svg { width: 16px; height: 16px; }
-.theme-moon { display: none; }
-html[data-theme="dark"] .theme-sun { display: none; }
-html[data-theme="dark"] .theme-moon { display: block; }
+/* 与课程页一致：浅色模式显示月亮，深色模式显示太阳 */
+html[data-theme="dark"] .theme-moon { display: none; }
+html:not([data-theme="dark"]) .theme-sun { display: none; }
+
+.sponsor-btn { color: #E11D48; border-color: rgba(225, 29, 72, 0.35); }
+.sponsor-btn:hover { color: #E11D48; border-color: #E11D48; background: rgba(225, 29, 72, 0.08); }
+html[data-theme="dark"] .sponsor-btn { color: #FB7185; border-color: rgba(251, 113, 133, 0.4); }
+html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB7185; background: rgba(251, 113, 133, 0.12); }
+.sponsor-btn svg { fill: currentColor; stroke: none; }
+
+.tip-wrap { position: relative; }
+.tip-card { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 250px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); z-index: 600; font-size: 0.78rem; line-height: 1.7; color: var(--ink-2); text-align: left; animation: pop-in 0.15s ease; pointer-events: none; }
+.tip-wrap:hover .tip-card, .tip-wrap:focus-within .tip-card { display: block; }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.about-wrap::after { content: ''; display: none; position: absolute; top: 100%; right: 0; width: 246px; height: 8px; }
+.about-wrap:hover::after, .about-wrap:focus-within::after { display: block; }
+.about-tip { width: 246px; padding: 0; overflow: hidden; pointer-events: auto; -webkit-user-select: text; user-select: text; }
+.about-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(120deg, rgba(53, 198, 167, 0.16), rgba(22, 123, 114, 0.05)); border-bottom: 1px solid var(--border); }
+.about-head svg { width: 27px; height: 27px; flex-shrink: 0; }
+.about-title { font-size: 0.86rem; font-weight: 700; line-height: 1.3; background-image: linear-gradient(118deg, #2FBE9E, #167B72); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html[data-theme="dark"] .about-title { background-image: linear-gradient(118deg, #5CE8C6, #35C6A7); }
+.about-sub { font-size: 0.68rem; color: var(--ink-3); line-height: 1.4; margin-top: 1px; }
+.about-body { padding: 11px 14px 13px; }
+.about-sec { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em; color: var(--ink-4); margin: 10px 0 6px; }
+.about-sec:first-child { margin-top: 0; }
+.about-person { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 500; color: var(--ink); line-height: 1.4; }
+.about-person + .about-person { margin-top: 6px; }
+.about-contact { display: grid; gap: 1px; margin: 7px 0 0 29px; font-size: 0.72rem; line-height: 1.5; color: var(--ink-3); }
+.about-contact-id { color: var(--accent); font-weight: 700; }
+.about-contact-note { color: var(--ink-4); }
+.about-avatar { width: 21px; height: 21px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.6rem; font-weight: 700; color: #fff; background: var(--av, linear-gradient(135deg, #2FBE9E, #167B72)); }
 
 .page { width: min(1120px, 100%); margin: 0 auto; padding: 0 28px 80px; }
 .page-head { display: block; position: relative; text-align: center; padding: 56px 16px 8px; animation: enter 0.35s ease-out both; }
@@ -172,14 +200,11 @@ html[data-theme="dark"] .review-nav-link { color: #0E1013; background: linear-gr
 .popular-course-count { color: var(--ink-3); font-family: var(--mono); font-size: 0.72rem; white-space: nowrap; }
 .popular-status { padding: 18px 14px; color: var(--ink-3); font-size: 0.8rem; text-align: center; }
 
-.stats { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; margin-top: 26px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); animation: enter 0.35s 0.1s ease-out both; }
-.stat { min-width: 0; padding: 16px 18px; }
-.stat + .stat { padding-left: 28px; text-align: right; }
-.stat-label { color: var(--ink-3); font-size: 0.75rem; }
-.stat-value { margin-top: 2px; color: var(--ink); font-family: var(--mono); font-size: 1rem; font-weight: 700; white-space: nowrap; }
-
-.result-toolbar { margin-top: 30px; }
+.result-toolbar { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; margin-top: 30px; animation: enter 0.35s 0.1s ease-out both; }
 .result-title { margin: 0; font-size: 1.05rem; font-weight: 750; }
+/* 数据范围与数据量：低调的小字备注，数字保持等宽字体 */
+.result-meta { margin: 0; color: var(--ink-3); font-size: 0.72rem; }
+.result-meta .meta-num { color: var(--ink-2); font-family: var(--mono); }
 .results { display: grid; gap: 14px; margin-top: 14px; }
 
 .thread { --thread-c: var(--accent); position: relative; min-width: 0; overflow: hidden; padding: 18px 20px; border: 1.5px solid var(--border); border-color: color-mix(in srgb, var(--thread-c) 38%, var(--border)); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-xs); cursor: pointer; animation: enter 0.28s ease-out both; transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s; }
@@ -319,6 +344,10 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
   .top-actions { gap: 6px; }
   .top-link { padding: 6px 10px; font-size: 0.74rem; }
   .icon-button { width: 31px; height: 31px; }
+  /* 小屏顶栏空间有限：赞助按钮只留爱心图标，悬浮卡改为屏内固定居中 */
+  .sponsor-btn span { display: none; }
+  .sponsor-btn { padding: 6px 8px; }
+  .tip-wrap .tip-card { position: fixed; top: 60px; left: 16px; right: 16px; width: auto; max-width: 340px; margin: 0 auto; }
   .page { padding: 0 16px 60px; }
   .page-head { padding: 36px 8px 4px; }
   h1 { font-size: 2.1rem; }
@@ -341,8 +370,6 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
 }
 
 @media (max-width: 390px) {
-  .top-link span { display: none; }
-  .top-link { width: 31px; height: 31px; padding: 0; }
   .topbar-inner { padding-left: 12px; padding-right: 12px; gap: 8px; }
   .page { padding-left: 12px; padding-right: 12px; }
   .term-nav { width: 100%; border-radius: 10px; }
@@ -352,9 +379,6 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
   .search-controls { gap: 8px; }
   .search-form { gap: 8px; padding-left: 12px; padding-right: 12px; }
   .popular-button { gap: 6px; padding-left: 10px; padding-right: 10px; font-size: 0.75rem; }
-  .stat { padding: 13px 10px; }
-  .stat + .stat { padding-left: 12px; }
-  .stat-value { font-size: 0.85rem; }
   .thread { padding: 15px 13px; }
   .thread-modal-overlay { padding: 6px; }
   .thread-modal { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); }
@@ -371,13 +395,12 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
   .brand-name { font-size: 0.9rem; }
   .brand img { width: 27px; height: 27px; }
   .icon-button { width: 29px; height: 29px; }
-  .top-link { width: 29px; height: 29px; }
+  .top-link { padding-left: 7px; padding-right: 7px; }
   .page-head { padding-left: 0; padding-right: 0; }
   .search-form { padding-left: 12px; padding-right: 12px; }
   .popular-button { padding-left: 8px; padding-right: 8px; }
   .popular-button svg { display: none; }
   .search-input { font-size: 0.9rem; }
-  .stat-value { font-size: 0.78rem; }
 }
 </style>
 </head>
@@ -389,14 +412,46 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
       <span class="brand-name">拼好课</span>
     </a>
     <div class="top-actions">
-      <a class="top-link" href="/">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        <span>课程搜索</span>
-      </a>
-      <button class="icon-button" id="themeButton" type="button" aria-label="切换深色或浅色模式" title="切换深色或浅色模式">
-        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.42"/></svg>
-        <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      <button class="icon-button" id="themeButton" type="button" aria-label="切换深色 / 浅色模式" title="Light / Dark">
+        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+      <div class="tip-wrap about-wrap">
+        <button class="icon-button" type="button" aria-label="关于本项目">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+        <div class="tip-card about-tip" role="tooltip">
+          <div class="about-head">
+            <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="abG" x1="55" y1="32" x2="156" y2="152" gradientUnits="userSpaceOnUse"><stop stop-color="#35C6A7"/><stop offset="1" stop-color="#167B72"/></linearGradient></defs><circle cx="90" cy="90" r="90" fill="#F6FFFC"/><g transform="translate(90,90) scale(0.88) translate(-102,-93)"><path d="M58 145V52C58 45 64 41 73 41H99C125 41 142 55 142 76C142 96 125 104 100 104H80" fill="none" stroke="url(#abG)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><g fill="none" stroke="#233F48" stroke-width="9.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="109" cy="126" r="6.2" fill="#233F48" stroke="none"/><path d="M109 139V150"/><path d="M128 150V128M128 140C133 132 142 128 148 132C151 135 151 142 151 150"/></g></g></svg>
+            <div>
+              <div class="about-title">拼好课</div>
+              <div class="about-sub">纯公益项目 · 每学期更新</div>
+            </div>
+          </div>
+          <div class="about-body">
+            <div class="about-sec">项目开发</div>
+            <div class="about-person"><span class="about-avatar">祈</span>祈愿的猫</div>
+            <div class="about-contact">
+              <div>VX 联系方式：<span class="about-contact-id">tuzengji</span></div>
+              <div class="about-contact-note">如果有问题或需求 欢迎联系！</div>
+            </div>
+            <div class="about-sec">鸣谢</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #6366F1, #4F46E5)">北</span>北京大学手语分社</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #F59E0B, #D97706)">L</span>Lynn</div>
+            <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #F43F5E, #E11D48)">理</span>理性的狂想家</div>
+          </div>
+        </div>
+      </div>
+      <a class="icon-button" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub — 给项目点个 Star">
+        <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <div class="tip-wrap">
+        <a class="top-link sponsor-btn" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span>赞助</span>
+        </a>
+        <div class="tip-card" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
+      </div>
     </div>
   </div>
 </header>
@@ -441,14 +496,10 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
     </div>
   </section>
 
-  <section class="stats" id="stats" aria-label="数据范围">
-    <div class="stat"><div class="stat-label">数据范围</div><div class="stat-value" id="statDateRange">-</div></div>
-    <div class="stat"><div class="stat-label">评测数据量</div><div class="stat-value" id="statTotal">-</div></div>
-  </section>
-
   <section aria-labelledby="resultsHeading">
     <div class="result-toolbar">
       <h2 class="result-title" id="resultsHeading">最新课程评测</h2>
+      <p class="result-meta" id="stats" aria-label="数据范围">数据范围 <span class="meta-num" id="statDateRange">-</span> · 评测数据量 <span class="meta-num" id="statTotal">-</span></p>
     </div>
     <div class="results" id="results"></div>
     <div class="load-row">
