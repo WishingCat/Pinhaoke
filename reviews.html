@@ -113,11 +113,18 @@ html[data-theme="dark"] body::before {
 html[data-theme="dark"] .theme-moon { display: none; }
 html:not([data-theme="dark"]) .theme-sun { display: none; }
 
-.sponsor-btn { color: #E11D48; border-color: rgba(225, 29, 72, 0.35); }
-.sponsor-btn:hover { color: #E11D48; border-color: #E11D48; background: rgba(225, 29, 72, 0.08); }
-html[data-theme="dark"] .sponsor-btn { color: #FB7185; border-color: rgba(251, 113, 133, 0.4); }
-html[data-theme="dark"] .sponsor-btn:hover { color: #FB7185; border-color: #FB7185; background: rgba(251, 113, 133, 0.12); }
-.sponsor-btn svg { fill: currentColor; stroke: none; }
+/* about card: GitHub + sponsor actions */
+.about-links-wrap { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.about-links { display: flex; gap: 8px; }
+.about-link-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); font-size: 0.78rem; font-weight: 600; text-decoration: none; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.about-link-btn svg { width: 14px; height: 14px; }
+.about-link-btn:hover { color: var(--ink); border-color: var(--ink-3); background: var(--bg); }
+.about-sponsor { color: #E11D48; border-color: rgba(225, 29, 72, 0.35); }
+.about-sponsor:hover { color: #E11D48; border-color: #E11D48; background: rgba(225, 29, 72, 0.08); }
+html[data-theme="dark"] .about-sponsor { color: #FB7185; border-color: rgba(251, 113, 133, 0.4); }
+html[data-theme="dark"] .about-sponsor:hover { color: #FB7185; border-color: #FB7185; background: rgba(251, 113, 133, 0.12); }
+.about-sponsor svg { fill: currentColor; stroke: none; }
+.about-links-note { margin-top: 8px; font-size: 0.7rem; line-height: 1.6; color: var(--ink-3); }
 
 .tip-wrap { position: relative; }
 .tip-card { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 250px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); z-index: 600; font-size: 0.78rem; line-height: 1.7; color: var(--ink-2); text-align: left; animation: pop-in 0.15s ease; pointer-events: none; }
@@ -344,9 +351,7 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
   .top-actions { gap: 6px; }
   .top-link { padding: 6px 10px; font-size: 0.74rem; }
   .icon-button { width: 31px; height: 31px; }
-  /* 小屏顶栏空间有限：赞助按钮只留爱心图标，悬浮卡改为屏内固定居中 */
-  .sponsor-btn span { display: none; }
-  .sponsor-btn { padding: 6px 8px; }
+  /* 小屏：悬浮卡改为屏内固定居中 */
   .tip-wrap .tip-card { position: fixed; top: 60px; left: 16px; right: 16px; width: auto; max-width: 340px; margin: 0 auto; }
   .page { padding: 0 16px 60px; }
   .page-head { padding: 36px 8px 4px; }
@@ -428,6 +433,19 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
               <div class="about-sub">纯公益项目 · 每学期更新</div>
             </div>
           </div>
+          <div class="about-links-wrap">
+            <div class="about-links">
+              <a class="about-link-btn" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener" aria-label="GitHub">
+                <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                <span>GitHub</span>
+              </a>
+              <a class="about-link-btn about-sponsor" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span>赞助</span>
+              </a>
+            </div>
+            <div class="about-links-note">需要能访问 GitHub · 纯公益项目，承诺永久免费服务</div>
+          </div>
           <div class="about-body">
             <div class="about-sec">项目开发</div>
             <div class="about-person"><span class="about-avatar">祈</span>祈愿的猫</div>
@@ -441,16 +459,6 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
             <div class="about-person"><span class="about-avatar" style="--av: linear-gradient(135deg, #F43F5E, #E11D48)">理</span>理性的狂想家</div>
           </div>
         </div>
-      </div>
-      <a class="icon-button" href="https://github.com/CalicoCatto/Pinhaoke" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub — 给项目点个 Star">
-        <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      </a>
-      <div class="tip-wrap">
-        <a class="top-link sponsor-btn" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span>赞助</span>
-        </a>
-        <div class="tip-card" role="tooltip">纯公益项目，欢迎赞助，支持网站域名、服务器、开发费用。点击跳转 GitHub 赞助页面，或获取我的联系方式。</div>
       </div>
     </div>
   </div>

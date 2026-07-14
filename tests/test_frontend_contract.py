@@ -178,13 +178,23 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('class="footer-contact"', REVIEWS_HTML)
         self.assertIn('id="backTop"', REVIEWS_HTML)
         self.assertIn("window.scrollY > 600", REVIEWS_HTML)
-        # 顶栏右侧与课程页一致：主题、关于悬浮卡、GitHub、赞助悬浮卡
+        # 顶栏右侧与课程页一致：主题、关于悬浮卡；GitHub 与赞助并列在关于卡头部下方
         self.assertIn('class="tip-wrap about-wrap"', REVIEWS_HTML)
         self.assertIn('class="tip-card about-tip"', REVIEWS_HTML)
         self.assertIn(".about-wrap:hover::after", REVIEWS_HTML)
         self.assertIn("user-select: text;", REVIEWS_HTML)
-        self.assertIn('class="top-link sponsor-btn"', REVIEWS_HTML)
-        self.assertIn('aria-label="GitHub"', REVIEWS_HTML)
+        for page in (HTML, REVIEWS_HTML):
+            self.assertIn('class="about-links"', page)
+            self.assertIn('class="about-link-btn about-sponsor"', page)
+            self.assertIn('aria-label="GitHub"', page)
+            self.assertIn("需要能访问 GitHub · 纯公益项目，承诺永久免费服务", page)
+            self.assertLess(
+                page.index("纯公益项目 · 每学期更新"),
+                page.index('class="about-links"'),
+            )
+            # 赞助与 GitHub 已移出顶栏，赞助不再有悬浮文字
+            self.assertNotIn("sponsor-btn", page)
+            self.assertNotIn("点击跳转 GitHub 赞助页面", page)
         self.assertNotIn(">课程搜索</span>", REVIEWS_HTML)
         # 关于卡与页脚各保留一份联系方式
         self.assertEqual(REVIEWS_HTML.count("tuzengji"), 2)
