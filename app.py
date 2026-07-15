@@ -67,6 +67,14 @@ VALID_SORTS = frozenset({
 })
 COURSE_ID_RE = re.compile(r"^[ugsar][1-9][0-9]*$")
 REVIEW_QUERY_MAX_LENGTH = 120
+# 默认列表把 2026 年（北京时间）质量分最高的若干树洞置顶，其余按时间倒序。
+REVIEW_FEATURED_COUNT = 10
+REVIEW_FEATURED_RANGE = (1767196800, 1798732800)
+REVIEW_QUALITY_SCORE_SQL = (
+    "(CASE t.post_kind WHEN 'review' THEN 120 ELSE 0 END)"
+    " + t.relevant_reply_count * 40"
+    " + MIN(LENGTH(t.content), 900) / 6"
+)
 _REVIEW_SEARCH_STRIP_RE = re.compile(
     r"[\s\u200b\u200c\u200d·•・_—–\-:：,，.。/\\《》<>\[\]【】'\"]+"
 )
@@ -1223,11 +1231,26 @@ def list_reviews(
         total = conn.execute(
             f"SELECT COUNT(*) FROM threads t {where}", params
         ).fetchone()[0]
-        rows = conn.execute(
-            f"SELECT t.* FROM threads t {where} "
-            "ORDER BY t.posted_at DESC, t.pid DESC LIMIT ? OFFSET ?",
-            [*params, page_size, offset],
-        ).fetchall()
+        if query:
+            rows = conn.execute(
+                f"SELECT t.* FROM threads t {where} "
+                "ORDER BY t.posted_at DESC, t.pid DESC LIMIT ? OFFSET ?",
+                [*params, page_size, offset],
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "WITH featured AS ("
+                f"  SELECT t.pid, {REVIEW_QUALITY_SCORE_SQL} AS quality"
+                "  FROM threads t"
+                "  WHERE t.posted_at >= ? AND t.posted_at < ?"
+                "  ORDER BY quality DESC, t.pid DESC LIMIT ?"
+                ") "
+                "SELECT t.* FROM threads t "
+                "LEFT JOIN featured f ON f.pid = t.pid "
+                "ORDER BY (f.pid IS NULL), f.quality DESC, f.pid DESC, "
+                "t.posted_at DESC, t.pid DESC LIMIT ? OFFSET ?",
+                [*REVIEW_FEATURED_RANGE, REVIEW_FEATURED_COUNT, page_size, offset],
+            ).fetchall()
         threads = _load_review_threads(conn, rows)
     return {
         "total": total,

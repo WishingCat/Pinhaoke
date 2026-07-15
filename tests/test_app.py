@@ -358,6 +358,23 @@ class ReviewApiTests(unittest.TestCase):
         self.assertFalse(set(first_ids) & set(second_ids))
         self.assertEqual(first_ids, [thread["pid"] for thread in self.call(page_size=17)["threads"]])
 
+    def test_review_default_order_features_top_2026_threads_first(self):
+        threads = self.call(page_size=30)["threads"]
+        featured = threads[:app.REVIEW_FEATURED_COUNT]
+        self.assertEqual(len(featured), app.REVIEW_FEATURED_COUNT)
+        start, end = app.REVIEW_FEATURED_RANGE
+        for thread in featured:
+            self.assertTrue(start <= thread["posted_at"] < end)
+            self.assertGreaterEqual(thread["relevant_reply_count"], 20)
+        self.assertEqual(featured[0]["pid"], 7949454)
+        # 置顶之后的其余列表回到时间倒序
+        rest_times = [t["posted_at"] for t in threads[app.REVIEW_FEATURED_COUNT:]]
+        self.assertEqual(rest_times, sorted(rest_times, reverse=True))
+        # 搜索结果不受置顶影响，仍按时间倒序
+        searched = self.call(q="军理", page_size=20)["threads"]
+        searched_times = [t["posted_at"] for t in searched]
+        self.assertEqual(searched_times, sorted(searched_times, reverse=True))
+
     def test_review_course_suggestions_are_ranked_and_searchable(self):
         suggestions = app.list_review_courses(q="博弈", limit=10)
         self.assertTrue(suggestions)
