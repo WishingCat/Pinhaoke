@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
-- 树洞课程评测作为学期控件旁的独立入口，在手机窄屏下单独占行。该入口处于下架状态：`index.html` 中 `reviewHubLink` 带 `hidden` 属性而不渲染，`/reviews` 页面与全部评测 API 保持可用，删除该属性即可重新上架。评测搜索框输入即搜，不显示联想下拉；前 `24` 门课程热榜只由右侧“热门课程”按钮展开。列表卡片用六组轮换的整框颜色区分相邻树洞，点击卡片才请求快照中的完整主帖和全部回复。
+- 树洞课程评测作为学期控件旁的独立入口，在手机窄屏下单独占行。评测搜索框输入即搜，不显示联想下拉；前 `24` 门课程热榜只由右侧“热门课程”按钮展开。列表卡片用六组轮换的整框颜色区分相邻树洞，点击卡片才请求快照中的完整主帖和全部回复。
 
 ## 目录职责
 
