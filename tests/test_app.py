@@ -1,4 +1,5 @@
 from contextlib import closing
+import json
 import sqlite3
 import subprocess
 import sys
@@ -312,6 +313,82 @@ class MessageBoardApiTests(unittest.TestCase):
             }
         self.assertIn("messages", tables)
         self.assertNotIn("basic_info", tables)
+
+
+class VisitStatsApiTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._original_path = app.STATS_DB_PATH
+        app.STATS_DB_PATH = Path(self._tmp.name) / "访问统计.db"
+        self.addCleanup(setattr, app, "STATS_DB_PATH", self._original_path)
+
+    @staticmethod
+    def request(ip="203.0.113.7", ua="Mozilla/5.0"):
+        return Mock(headers={"x-real-ip": ip, "user-agent": ua}, client=None)
+
+    def stats(self):
+        response = app.get_stats()
+        return json.loads(response.body)
+
+    def test_same_visitor_counts_once_per_day_but_accumulates_views(self):
+        app.record_visit(self.request("1.1.1.1"))
+        app.record_visit(self.request("1.1.1.1"))
+        app.record_visit(self.request("2.2.2.2"))
+        payload = self.stats()
+        self.assertEqual(payload["today"], {"views": 3, "visitors": 2})
+        self.assertEqual(payload["total"], {"views": 3, "visitors": 2})
+
+    def test_bot_user_agents_are_ignored(self):
+        for ua in ("Googlebot/2.1", "curl/8.0", "python-requests/2.0", ""):
+            app.record_visit(self.request("9.9.9.9", ua))
+        self.assertEqual(self.stats()["today"], {"views": 0, "visitors": 0})
+
+    def test_trend_has_seven_days_ending_today_in_beijing_time(self):
+        app.record_visit(self.request("1.1.1.1"))
+        payload = self.stats()
+        self.assertEqual(len(payload["trend"]), app.STATS_TREND_DAYS)
+        today = app._beijing_day(int(app.time.time()))
+        self.assertEqual(payload["trend"][-1]["day"], today)
+        self.assertEqual(payload["trend"][-1]["views"], 1)
+        days = [point["day"] for point in payload["trend"]]
+        self.assertEqual(days, sorted(days))
+
+    def test_week_window_and_backfilled_day_aggregate(self):
+        app.record_visit(self.request("1.1.1.1"))
+        now = int(app.time.time())
+        with app.get_stats_db() as conn:
+            yesterday = app._beijing_day(now - 86400)
+            old = app._beijing_day(now - 30 * 86400)
+            conn.execute(
+                "INSERT INTO visit_days(day, ip_hash, views, last_at) VALUES (?,?,?,?)",
+                (yesterday, "y1", 4, now - 86400),
+            )
+            conn.execute(
+                "INSERT INTO visit_days(day, ip_hash, views, last_at) VALUES (?,?,?,?)",
+                (old, "o1", 9, now - 30 * 86400),
+            )
+            conn.commit()
+        payload = self.stats()
+        self.assertEqual(payload["week"], {"views": 5, "visitors": 2})
+        self.assertEqual(payload["total"], {"views": 14, "visitors": 3})
+
+    def test_stats_response_is_no_store_and_has_no_identity_fields(self):
+        app.record_visit(self.request())
+        response = app.get_stats()
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertNotIn(b"ip_hash", response.body)
+
+    def test_recording_never_raises_and_page_routes_still_return_files(self):
+        # request=None 与坏库路径都不能抛出，页面照常返回
+        app.record_visit(None)
+        self.assertEqual(Path(app.root(None).path), app.BASE_DIR / "index.html")
+        self.assertEqual(Path(app.reviews_page(None).path), app.BASE_DIR / "reviews.html")
+        app.STATS_DB_PATH = Path(self._tmp.name) / "missing" / "访问统计.db"
+        try:
+            app.record_visit(self.request())  # 目录不存在，应被静默吞掉
+        except Exception as exc:  # noqa: BLE001 - 明确断言不抛出
+            self.fail(f"record_visit raised: {exc!r}")
 
 
 class ReviewApiTests(unittest.TestCase):

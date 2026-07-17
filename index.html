@@ -1364,6 +1364,39 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 }
 .msg-more:hover { border-color: var(--ink-3); color: var(--ink); }
 
+/* ===== Visit statistics ===== */
+.stats-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  max-height: min(640px, 92vh);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 4px 18px 14px; }
+.stat-block { padding: 12px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); text-align: center; }
+.stat-label { font-size: 0.72rem; color: var(--ink-3); }
+.stat-value { margin: 6px 0 2px; font-family: var(--f-mono); font-size: 1.55rem; font-weight: 600; line-height: 1.1; color: var(--accent); }
+.stat-sub { font-size: 0.7rem; color: var(--ink-3); }
+.stat-sub span { font-family: var(--f-mono); color: var(--ink-2); }
+
+.stats-trend { padding: 4px 18px 6px; }
+.trend-chart { display: flex; align-items: flex-end; gap: 8px; height: 108px; margin-top: 10px; padding-top: 4px; }
+.trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.trend-bar-wrap { width: 100%; height: 76px; display: flex; align-items: flex-end; justify-content: center; }
+.trend-bar { width: 62%; min-height: 3px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #2FBE9E, #167B72); }
+.trend-bar.is-today { background: linear-gradient(180deg, #4FD8BC, #08766B); }
+.trend-count { font-family: var(--f-mono); font-size: 0.66rem; color: var(--ink-2); }
+.trend-day { font-family: var(--f-mono); font-size: 0.6rem; color: var(--ink-3); }
+
+.stats-status { min-height: 1em; margin: 4px 18px 0; font-size: 0.72rem; color: var(--ink-3); text-align: center; }
+.stats-note { margin: 6px 18px 16px; font-size: 0.7rem; line-height: 1.7; color: var(--ink-3); }
+
 .modal-content {
   width: 100%;
   min-width: 0;
@@ -1792,6 +1825,11 @@ html[data-theme="dark"] .site-footer::after {
   .course-card { padding: 16px; }
   .card-meta { grid-template-columns: 1fr; gap: 4px 0; }
   .modal-overlay { padding: 12px; }
+  .stats-grid { gap: 7px; padding: 4px 14px 12px; }
+  .stat-block { padding: 10px 4px; }
+  .stat-value { font-size: 1.3rem; }
+  .stats-trend, .stats-status, .stats-note { padding-left: 14px; padding-right: 14px; }
+  .stats-note { margin-left: 14px; margin-right: 14px; }
   .modal-head { padding: 18px 18px 12px; }
   .modal-body { padding: 14px 18px 24px; }
   .modal-title { font-size: 1.18rem; }
@@ -1885,6 +1923,9 @@ window._hmt.push(['_trackPageview', location.pathname]);
           <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
         </div>
       </div>
+      <button class="icon-btn" id="statsBtn" onclick="openStats()" aria-label="访问统计" title="访问统计">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </button>
       <button class="icon-btn" id="msgBoardBtn" onclick="openMsgBoard()" aria-label="留言板" title="留言板">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </button>
@@ -2066,6 +2107,40 @@ window._hmt.push(['_trackPageview', location.pathname]);
     </form>
     <div class="msg-list" id="msgList" aria-label="全部留言"></div>
     <button type="button" class="msg-more hidden" id="msgMore" onclick="loadMessages(false)">加载更多</button>
+  </div>
+</div>
+
+<!-- Visit statistics -->
+<div class="modal-overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-labelledby="statsTitle" onclick="if(event.target===this)closeStats()">
+  <div class="stats-panel">
+    <div class="msg-head">
+      <span class="modal-title" id="statsTitle">访问统计</span>
+      <button class="modal-close" onclick="closeStats()" aria-label="关闭访问统计">&times;</button>
+    </div>
+    <p class="msg-hint">实时统计网站访问情况，每 20 秒自动刷新。</p>
+    <div class="stats-grid">
+      <div class="stat-block">
+        <div class="stat-label">今日访问</div>
+        <div class="stat-value" id="statTodayViews">–</div>
+        <div class="stat-sub"><span id="statTodayVisitors">–</span> 位访客</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">近 7 天</div>
+        <div class="stat-value" id="statWeekViews">–</div>
+        <div class="stat-sub"><span id="statWeekVisitors">–</span> 位访客</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">累计访问</div>
+        <div class="stat-value" id="statTotalViews">–</div>
+        <div class="stat-sub"><span id="statTotalVisitors">–</span> 位访客</div>
+      </div>
+    </div>
+    <div class="stats-trend">
+      <div class="stat-label">近 7 天每日访问量</div>
+      <div class="trend-chart" id="trendChart" aria-hidden="true"></div>
+    </div>
+    <p class="stats-status" id="statsStatus" role="status" aria-live="polite"></p>
+    <p class="stats-note">按北京时间分日统计；同一访客当天多次访问按一位访客计，不收集任何身份信息。</p>
   </div>
 </div>
 
@@ -3749,6 +3824,99 @@ function closeModal() {
   if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => returnTarget.focus());
 }
 
+/* ===== Visit statistics ===== */
+let statsReturnFocus = null;
+let statsTimer = null;
+
+function setStat(id, value) {
+  document.getElementById(id).textContent = Number(value).toLocaleString('en-US');
+}
+
+function renderTrend(trend) {
+  const chart = document.getElementById('trendChart');
+  chart.textContent = '';
+  const max = Math.max(1, ...trend.map(point => point.views));
+  trend.forEach((point, index) => {
+    const col = document.createElement('div');
+    col.className = 'trend-col';
+    const wrap = document.createElement('div');
+    wrap.className = 'trend-bar-wrap';
+    const bar = document.createElement('div');
+    bar.className = 'trend-bar' + (index === trend.length - 1 ? ' is-today' : '');
+    bar.style.height = Math.round((point.views / max) * 100) + '%';
+    wrap.appendChild(bar);
+    const count = document.createElement('div');
+    count.className = 'trend-count';
+    count.textContent = point.views;
+    const day = document.createElement('div');
+    day.className = 'trend-day';
+    day.textContent = point.day.slice(5);
+    col.append(wrap, count, day);
+    chart.appendChild(col);
+  });
+}
+
+async function loadStats() {
+  const status = document.getElementById('statsStatus');
+  try {
+    const resp = await fetch('/api/stats', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('bad status');
+    const data = await resp.json();
+    setStat('statTodayViews', data.today.views);
+    setStat('statTodayVisitors', data.today.visitors);
+    setStat('statWeekViews', data.week.views);
+    setStat('statWeekVisitors', data.week.visitors);
+    setStat('statTotalViews', data.total.views);
+    setStat('statTotalVisitors', data.total.visitors);
+    renderTrend(data.trend);
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = '统计加载失败，请稍后再试';
+  }
+}
+
+function openStats() {
+  const overlay = document.getElementById('statsOverlay');
+  if (overlay.classList.contains('open')) return;
+  statsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setModalBackgroundInert(true);
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => document.querySelector('#statsOverlay .modal-close').focus());
+  loadStats();
+  statsTimer = setInterval(loadStats, 20000);
+}
+
+function closeStats() {
+  const overlay = document.getElementById('statsOverlay');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  setModalBackgroundInert(false);
+  if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
+  const returnTarget = statsReturnFocus;
+  statsReturnFocus = null;
+  if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => returnTarget.focus());
+}
+
+function trapStatsFocus(event) {
+  if (event.key !== 'Tab') return;
+  const overlay = document.getElementById('statsOverlay');
+  const focusable = [...overlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 /* ===== Message board ===== */
 let msgReturnFocus = null;
 let msgPage = 0;
@@ -3915,9 +4083,17 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  const statsOpen = document.getElementById('statsOverlay').classList.contains('open');
   const msgOpen = document.getElementById('msgOverlay').classList.contains('open');
   const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
-  if (msgOpen) {
+  if (statsOpen) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeStats();
+    } else {
+      trapStatsFocus(e);
+    }
+  } else if (msgOpen) {
     if (e.key === 'Escape') {
       e.preventDefault();
       closeMsgBoard();

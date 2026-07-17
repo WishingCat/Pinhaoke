@@ -114,6 +114,32 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("closeMsgBoard()", HTML)
         self.assertIn('aria-label="关闭留言板"', HTML)
 
+    def test_visit_stats_button_and_panel_contract(self):
+        # 统计按钮只在课程页，位于顶栏动作区（语言切换之后）
+        lang = HTML.index('id="langSelector"')
+        button = HTML.index('id="statsBtn"')
+        self.assertLess(lang, button)
+        self.assertNotIn('id="statsBtn"', REVIEWS_HTML)
+        # 悬浮面板：三块统计、近 7 天趋势、隐私说明
+        self.assertIn('id="statsOverlay" role="dialog" aria-modal="true"', HTML)
+        for stat_id in (
+            'id="statTodayViews"',
+            'id="statWeekViews"',
+            'id="statTotalViews"',
+            'id="trendChart"',
+        ):
+            self.assertIn(stat_id, HTML)
+        self.assertIn("按北京时间分日统计", HTML)
+        # 数字与趋势只经 textContent / 数值高度渲染，禁止拼入 innerHTML
+        self.assertIn("textContent = Number(value).toLocaleString", HTML)
+        self.assertIn("count.textContent = point.views", HTML)
+        self.assertIn("bar.style.height = Math.round", HTML)
+        # 打开时轮询、关闭时清理定时器；焦点与键盘契约
+        self.assertIn("statsTimer = setInterval(loadStats, 20000)", HTML)
+        self.assertIn("clearInterval(statsTimer)", HTML)
+        self.assertIn("function trapStatsFocus", HTML)
+        self.assertIn('aria-label="关闭访问统计"', HTML)
+
     def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
         self.assertEqual(HTML.count("VX 联系方式："), 2)
         self.assertEqual(HTML.count("tuzengji"), 2)

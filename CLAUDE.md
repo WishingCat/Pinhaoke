@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 拼好课 V2 是北京大学课程搜索与树洞课程评测应用：
 
-- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以独立可写 SQLite 库提供公开留言板。
-- 课程页顶栏语言切换旁有留言板按钮，打开简洁的悬浮留言面板：顶部一句话提示欢迎写问题反馈、功能建议和想对开发者说的话，下方是发布输入框和可滚动的公开留言列表。留言板按钮只在课程页。
+- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以两个独立可写 SQLite 库提供公开留言板和访问统计。
+- 课程页顶栏语言切换旁有访问统计与留言板两个按钮。统计按钮打开悬浮面板，展示今日/近 7 天/累计的访问量与访客数及近 7 天柱状趋势，每 20 秒刷新。留言板按钮打开简洁的悬浮面板：顶部一句话提示欢迎写问题反馈、功能建议和想对开发者说的话，下方是发布输入框和可滚动的公开留言列表。两个按钮只在课程页。
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
@@ -56,6 +56,7 @@ tests/                          标准库 unittest 回归测试
 - 评测列表只能渲染筛选后的评测主帖与相关回复；完整树洞弹窗才渲染 `thread_replies`。桌面弹窗居中，`640px` 下贴近底部，内部独立滚动，不能让长线程撑破 viewport。
 - 项目开发人员悬浮卡在触发按钮或卡片上 hover/focus 时保持显示，文本允许选择和复制；联系方式 `tuzengji` 及欢迎联系文案同时保留在页脚。
 - 课程页顶栏的留言板按钮打开悬浮留言面板：面板包含一句话提示、`500` 字上限的输入框、可滚动的公开留言列表和“加载更多”按钮。面板遵循与课程详情弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；留言正文和时间只能通过 `textContent` 渲染。
+- 课程页顶栏的访问统计按钮打开悬浮统计面板：面板展示今日/近 7 天/累计的访问量与访客数、近 7 天柱状趋势和隐私说明，打开时拉取 `/api/stats` 并每 20 秒轮询，关闭时清除定时器。数字用 `textContent`、柱状高度用数值渲染，遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求。
 
 ### 状态、安全与无障碍
 
@@ -117,6 +118,8 @@ git diff --check
 
 `get_messages_db()` 打开唯一可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表；六个正式库保持只读，`GET /api/health` 不检查留言库。
 
+`get_stats_db()` 以同样方式打开可写的访问统计数据库：路径来自 `PINHAOKE_STATS_DB`，本地默认仓库根目录 `访问统计.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/访问统计.db`，首次使用时自建 `visit_days(day, ip_hash, views, last_at)` 表。`record_visit()` 在 `/` 和 `/reviews` 页面路由中记录访问，按北京时间分日、以 IP 哈希对当日访客去重、`views` 累加，并过滤明显的 bot User-Agent；任何异常都被吞掉，绝不影响页面返回。`GET /api/health` 不检查统计库。
+
 ## API 契约
 
 | Endpoint | 契约 |
@@ -130,6 +133,7 @@ git diff --check
 | `GET /api/reviews/meta` | 返回保留条目的起止日期、树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
 | `GET /api/messages` | 返回 `{total, page, page_size, messages}`，公开留言按发布时间倒序分页。 |
 | `POST /api/messages` | 发布一条公开留言，body 为 `{content}`；成功返回 201 和新留言。 |
+| `GET /api/stats` | 返回今日/近 7 天/累计的访问量与访客数及近 7 天每日趋势；`no-store`。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
@@ -161,6 +165,13 @@ git diff --check
 - `POST /api/messages`：`content` 去除首尾空白后为 1 到 `500` 字，非法 payload 返回 422。
 - 留言只保存发布时间与正文；来源 IP 以 SHA-256 哈希形式仅用于发布频率限制，同一 IP 哈希每小时最多 `5` 条、每天最多 `20` 条，超限返回 429。任何响应都不包含 IP 或身份字段。
 - 前端渲染留言正文必须使用 `textContent`，禁止拼入 `innerHTML`。
+
+访问统计契约：
+
+- `visit_days` 按北京时间（UTC+8）分日，主键 `(day, ip_hash)`；同一访客当天多次访问只累加 `views`，`COUNT(*)` 即当日访客数，跨日访客用 `COUNT(DISTINCT ip_hash)`。
+- `record_visit()` 只在 `/` 和 `/reviews` 页面路由调用，过滤含 `bot/spider/crawl/curl/wget/python-` 等标记或空的 User-Agent，并把所有异常吞掉；页面返回不得因统计失败而受影响。
+- `GET /api/stats` 返回当日、近 `7` 天、累计三组 `{views, visitors}`，以及 `trend`（近 `7` 天每日 `{day, views}`，按日期升序、末位为当日），响应 `no-store`。IP 哈希只用于去重，绝不进入响应。
+- 前端统计数字用 `textContent`、柱状高度用数值渲染，禁止把统计数据拼入 `innerHTML`。
 
 ## 课程 ID
 
@@ -261,7 +272,7 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 
 不要手工 `git pull` 后重启，不要绕过预检，不要让 `www-data` 持有代码、Git、虚拟环境或六个正式数据库。更新脚本部署精确 `origin/main`，在停服前完成目标工作树、LFS 和候选 venv 预检，激活失败或收到 INT/TERM 时自动恢复旧提交、旧 unit、旧 venv 和原服务状态。
 
-留言板数据库是唯一例外：它位于 `/var/lib/pinhaoke/留言板.db`，由 systemd `StateDirectory` 自动创建并归服务用户所有，不在仓库和 `/opt/pinhaoke` 内。`deploy/update.sh` 与回滚不触碰留言数据，备份需单独处理。
+留言板数据库是唯一例外：它位于 `/var/lib/pinhaoke/留言板.db`，由 systemd `StateDirectory` 自动创建并归服务用户所有，不在仓库和 `/opt/pinhaoke` 内。`deploy/update.sh` 与回滚不触碰留言数据，备份需单独处理。访问统计库 `/var/lib/pinhaoke/访问统计.db` 同理。
 
 `deploy/nginx.conf` 只是与 Certbot 共存的站点模板，必须手工安装并先运行 `nginx -t`；`deploy/update.sh` 不覆盖 Nginx。任何任务只有用户明确要求后才可 push 或部署。本地通过测试不代表生产已更新。
 

@@ -55,6 +55,14 @@ MESSAGE_PAGE_SIZE_MAX = 50
 # (窗口秒数, 每个 IP 哈希在窗口内的发布上限)
 MESSAGE_RATE_LIMITS = ((3600, 5), (86400, 20))
 
+# 访问统计库，同为可写数据、与只读正式库分离，不进入仓库。
+STATS_DB_PATH = Path(
+    os.environ.get("PINHAOKE_STATS_DB", "") or (BASE_DIR / "访问统计.db")
+)
+# 访问按北京时间分日，同一 IP 哈希当日只算一名访客、浏览量累加。
+STATS_TZ_OFFSET_SECONDS = 8 * 3600
+STATS_TREND_DAYS = 7
+
 # (alias, path, id_prefix)
 TERM_DBS = {
     "spring": [
@@ -152,6 +160,32 @@ def get_messages_db():
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_messages_ip_time"
             " ON messages(ip_hash, posted_at)"
+        )
+        yield conn
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@contextmanager
+def get_stats_db():
+    conn = None
+    try:
+        conn = sqlite3.connect(STATS_DB_PATH, timeout=5)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        # 每天每个访客一行；同一访客当天多次访问只累加 views，不新增行。
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS visit_days ("
+            " day TEXT NOT NULL,"
+            " ip_hash TEXT NOT NULL,"
+            " views INTEGER NOT NULL DEFAULT 0,"
+            " last_at INTEGER NOT NULL,"
+            " PRIMARY KEY (day, ip_hash))"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_visit_days_day ON visit_days(day)"
         )
         yield conn
     finally:
@@ -1440,6 +1474,94 @@ def _client_ip_hash(request) -> str:
     return hashlib.sha256((ip or "unknown").encode("utf-8")).hexdigest()
 
 
+def _beijing_day(timestamp: int) -> str:
+    # 用北京时间把时间戳归到 YYYY-MM-DD，与页面日期口径一致。
+    return time.strftime(
+        "%Y-%m-%d", time.gmtime(timestamp + STATS_TZ_OFFSET_SECONDS)
+    )
+
+
+def _is_bot_user_agent(user_agent: str) -> bool:
+    ua = (user_agent or "").lower()
+    if not ua:
+        return True
+    return any(
+        token in ua
+        for token in ("bot", "spider", "crawl", "slurp", "curl", "wget", "python-")
+    )
+
+
+def record_visit(request) -> None:
+    # 记录一次页面访问；任何异常都不能影响页面返回。
+    if request is None:
+        return
+    try:
+        if _is_bot_user_agent(request.headers.get("user-agent", "")):
+            return
+        now = int(time.time())
+        day = _beijing_day(now)
+        ip_hash = _client_ip_hash(request)
+        with get_stats_db() as conn:
+            conn.execute(
+                "INSERT INTO visit_days (day, ip_hash, views, last_at)"
+                " VALUES (?, ?, 1, ?)"
+                " ON CONFLICT(day, ip_hash) DO UPDATE SET"
+                " views = views + 1, last_at = excluded.last_at",
+                (day, ip_hash, now),
+            )
+            conn.commit()
+    except (sqlite3.Error, OSError, ValueError):
+        return
+
+
+def _visit_stats_payload() -> dict:
+    now = int(time.time())
+    today = _beijing_day(now)
+    trend_days = [
+        _beijing_day(now - offset * 86400)
+        for offset in range(STATS_TREND_DAYS - 1, -1, -1)
+    ]
+    window_start = trend_days[0]
+    with get_stats_db() as conn:
+        today_row = conn.execute(
+            "SELECT COALESCE(SUM(views), 0) AS views, COUNT(*) AS visitors"
+            " FROM visit_days WHERE day = ?",
+            (today,),
+        ).fetchone()
+        week_row = conn.execute(
+            "SELECT COALESCE(SUM(views), 0) AS views,"
+            " COUNT(DISTINCT ip_hash) AS visitors"
+            " FROM visit_days WHERE day >= ?",
+            (window_start,),
+        ).fetchone()
+        total_row = conn.execute(
+            "SELECT COALESCE(SUM(views), 0) AS views,"
+            " COUNT(DISTINCT ip_hash) AS visitors FROM visit_days"
+        ).fetchone()
+        by_day = {
+            row["day"]: row["views"]
+            for row in conn.execute(
+                "SELECT day, COALESCE(SUM(views), 0) AS views"
+                " FROM visit_days WHERE day >= ? GROUP BY day",
+                (window_start,),
+            )
+        }
+    trend = [{"day": day, "views": by_day.get(day, 0)} for day in trend_days]
+    return {
+        "today": {"views": today_row["views"], "visitors": today_row["visitors"]},
+        "week": {"views": week_row["views"], "visitors": week_row["visitors"]},
+        "total": {"views": total_row["views"], "visitors": total_row["visitors"]},
+        "trend": trend,
+    }
+
+
+@app.get("/api/stats")
+def get_stats():
+    return JSONResponse(
+        _visit_stats_payload(), headers={"Cache-Control": "no-store"}
+    )
+
+
 def _insert_message(content: str, ip_hash: str) -> dict:
     now = int(time.time())
     with get_messages_db() as conn:
@@ -1504,10 +1626,12 @@ app.mount("/Images", StaticFiles(directory=str(BASE_DIR / "Images")), name="imag
 
 
 @app.get("/")
-def root():
+def root(request: Request = None):
+    record_visit(request)
     return FileResponse(BASE_DIR / "index.html")
 
 
 @app.get("/reviews", include_in_schema=False)
-def reviews_page():
+def reviews_page(request: Request = None):
+    record_visit(request)
     return FileResponse(BASE_DIR / "reviews.html")

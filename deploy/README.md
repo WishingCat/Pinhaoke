@@ -18,7 +18,7 @@
 - `venv` 为 `root:root`，目录 `0755`，普通文件 `0644`，`bin/` 可执行文件 `0755`
 - 五个课程数据库和一个树洞评测数据库均由应用以 SQLite `mode=ro` 和 `PRAGMA query_only = ON` 打开
 - systemd 使用 `ProtectSystem=strict`、`ReadOnlyPaths=/opt/pinhaoke`、`NoNewPrivileges=true`、私有临时目录、空 capability 和 `UMask=0027`
-- 留言板数据库是唯一可写数据：unit 通过 `StateDirectory=pinhaoke` 让 systemd 自动创建 `/var/lib/pinhaoke` 并归服务用户所有，`PINHAOKE_MESSAGES_DB` 指向其中的 `留言板.db`。它不在仓库和 `/opt/pinhaoke` 内，更新与回滚不触碰留言数据，备份需单独处理。
+- 留言板数据库是唯一可写数据：unit 通过 `StateDirectory=pinhaoke` 让 systemd 自动创建 `/var/lib/pinhaoke` 并归服务用户所有，`PINHAOKE_MESSAGES_DB` 指向其中的 `留言板.db`，`PINHAOKE_STATS_DB` 指向访问统计库 `访问统计.db`。它们不在仓库和 `/opt/pinhaoke` 内，更新与回滚不触碰这些数据，备份需单独处理。
 
 不要对 `/opt/pinhaoke` 执行递归 `chown www-data`。更新脚本会避开 `.git`、staging、备份/诊断 venv 和活动 venv，使用 symlink-safe 的权限处理。
 
