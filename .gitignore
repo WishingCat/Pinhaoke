@@ -8,6 +8,9 @@ tmp_summer/
 tmp_undergrad_2627_fall/
 tmp_graduate_2627_fall/
 
+# 本地开发的留言板数据库（生产在 /var/lib/pinhaoke），永远不要提交
+留言板.db*
+
 # 翻译用的 API 凭据/密钥文件，永远不要提交
 .env
 .env.*

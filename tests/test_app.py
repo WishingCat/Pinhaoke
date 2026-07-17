@@ -224,6 +224,96 @@ class DatabaseConnectionTests(unittest.TestCase):
             self.assert_unhealthy_response(response, tmp)
 
 
+class MessageBoardApiTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._original_path = app.MESSAGES_DB_PATH
+        app.MESSAGES_DB_PATH = Path(self._tmp.name) / "留言板.db"
+        self.addCleanup(setattr, app, "MESSAGES_DB_PATH", self._original_path)
+
+    @staticmethod
+    def request(ip="203.0.113.9"):
+        return Mock(headers={"x-real-ip": ip}, client=None)
+
+    def test_post_then_list_roundtrip_without_identity_fields(self):
+        created = app.create_message(self.request(), {"content": "  希望增加成绩分布查询  "})
+        self.assertEqual(set(created), {"id", "posted_at", "content"})
+        self.assertEqual(created["content"], "希望增加成绩分布查询")
+        listing = app.list_messages(page=1, page_size=20)
+        self.assertEqual(listing["total"], 1)
+        self.assertEqual(set(listing), {"total", "page", "page_size", "messages"})
+        self.assertEqual(set(listing["messages"][0]), {"id", "posted_at", "content"})
+        self.assertEqual(listing["messages"][0]["content"], "希望增加成绩分布查询")
+
+    def test_list_is_newest_first_and_paginated(self):
+        for index in range(3):
+            app.create_message(self.request(f"198.51.100.{index}"), {"content": f"第 {index} 条"})
+        listing = app.list_messages(page=1, page_size=2)
+        self.assertEqual(listing["total"], 3)
+        self.assertEqual([m["content"] for m in listing["messages"]], ["第 2 条", "第 1 条"])
+        second = app.list_messages(page=2, page_size=2)
+        self.assertEqual([m["content"] for m in second["messages"]], ["第 0 条"])
+
+    def test_content_validation_rejects_bad_payloads(self):
+        for payload in (
+            {"content": ""},
+            {"content": "   "},
+            {"content": "x" * (app.MESSAGE_MAX_LENGTH + 1)},
+            {"content": 42},
+            {"content": None},
+            {"other": "x"},
+            ["content"],
+            "content",
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.create_message(self.request(), payload)
+                self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_pagination_validation_rejects_bad_values(self):
+        for values in (
+            {"page": 0},
+            {"page": 10001},
+            {"page_size": 0},
+            {"page_size": app.MESSAGE_PAGE_SIZE_MAX + 1},
+            {"page": True},
+        ):
+            with self.subTest(values=values):
+                args = {"page": 1, "page_size": 20}
+                args.update(values)
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.list_messages(**args)
+                self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_rate_limit_applies_per_ip_hash(self):
+        hourly_limit = app.MESSAGE_RATE_LIMITS[0][1]
+        for index in range(hourly_limit):
+            app.create_message(self.request(), {"content": f"正常留言 {index}"})
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.create_message(self.request(), {"content": "超限留言"})
+        self.assertEqual(ctx.exception.status_code, 429)
+        # 其他 IP 不受影响
+        other = app.create_message(self.request("198.51.100.200"), {"content": "另一位用户"})
+        self.assertEqual(other["content"], "另一位用户")
+
+    def test_ip_hash_stays_out_of_api_and_message_db_is_separate(self):
+        app.create_message(self.request(), {"content": "隐私检查"})
+        listing = app.list_messages(page=1, page_size=10)
+        self.assertNotIn("ip_hash", listing["messages"][0])
+        # 留言库独立于六个只读正式库
+        self.assertNotEqual(app.MESSAGES_DB_PATH.parent, app.DB_DIR)
+        with closing(sqlite3.connect(app.MESSAGES_DB_PATH)) as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+        self.assertIn("messages", tables)
+        self.assertNotIn("basic_info", tables)
+
+
 class ReviewApiTests(unittest.TestCase):
     def call(self, **overrides):
         args = {"q": "", "page": 1, "page_size": 20}

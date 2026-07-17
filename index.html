@@ -1298,6 +1298,72 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 
 .modal-overlay.open { display: flex; }
 
+/* ===== Message board ===== */
+.msg-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  max-height: min(680px, 92vh);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.msg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px 8px; }
+.msg-hint { margin: 0; padding: 0 18px 12px; font-size: 0.78rem; line-height: 1.7; color: var(--ink-3); }
+
+.msg-form { display: flex; flex-direction: column; gap: 8px; padding: 0 18px 14px; border-bottom: 1px solid var(--border); }
+.msg-form textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.msg-form textarea:focus { outline: none; border-color: var(--accent); }
+.msg-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.msg-status { font-size: 0.74rem; color: var(--ink-3); }
+.msg-submit {
+  flex-shrink: 0;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #08766B, #075F57);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.msg-submit:disabled { opacity: 0.55; cursor: default; }
+
+.msg-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 18px; }
+.msg-item { border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; background: var(--bg); }
+.msg-time { font-family: var(--f-mono); font-size: 0.68rem; color: var(--ink-3); margin-bottom: 4px; }
+.msg-content { margin: 0; font-size: 0.85rem; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-empty, .msg-error { margin: 6px 0; font-size: 0.8rem; color: var(--ink-3); text-align: center; }
+
+.msg-more {
+  margin: 0 18px 14px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.msg-more:hover { border-color: var(--ink-3); color: var(--ink); }
+
 .modal-content {
   width: 100%;
   min-width: 0;
@@ -1819,6 +1885,9 @@ window._hmt.push(['_trackPageview', location.pathname]);
           <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
         </div>
       </div>
+      <button class="icon-btn" id="msgBoardBtn" onclick="openMsgBoard()" aria-label="留言板" title="留言板">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
       <button class="icon-btn" onclick="toggleTheme()" aria-label="切换深色 / 浅色模式" title="Light / Dark">
         <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -1978,6 +2047,26 @@ window._hmt.push(['_trackPageview', location.pathname]);
 <!-- Detail Modal -->
 <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" onclick="if(event.target===this)closeModal()">
   <div class="modal-content" id="modalContent" tabindex="-1"></div>
+</div>
+
+<!-- Message board -->
+<div class="modal-overlay" id="msgOverlay" role="dialog" aria-modal="true" aria-labelledby="msgTitle" onclick="if(event.target===this)closeMsgBoard()">
+  <div class="msg-panel">
+    <div class="msg-head">
+      <span class="modal-title" id="msgTitle">留言板</span>
+      <button class="modal-close" onclick="closeMsgBoard()" aria-label="关闭留言板">&times;</button>
+    </div>
+    <p class="msg-hint">欢迎公开留言：问题反馈、功能建议、想对开发者说的话都可以写在这里，所有人可见。</p>
+    <form class="msg-form" onsubmit="submitMessage(event)">
+      <textarea id="msgInput" maxlength="500" rows="3" placeholder="写下你的留言…（最多 500 字）" aria-label="留言内容"></textarea>
+      <div class="msg-form-foot">
+        <span class="msg-status" id="msgStatus" role="status" aria-live="polite"></span>
+        <button type="submit" class="msg-submit" id="msgSubmit">发布留言</button>
+      </div>
+    </form>
+    <div class="msg-list" id="msgList" aria-label="全部留言"></div>
+    <button type="button" class="msg-more hidden" id="msgMore" onclick="loadMessages(false)">加载更多</button>
+  </div>
 </div>
 
 <script>
@@ -3660,6 +3749,146 @@ function closeModal() {
   if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => returnTarget.focus());
 }
 
+/* ===== Message board ===== */
+let msgReturnFocus = null;
+let msgPage = 0;
+let msgTotal = 0;
+let msgLoading = false;
+const MSG_PAGE_SIZE = 20;
+
+function formatMsgTime(ts) {
+  const d = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderMessage(message) {
+  const item = document.createElement('div');
+  item.className = 'msg-item';
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = formatMsgTime(message.posted_at);
+  const body = document.createElement('p');
+  body.className = 'msg-content';
+  body.textContent = message.content;
+  item.append(time, body);
+  return item;
+}
+
+async function loadMessages(reset) {
+  if (msgLoading) return;
+  msgLoading = true;
+  const list = document.getElementById('msgList');
+  const more = document.getElementById('msgMore');
+  if (reset) {
+    msgPage = 0;
+    list.textContent = '';
+    more.classList.add('hidden');
+  }
+  const page = msgPage + 1;
+  try {
+    const resp = await fetch(`/api/messages?page=${page}&page_size=${MSG_PAGE_SIZE}`);
+    if (!resp.ok) throw new Error('bad status');
+    const data = await resp.json();
+    msgPage = page;
+    msgTotal = data.total;
+    if (reset && !data.messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'msg-empty';
+      empty.textContent = '还没有留言，来写第一条吧！';
+      list.appendChild(empty);
+    }
+    data.messages.forEach(message => list.appendChild(renderMessage(message)));
+    more.classList.toggle('hidden', msgPage * MSG_PAGE_SIZE >= msgTotal);
+  } catch (err) {
+    const error = document.createElement('p');
+    error.className = 'msg-error';
+    error.textContent = '留言加载失败，请稍后再试';
+    list.appendChild(error);
+  } finally {
+    msgLoading = false;
+  }
+}
+
+async function submitMessage(event) {
+  event.preventDefault();
+  const input = document.getElementById('msgInput');
+  const status = document.getElementById('msgStatus');
+  const submit = document.getElementById('msgSubmit');
+  const content = input.value.trim();
+  if (!content) {
+    status.textContent = '留言不能为空';
+    return;
+  }
+  submit.disabled = true;
+  status.textContent = '发布中…';
+  try {
+    const resp = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (resp.status === 429) {
+      status.textContent = '发布太频繁，请稍后再试';
+      return;
+    }
+    if (!resp.ok) throw new Error('bad status');
+    const created = await resp.json();
+    input.value = '';
+    status.textContent = '已发布';
+    const list = document.getElementById('msgList');
+    const empty = list.querySelector('.msg-empty');
+    if (empty) empty.remove();
+    list.prepend(renderMessage(created));
+    msgTotal += 1;
+  } catch (err) {
+    status.textContent = '发布失败，请稍后再试';
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+function openMsgBoard() {
+  const overlay = document.getElementById('msgOverlay');
+  if (overlay.classList.contains('open')) return;
+  msgReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setModalBackgroundInert(true);
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('msgStatus').textContent = '';
+  requestAnimationFrame(() => document.getElementById('msgInput').focus());
+  loadMessages(true);
+}
+
+function closeMsgBoard() {
+  const overlay = document.getElementById('msgOverlay');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  setModalBackgroundInert(false);
+  const returnTarget = msgReturnFocus;
+  msgReturnFocus = null;
+  if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => returnTarget.focus());
+}
+
+function trapMsgFocus(event) {
+  if (event.key !== 'Tab') return;
+  const overlay = document.getElementById('msgOverlay');
+  const focusable = [...overlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 /* ===== Misc ===== */
 function esc(str) {
   if (!str) return '';
@@ -3686,8 +3915,16 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  const msgOpen = document.getElementById('msgOverlay').classList.contains('open');
   const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
-  if (modalOpen) {
+  if (msgOpen) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeMsgBoard();
+    } else {
+      trapMsgFocus(e);
+    }
+  } else if (modalOpen) {
     if (e.key === 'Escape') {
       e.preventDefault();
       closeModal();

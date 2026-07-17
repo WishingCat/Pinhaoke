@@ -92,6 +92,28 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('href="/reviews"', anchor)
         self.assertNotIn(" hidden>", anchor)
 
+    def test_message_board_button_and_panel_contract(self):
+        # 留言按钮只在课程页，位于语言切换旁
+        lang = HTML.index('id="langSelector"')
+        button = HTML.index('id="msgBoardBtn"')
+        theme = HTML.index('onclick="toggleTheme()"')
+        self.assertLess(lang, button)
+        self.assertLess(button, theme)
+        self.assertNotIn('id="msgBoardBtn"', REVIEWS_HTML)
+        # 悬浮面板：提示语、输入框、可滚动列表、加载更多
+        self.assertIn('id="msgOverlay" role="dialog" aria-modal="true"', HTML)
+        self.assertIn("欢迎公开留言：问题反馈、功能建议、想对开发者说的话都可以写在这里，所有人可见。", HTML)
+        self.assertIn('maxlength="500"', HTML)
+        self.assertIn(".msg-list { flex: 1; overflow-y: auto;", HTML)
+        self.assertIn('id="msgMore"', HTML)
+        # 留言内容只能通过 textContent 渲染，禁止拼入 innerHTML
+        self.assertIn("body.textContent = message.content", HTML)
+        self.assertIn("time.textContent = formatMsgTime(message.posted_at)", HTML)
+        # 焦点与键盘契约
+        self.assertIn("function trapMsgFocus", HTML)
+        self.assertIn("closeMsgBoard()", HTML)
+        self.assertIn('aria-label="关闭留言板"', HTML)
+
     def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
         self.assertEqual(HTML.count("VX 联系方式："), 2)
         self.assertEqual(HTML.count("tuzengji"), 2)

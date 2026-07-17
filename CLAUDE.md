@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-拼好课 V2 由 FastAPI、两个无构建步骤的 HTML 页面、五个课程 SQLite 数据库和一个树洞评测数据库组成。生产应用只读数据，课程抓取必须复用已登录的 Chrome 页面，翻译任务不得自动产生 API 费用。以代码、数据库契约和测试为最终事实来源；用户入口与功能简介见 [README.md](README.md)，抓取、翻译、数据和部署的详细操作分别由各目录 README 负责。
+拼好课 V2 由 FastAPI、两个无构建步骤的 HTML 页面、五个课程 SQLite 数据库和一个树洞评测数据库组成。生产应用对课程与评测数据只读，唯一可写数据是独立的留言板数据库；课程抓取必须复用已登录的 Chrome 页面，翻译任务不得自动产生 API 费用。以代码、数据库契约和测试为最终事实来源；用户入口与功能简介见 [README.md](README.md)，抓取、翻译、数据和部署的详细操作分别由各目录 README 负责。
 
 ## 项目定位
 
 拼好课 V2 是北京大学课程搜索与树洞课程评测应用：
 
-- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库。
+- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以独立可写 SQLite 库提供公开留言板。
+- 课程页顶栏语言切换旁有留言板按钮，打开简洁的悬浮留言面板：顶部一句话提示欢迎写问题反馈、功能建议和想对开发者说的话，下方是发布输入框和可滚动的公开留言列表。留言板按钮只在课程页。
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
@@ -54,6 +55,7 @@ tests/                          标准库 unittest 回归测试
 - 树洞卡片按结果索引在六组颜色间轮换，使用完整 `1.5px` 边框，不使用左侧彩条。卡片点击或 Enter/Space 按需请求 `/api/reviews/{pid}`；原树洞链接、课程标签、展开按钮和文本选择不得误触发弹窗。
 - 评测列表只能渲染筛选后的评测主帖与相关回复；完整树洞弹窗才渲染 `thread_replies`。桌面弹窗居中，`640px` 下贴近底部，内部独立滚动，不能让长线程撑破 viewport。
 - 项目开发人员悬浮卡在触发按钮或卡片上 hover/focus 时保持显示，文本允许选择和复制；联系方式 `tuzengji` 及欢迎联系文案同时保留在页脚。
+- 课程页顶栏的留言板按钮打开悬浮留言面板：面板包含一句话提示、`500` 字上限的输入框、可滚动的公开留言列表和“加载更多”按钮。面板遵循与课程详情弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；留言正文和时间只能通过 `textContent` 渲染。
 
 ### 状态、安全与无障碍
 
@@ -109,9 +111,11 @@ git diff --check
 
 验收口径可写作 `fall=4421`、`spring=3701`、`summer=160`。这些是列表合并后的卡片数，不是数据库原始行数。
 
-`get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写数据库。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
+`get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写课程或评测数据库；唯一允许的写入是留言板 API 对留言库的插入。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
 
 `get_reviews_db()` 以相同的 SQLite URI `mode=ro` 和 `PRAGMA query_only = ON` 打开 `树洞课程评测.db`。`GET /api/health` 检查五个课程库的表、详情行数、ID 集合、外键与完整性，同时检查评测库的必需表、元数据行数、外键和完整性。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
+
+`get_messages_db()` 打开唯一可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表；六个正式库保持只读，`GET /api/health` 不检查留言库。
 
 ## API 契约
 
@@ -124,6 +128,8 @@ git diff --check
 | `GET /api/reviews/{pid}` | 返回一个已命中评测主题的完整主帖与快照内全部回复；只在用户打开卡片时请求。 |
 | `GET /api/review-courses` | 返回按热度排序且可按 `q` 过滤的课程名、课程号、主题数和条目数；评测页用它填充“热门课程”菜单。 |
 | `GET /api/reviews/meta` | 返回保留条目的起止日期、树洞快照日期、源数量、命中数量和缓存回复覆盖率。 |
+| `GET /api/messages` | 返回 `{total, page, page_size, messages}`，公开留言按发布时间倒序分页。 |
+| `POST /api/messages` | 发布一条公开留言，body 为 `{content}`；成功返回 201 和新留言。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
@@ -148,6 +154,13 @@ git diff --check
 - 默认列表的置顶树洞由 `REVIEW_FEATURED_COUNT` 与 `REVIEW_FEATURED_RANGE`（2026 年北京时间区间）选出，质量分为 `REVIEW_QUALITY_SCORE_SQL`：主帖为评测 `+120`，每条相关回复 `+40`，正文长度按 `900` 封顶再除以 `6`。排序必须保持跨页确定性，置顶之后回到时间倒序。
 - 页面只显示保留条目的日期范围和评测数据量，以结果标题旁的小字备注呈现；日期范围来自 `entries.posted_at` 的最小值与最大值，评测数据量等于 `matched_threads + matched_replies`，也就是 `matched_entries`。
 - 列表 API 只返回筛选后的相关回复、课程标签和课程/教师高亮；详情 API 另外返回快照内全部回复。两者都只能包含树洞号、评论号、楼层、时间、来源月份、原帖链接和正文等公开字段，不得暴露作者标识或回复关系。高亮区间采用 Unicode 码点偏移，前端必须通过文本节点安全分段，不得把正文拼入 `innerHTML`。
+
+留言板 API 参数：
+
+- `GET /api/messages`：`page` 为 1 到 10000，`page_size` 为 1 到 50。
+- `POST /api/messages`：`content` 去除首尾空白后为 1 到 `500` 字，非法 payload 返回 422。
+- 留言只保存发布时间与正文；来源 IP 以 SHA-256 哈希形式仅用于发布频率限制，同一 IP 哈希每小时最多 `5` 条、每天最多 `20` 条，超限返回 429。任何响应都不包含 IP 或身份字段。
+- 前端渲染留言正文必须使用 `textContent`，禁止拼入 `innerHTML`。
 
 ## 课程 ID
 
@@ -246,7 +259,9 @@ python3 数据库构建脚本/build_treehole_reviews.py --enrich-existing
 sudo bash /opt/pinhaoke/deploy/update.sh
 ```
 
-不要手工 `git pull` 后重启，不要绕过预检，不要让 `www-data` 持有代码、Git、虚拟环境或数据库。更新脚本部署精确 `origin/main`，在停服前完成目标工作树、LFS 和候选 venv 预检，激活失败或收到 INT/TERM 时自动恢复旧提交、旧 unit、旧 venv 和原服务状态。
+不要手工 `git pull` 后重启，不要绕过预检，不要让 `www-data` 持有代码、Git、虚拟环境或六个正式数据库。更新脚本部署精确 `origin/main`，在停服前完成目标工作树、LFS 和候选 venv 预检，激活失败或收到 INT/TERM 时自动恢复旧提交、旧 unit、旧 venv 和原服务状态。
+
+留言板数据库是唯一例外：它位于 `/var/lib/pinhaoke/留言板.db`，由 systemd `StateDirectory` 自动创建并归服务用户所有，不在仓库和 `/opt/pinhaoke` 内。`deploy/update.sh` 与回滚不触碰留言数据，备份需单独处理。
 
 `deploy/nginx.conf` 只是与 Certbot 共存的站点模板，必须手工安装并先运行 `nginx -t`；`deploy/update.sh` 不覆盖 Nginx。任何任务只有用户明确要求后才可 push 或部署。本地通过测试不代表生产已更新。
 

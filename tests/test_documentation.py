@@ -63,6 +63,8 @@ class DocumentationTests(unittest.TestCase):
     def test_readme_has_https_terms_and_correct_sponsor_labels(self):
         text = read("README.md")
         self.assertIn("https://www.pinhaoke.love", text)
+        self.assertIn("### 留言板", text)
+        self.assertIn("公开留言", text)
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
         self.assertLess(text.index("2026 暑期"), text.index("2026 秋季"))
         self.assertIn("秋季为默认学期", text)
@@ -112,6 +114,10 @@ class DocumentationTests(unittest.TestCase):
             "GET /api/reviews",
             "GET /api/reviews/{pid}",
             "GET /api/review-courses",
+            "GET /api/messages",
+            "POST /api/messages",
+            "PINHAOKE_MESSAGES_DB",
+            "StateDirectory",
             "热门课程",
             "树洞课程评测.db",
             "47843",
@@ -224,6 +230,8 @@ class DocumentationTests(unittest.TestCase):
             "/api/health",
             "/api/reviews?page_size=1",
             "/api/reviews/{pid}",
+            "StateDirectory=pinhaoke",
+            "PINHAOKE_MESSAGES_DB",
             "五类本机 API 契约",
             "review-detail 五类烟测",
         ):

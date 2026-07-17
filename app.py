@@ -22,7 +22,9 @@ The prefix alone determines which DB the detail endpoint opens, so callers do
 NOT need to pass ?term= when fetching a specific course.
 """
 from contextlib import contextmanager
+import hashlib
 import math
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -30,7 +32,7 @@ import threading
 import time
 import unicodedata
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -42,6 +44,16 @@ SUMMER_DB = DB_DIR / "2026暑期本科生课程.db"
 FALL_UG_DB = DB_DIR / "2026秋季学期本科生课程.db"
 FALL_GR_DB = DB_DIR / "2026秋季学期研究生课程.db"
 REVIEWS_DB = DB_DIR / "树洞课程评测.db"
+
+# 留言板是唯一可写库，与六个只读正式库分离，不进入仓库。
+# 生产由 systemd StateDirectory 提供 /var/lib/pinhaoke 并通过环境变量指定路径。
+MESSAGES_DB_PATH = Path(
+    os.environ.get("PINHAOKE_MESSAGES_DB", "") or (BASE_DIR / "留言板.db")
+)
+MESSAGE_MAX_LENGTH = 500
+MESSAGE_PAGE_SIZE_MAX = 50
+# (窗口秒数, 每个 IP 哈希在窗口内的发布上限)
+MESSAGE_RATE_LIMITS = ((3600, 5), (86400, 20))
 
 # (alias, path, id_prefix)
 TERM_DBS = {
@@ -116,6 +128,31 @@ def get_reviews_db():
         conn = sqlite3.connect(_readonly_uri(REVIEWS_DB), uri=True)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA query_only = ON")
+        yield conn
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@contextmanager
+def get_messages_db():
+    conn = None
+    try:
+        conn = sqlite3.connect(MESSAGES_DB_PATH, timeout=5)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS messages ("
+            " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " posted_at INTEGER NOT NULL,"
+            " content TEXT NOT NULL,"
+            " ip_hash TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_messages_ip_time"
+            " ON messages(ip_hash, posted_at)"
+        )
         yield conn
     finally:
         if conn is not None:
@@ -1364,6 +1401,92 @@ def get_review_thread(pid: int):
         "reply_count": len(replies),
         "replies": replies,
     }
+
+
+# Message board -------------------------------------------------------------------
+
+
+def _validate_message_pagination(page: int, page_size: int) -> None:
+    if (
+        isinstance(page, bool)
+        or not isinstance(page, int)
+        or not 1 <= page <= 10000
+        or isinstance(page_size, bool)
+        or not isinstance(page_size, int)
+        or not 1 <= page_size <= MESSAGE_PAGE_SIZE_MAX
+    ):
+        raise HTTPException(status_code=422, detail="Invalid message query parameter")
+
+
+def _validate_message_content(payload) -> str:
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Invalid message payload")
+    content = payload.get("content")
+    if not isinstance(content, str):
+        raise HTTPException(status_code=422, detail="Invalid message payload")
+    content = content.strip()
+    if not content or len(content) > MESSAGE_MAX_LENGTH:
+        raise HTTPException(status_code=422, detail="Invalid message payload")
+    return content
+
+
+def _client_ip_hash(request) -> str:
+    # 仅用于发布频率限制，不进入任何 API 响应。
+    ip = ""
+    if request is not None:
+        ip = (request.headers.get("x-real-ip") or "").strip()
+        if not ip and request.client is not None:
+            ip = request.client.host or ""
+    return hashlib.sha256((ip or "unknown").encode("utf-8")).hexdigest()
+
+
+def _insert_message(content: str, ip_hash: str) -> dict:
+    now = int(time.time())
+    with get_messages_db() as conn:
+        for window, limit in MESSAGE_RATE_LIMITS:
+            recent = conn.execute(
+                "SELECT COUNT(*) FROM messages WHERE ip_hash=? AND posted_at>?",
+                (ip_hash, now - window),
+            ).fetchone()[0]
+            if recent >= limit:
+                raise HTTPException(
+                    status_code=429, detail="Too many messages, please retry later"
+                )
+        cursor = conn.execute(
+            "INSERT INTO messages (posted_at, content, ip_hash) VALUES (?, ?, ?)",
+            (now, content, ip_hash),
+        )
+        conn.commit()
+        message_id = cursor.lastrowid
+    return {"id": message_id, "posted_at": now, "content": content}
+
+
+@app.get("/api/messages")
+def list_messages(
+    page: int = Query(1, ge=1, le=10000),
+    page_size: int = Query(20, ge=1, le=MESSAGE_PAGE_SIZE_MAX),
+):
+    _validate_message_pagination(page, page_size)
+    offset = (page - 1) * page_size
+    with get_messages_db() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        rows = conn.execute(
+            "SELECT id, posted_at, content FROM messages "
+            "ORDER BY id DESC LIMIT ? OFFSET ?",
+            (page_size, offset),
+        ).fetchall()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "messages": [dict(row) for row in rows],
+    }
+
+
+@app.post("/api/messages", status_code=201)
+def create_message(request: Request, payload: dict = Body(...)):
+    content = _validate_message_content(payload)
+    return _insert_message(content, _client_ip_hash(request))
 
 
 # Static files ------------------------------------------------------------------
