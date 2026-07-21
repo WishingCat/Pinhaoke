@@ -52,6 +52,11 @@ class DatabaseConnectionTests(unittest.TestCase):
     def test_reviews_page_resolves_from_project_directory(self):
         self.assertEqual(Path(app.reviews_page().path), app.BASE_DIR / "reviews.html")
 
+    def test_page_routes_force_cache_revalidation(self):
+        # 无 Cache-Control 时浏览器按启发式缓存旧页面，部署后用户可能长时间看不到新版
+        for response in (app.root(None), app.reviews_page(None)):
+            self.assertEqual(response.headers["cache-control"], "no-cache")
+
     def test_attach_failure_closes_main_connection(self):
         fake = app.sqlite3.connect(":memory:")
         missing_db = Path("missing.db")

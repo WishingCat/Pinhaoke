@@ -1625,13 +1625,18 @@ def get_health():
 app.mount("/Images", StaticFiles(directory=str(BASE_DIR / "Images")), name="images")
 
 
+# 页面无 Cache-Control 时浏览器会按启发式缓存旧版；no-cache 强制每次回源验证,
+# 未变化时命中 ETag 返回 304,保证部署后用户刷新即见新版。
+PAGE_CACHE_HEADERS = {"Cache-Control": "no-cache"}
+
+
 @app.get("/")
 def root(request: Request = None):
     record_visit(request)
-    return FileResponse(BASE_DIR / "index.html")
+    return FileResponse(BASE_DIR / "index.html", headers=PAGE_CACHE_HEADERS)
 
 
 @app.get("/reviews", include_in_schema=False)
 def reviews_page(request: Request = None):
     record_visit(request)
-    return FileResponse(BASE_DIR / "reviews.html")
+    return FileResponse(BASE_DIR / "reviews.html", headers=PAGE_CACHE_HEADERS)
