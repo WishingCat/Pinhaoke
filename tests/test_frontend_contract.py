@@ -93,52 +93,61 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn(" hidden>", anchor)
 
     def test_message_board_button_and_panel_contract(self):
-        # 留言按钮只在课程页，位于语言切换旁
+        # 两页顶栏都有留言按钮：课程页位于语言切换旁，评测页位于主题切换前
         lang = HTML.index('id="langSelector"')
         button = HTML.index('id="msgBoardBtn"')
         theme = HTML.index('onclick="toggleTheme()"')
         self.assertLess(lang, button)
         self.assertLess(button, theme)
-        self.assertNotIn('id="msgBoardBtn"', REVIEWS_HTML)
-        # 悬浮面板：提示语、输入框、可滚动列表、加载更多
-        self.assertIn('id="msgOverlay" role="dialog" aria-modal="true"', HTML)
-        self.assertIn("欢迎公开留言：问题反馈、功能建议、想对开发者说的话都可以写在这里，所有人可见。", HTML)
-        self.assertIn('maxlength="500"', HTML)
-        self.assertIn(".msg-list { flex: 1; overflow-y: auto;", HTML)
-        self.assertIn('id="msgMore"', HTML)
-        # 留言内容只能通过 textContent 渲染，禁止拼入 innerHTML
-        self.assertIn("body.textContent = message.content", HTML)
-        self.assertIn("time.textContent = formatMsgTime(message.posted_at)", HTML)
-        # 焦点与键盘契约
-        self.assertIn("function trapMsgFocus", HTML)
-        self.assertIn("closeMsgBoard()", HTML)
-        self.assertIn('aria-label="关闭留言板"', HTML)
+        self.assertLess(
+            REVIEWS_HTML.index('id="msgBoardBtn"'),
+            REVIEWS_HTML.index('id="themeButton"'),
+        )
+        for page in (HTML, REVIEWS_HTML):
+            # 悬浮面板：提示语、输入框、可滚动列表、加载更多
+            self.assertIn('id="msgOverlay" role="dialog" aria-modal="true"', page)
+            self.assertIn("欢迎公开留言：问题反馈、功能建议、想对开发者说的话都可以写在这里，所有人可见。", page)
+            self.assertIn('maxlength="500"', page)
+            self.assertIn(".msg-list { flex: 1; overflow-y: auto;", page)
+            self.assertIn('id="msgMore"', page)
+            # 留言内容只能通过 textContent 渲染，禁止拼入 innerHTML
+            self.assertIn("body.textContent = message.content", page)
+            self.assertIn("time.textContent = formatMsgTime(message.posted_at)", page)
+            # 焦点与键盘契约
+            self.assertIn("function trapMsgFocus", page)
+            self.assertIn("closeMsgBoard()", page)
+            self.assertIn('aria-label="关闭留言板"', page)
 
     def test_visit_stats_button_and_panel_contract(self):
-        # 统计按钮只在课程页，位于顶栏动作区（语言切换之后）
+        # 两页顶栏都有统计按钮，且排在留言按钮之前
         lang = HTML.index('id="langSelector"')
         button = HTML.index('id="statsBtn"')
         self.assertLess(lang, button)
-        self.assertNotIn('id="statsBtn"', REVIEWS_HTML)
-        # 悬浮面板：三块统计、近 7 天趋势、隐私说明
-        self.assertIn('id="statsOverlay" role="dialog" aria-modal="true"', HTML)
-        for stat_id in (
-            'id="statTodayViews"',
-            'id="statWeekViews"',
-            'id="statTotalViews"',
-            'id="trendChart"',
-        ):
-            self.assertIn(stat_id, HTML)
-        self.assertIn("按北京时间分日统计", HTML)
-        # 数字与趋势只经 textContent / 数值高度渲染，禁止拼入 innerHTML
-        self.assertIn("textContent = Number(value).toLocaleString", HTML)
-        self.assertIn("count.textContent = point.views", HTML)
-        self.assertIn("bar.style.height = Math.round", HTML)
-        # 打开时轮询、关闭时清理定时器；焦点与键盘契约
-        self.assertIn("statsTimer = setInterval(loadStats, 20000)", HTML)
-        self.assertIn("clearInterval(statsTimer)", HTML)
-        self.assertIn("function trapStatsFocus", HTML)
-        self.assertIn('aria-label="关闭访问统计"', HTML)
+        self.assertLess(button, HTML.index('id="msgBoardBtn"'))
+        self.assertLess(
+            REVIEWS_HTML.index('id="statsBtn"'),
+            REVIEWS_HTML.index('id="msgBoardBtn"'),
+        )
+        for page in (HTML, REVIEWS_HTML):
+            # 悬浮面板：三块统计、近 7 天趋势、隐私说明
+            self.assertIn('id="statsOverlay" role="dialog" aria-modal="true"', page)
+            for stat_id in (
+                'id="statTodayViews"',
+                'id="statWeekViews"',
+                'id="statTotalViews"',
+                'id="trendChart"',
+            ):
+                self.assertIn(stat_id, page)
+            self.assertIn("按北京时间分日统计", page)
+            # 数字与趋势只经 textContent / 数值高度渲染，禁止拼入 innerHTML
+            self.assertIn("textContent = Number(value).toLocaleString", page)
+            self.assertIn("count.textContent = point.views", page)
+            self.assertIn("bar.style.height = Math.round", page)
+            # 打开时轮询、关闭时清理定时器；焦点与键盘契约
+            self.assertIn("statsTimer = setInterval(loadStats, 20000)", page)
+            self.assertIn("clearInterval(statsTimer)", page)
+            self.assertIn("function trapStatsFocus", page)
+            self.assertIn('aria-label="关闭访问统计"', page)
 
     def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
         self.assertEqual(HTML.count("VX 联系方式："), 2)
