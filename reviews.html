@@ -98,7 +98,7 @@ html[data-theme="dark"] body::before {
 .topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 40%, transparent), color-mix(in srgb, var(--accent) 12%, transparent) 40%, transparent 78%); }
 .topbar-inner { width: min(1120px, 100%); height: 58px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
-.brand img { width: 30px; height: 30px; flex: 0 0 auto; }
+.brand img { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 22%; }
 .brand-name { font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
 .top-actions { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .top-link, .icon-button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow-xs); color: var(--ink-2); text-decoration: none; cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease; user-select: none; }
