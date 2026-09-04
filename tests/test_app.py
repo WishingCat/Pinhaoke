@@ -1,9 +1,12 @@
 from contextlib import closing
+import hashlib
 import json
+import re
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -394,6 +397,743 @@ class VisitStatsApiTests(unittest.TestCase):
             app.record_visit(self.request())  # 目录不存在，应被静默吞掉
         except Exception as exc:  # noqa: BLE001 - 明确断言不抛出
             self.fail(f"record_visit raised: {exc!r}")
+
+
+def _session_cookie(response):
+    header = response.headers.get("set-cookie", "")
+    match = re.match(r"pinhaoke_session=([^;]*)", header)
+    return (match.group(1) if match else None), header
+
+
+def _account_request(
+    ip="203.0.113.9",
+    cookie=None,
+    origin="https://www.pinhaoke.love",
+    host="www.pinhaoke.love",
+    proto="https",
+    referer=None,
+):
+    headers = {"x-real-ip": ip, "host": host, "x-forwarded-proto": proto}
+    if origin is not None:
+        headers["origin"] = origin
+    if referer is not None:
+        headers["referer"] = referer
+    cookies = {app.SESSION_COOKIE: cookie} if cookie else {}
+    return Mock(headers=headers, cookies=cookies, client=None, url=Mock(scheme="http"))
+
+
+def _build_course_db(path, courses):
+    if path.exists():
+        path.unlink()
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute(
+            "CREATE TABLE basic_info("
+            " id INTEGER PRIMARY KEY, course_type TEXT, course_code TEXT, class_no TEXT,"
+            " course_name TEXT, category TEXT, credits REAL, teacher TEXT, department TEXT,"
+            " major TEXT, grade TEXT, schedule TEXT, classroom TEXT, enrollment TEXT,"
+            " pnp TEXT, notes TEXT, weekdays TEXT)"
+        )
+        conn.execute(
+            "CREATE TABLE detail_info("
+            " course_id INTEGER PRIMARY KEY REFERENCES basic_info(id), english_name TEXT,"
+            " prerequisites TEXT, intro_cn TEXT, intro_en TEXT, grading TEXT, ge_series TEXT,"
+            " language TEXT, textbook TEXT, reference_book TEXT, syllabus TEXT, evaluation TEXT)"
+        )
+        conn.execute(
+            "CREATE TABLE translations(course_id INTEGER, field TEXT, lang TEXT, text TEXT)"
+        )
+        for course in courses:
+            conn.execute(
+                "INSERT INTO basic_info (id, course_type, course_code, class_no, course_name,"
+                " category, credits, teacher, department, schedule, weekdays)"
+                " VALUES (?, '专业课', ?, ?, ?, '专业必修', ?, ?, ?, ?, '周三')",
+                (
+                    course["id"], course["course_code"], course["class_no"],
+                    course["course_name"], course["credits"], course["teacher"],
+                    course["department"], course["schedule"],
+                ),
+            )
+            conn.execute(
+                "INSERT INTO detail_info (course_id, english_name) VALUES (?, ?)",
+                (course["id"], "Course"),
+            )
+        conn.commit()
+
+
+FIXTURE_COURSES = [
+    {
+        "id": 1, "course_code": "04831180", "class_no": "1",
+        "course_name": "PSoC应用开发基础实验", "credits": 2.0, "teacher": "张三(教授)",
+        "department": "信息科学技术学院", "schedule": "1~16周 每周周三3~4节",
+    },
+    {
+        "id": 2, "course_code": "00131520", "class_no": "2",
+        "course_name": "数学分析（一）", "credits": 5.0, "teacher": "",
+        "department": "数学科学学院", "schedule": "1~16周 每周周一1~2节",
+    },
+]
+
+
+class AccountApiTests(unittest.TestCase):
+    QUESTIONS = [{"question": "最喜欢的课？", "answer": " Hello World "}]
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.production_scrypt = dict(app.SCRYPT_PARAMS)
+        self.addCleanup(setattr, app, "ACCOUNTS_DB_PATH", app.ACCOUNTS_DB_PATH)
+        app.ACCOUNTS_DB_PATH = Path(self._tmp.name) / "账户.db"
+        patcher = patch.object(app, "SCRYPT_PARAMS", {"n": 16, "r": 8, "p": 1})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(setattr, app, "_DUMMY_SECRET_HASH", None)
+        app._DUMMY_SECRET_HASH = None
+
+    request = staticmethod(_account_request)
+
+    def register(self, username="Alice_01", password="correct-horse", ip="203.0.113.9", **extra):
+        payload = {"username": username, "password": password, "questions": self.QUESTIONS}
+        payload.update(extra)
+        response = app.register_account(self.request(ip=ip), payload)
+        token, _ = _session_cookie(response)
+        return response, token
+
+    def login(self, username="Alice_01", password="correct-horse", ip="203.0.113.9", cookie=None):
+        response = app.login_account(
+            self.request(ip=ip, cookie=cookie), {"username": username, "password": password}
+        )
+        token, _ = _session_cookie(response)
+        return response, token
+
+    @staticmethod
+    def body(response):
+        return json.loads(response.body)
+
+    def db(self):
+        return closing(sqlite3.connect(app.ACCOUNTS_DB_PATH))
+
+    def test_register_logs_in_and_never_leaks_secrets(self):
+        response, token = self.register()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.body(response), {"username": "Alice_01"})
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        _, header = _session_cookie(response)
+        self.assertTrue(token)
+        self.assertIn("HttpOnly", header)
+        self.assertIn("SameSite=lax", header)
+        self.assertIn("Secure", header)
+        self.assertIn("Path=/", header)
+        self.assertIn(f"Max-Age={app.SESSION_TTL_SECONDS}", header)
+
+        account = app.get_account(self.request(cookie=token))
+        self.assertEqual(account.status_code, 200)
+        payload = self.body(account)
+        self.assertEqual(
+            set(payload), {"authenticated", "username", "questions", "favorites", "limit"}
+        )
+        self.assertTrue(payload["authenticated"])
+        self.assertEqual(payload["username"], "Alice_01")
+        self.assertEqual(payload["questions"], [{"position": 1, "question": "最喜欢的课？"}])
+        self.assertEqual(payload["favorites"], [])
+        self.assertEqual(payload["limit"], app.FAVORITES_MAX)
+        for forbidden in (b"password_hash", b"answer_hash", b"ip_hash", b"token_hash", b"user_id"):
+            self.assertNotIn(forbidden, account.body)
+        with self.db() as conn:
+            stored = conn.execute("SELECT password_hash FROM users").fetchone()[0]
+            self.assertTrue(stored.startswith("scrypt$16$8$1$"))
+            self.assertNotIn("correct-horse", stored)
+            answer_hash = conn.execute("SELECT answer_hash FROM security_questions").fetchone()[0]
+            self.assertNotIn("helloworld", answer_hash)
+            token_hash = conn.execute("SELECT token_hash FROM sessions").fetchone()[0]
+            self.assertNotEqual(token_hash, token)
+            self.assertEqual(token_hash, app._session_token_hash(token))
+
+    def test_cookie_secure_flag_follows_forwarded_proto(self):
+        response, _ = self.register(ip="198.51.100.1")
+        self.assertIn("Secure", response.headers["set-cookie"])
+        plain = app.login_account(
+            self.request(ip="198.51.100.2", proto="http", origin="http://127.0.0.1:8000", host="127.0.0.1:8000"),
+            {"username": "alice_01", "password": "correct-horse"},
+        )
+        self.assertNotIn("Secure", plain.headers["set-cookie"])
+        self.assertIn("HttpOnly", plain.headers["set-cookie"])
+
+    def test_anonymous_account_lookup_does_not_touch_accounts_db(self):
+        response = app.get_account(self.request())
+        self.assertEqual(self.body(response), {"authenticated": False})
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertFalse(app.ACCOUNTS_DB_PATH.exists())
+        garbage = app.get_account(self.request(cookie="not-a-real-token"))
+        self.assertEqual(self.body(garbage), {"authenticated": False})
+        self.assertIn("Max-Age=0", garbage.headers["set-cookie"])
+
+    def test_username_is_unique_case_insensitively_but_keeps_display_case(self):
+        self.register(username="Alice_01")
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.register(username="alice_01", ip="198.51.100.7")
+        self.assertEqual(ctx.exception.status_code, 409)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.register(username="ALICE_01", ip="198.51.100.8")
+        self.assertEqual(ctx.exception.status_code, 409)
+        response, _ = self.login(username="ALICE_01", ip="198.51.100.9")
+        self.assertEqual(self.body(response), {"username": "Alice_01"})
+
+    def test_register_rejects_invalid_payloads(self):
+        good = {"username": "Bob_2026", "password": "correct-horse", "questions": self.QUESTIONS}
+        bad_cases = {
+            "short username": {"username": "ab"},
+            "long username": {"username": "a" * 21},
+            "unicode username": {"username": "小明123"},
+            "dash username": {"username": "bob-2026"},
+            "non-string username": {"username": 123},
+            "short password": {"password": "1234567"},
+            "long password": {"password": "x" * 129},
+            "password equals username": {"password": "bob_2026"},
+            "non-string password": {"password": ["x"] * 8},
+            "no questions": {"questions": []},
+            "too many questions": {"questions": [{"question": f"q{i}", "answer": "abc"} for i in range(4)]},
+            "question not dict": {"questions": ["q"]},
+            "questions not list": {"questions": {"question": "q", "answer": "abc"}},
+            "empty question": {"questions": [{"question": "   ", "answer": "abc"}]},
+            "long question": {"questions": [{"question": "问" * 61, "answer": "abc"}]},
+            "duplicate questions": {
+                "questions": [
+                    {"question": "Same", "answer": "abc"},
+                    {"question": "same", "answer": "def"},
+                ]
+            },
+            "short answer": {"questions": [{"question": "q", "answer": " a "}]},
+            "long answer": {"questions": [{"question": "q", "answer": "a" * 65}]},
+            "answer equals username": {"questions": [{"question": "q", "answer": "Bob_2026"}]},
+            "non-string answer": {"questions": [{"question": "q", "answer": 12}]},
+        }
+        for label, override in bad_cases.items():
+            with self.subTest(label):
+                payload = dict(good)
+                payload.update(override)
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.register_account(self.request(ip="198.51.100.20"), payload)
+                self.assertEqual(ctx.exception.status_code, 422)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.register_account(self.request(ip="198.51.100.20"), ["not", "a", "dict"])
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertFalse(app.ACCOUNTS_DB_PATH.exists())
+
+    def test_login_errors_are_uniform(self):
+        self.register()
+        details = set()
+        for username, password in (("Alice_01", "wrong-password"), ("nobody_99", "wrong-password")):
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.login(username=username, password=password, ip="198.51.100.30")
+            self.assertEqual(ctx.exception.status_code, 401)
+            details.add(ctx.exception.detail)
+        self.assertEqual(len(details), 1)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.login_account(self.request(ip="198.51.100.30"), {"username": "Alice_01"})
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_login_failures_are_rate_limited_per_ip_and_per_user(self):
+        self.register()
+        window, limit = app.AUTH_RATE_LIMITS["login_fail_ip"][0]
+        for index in range(limit):
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.login(username=f"ghost_{index}", password="wrong-password", ip="198.51.100.40")
+            self.assertEqual(ctx.exception.status_code, 401)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.login(username="Alice_01", password="correct-horse", ip="198.51.100.40")
+        self.assertEqual(ctx.exception.status_code, 429)
+        self.assertEqual(ctx.exception.headers["Retry-After"], str(window))
+        # 换 IP 之后按用户名计数仍然生效，且对不存在的用户名同样计数
+        _, user_limit = app.AUTH_RATE_LIMITS["login_fail_user"][0]
+        for index in range(user_limit):
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.login(username="Alice_01", password="wrong-password", ip=f"198.51.101.{index}")
+            self.assertEqual(ctx.exception.status_code, 401)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.login(username="alice_01", password="correct-horse", ip="198.51.101.200")
+        self.assertEqual(ctx.exception.status_code, 429)
+        for index in range(user_limit):
+            with self.assertRaises(app.HTTPException):
+                self.login(username="phantom", password="wrong-password", ip=f"198.51.102.{index}")
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.login(username="phantom", password="wrong-password", ip="198.51.102.200")
+        self.assertEqual(ctx.exception.status_code, 429)
+        # 其它用户不受影响
+        self.register(username="Carol_7", ip="198.51.103.1")
+        response, _ = self.login(username="Carol_7", ip="198.51.103.2")
+        self.assertEqual(response.status_code, 200)
+
+    def test_register_is_rate_limited_per_ip(self):
+        _, limit = app.AUTH_RATE_LIMITS["register_ip"][0]
+        for index in range(limit):
+            response, _ = self.register(username=f"user_{index}", ip="198.51.100.50")
+            self.assertEqual(response.status_code, 201)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.register(username="user_extra", ip="198.51.100.50")
+        self.assertEqual(ctx.exception.status_code, 429)
+        response, _ = self.register(username="user_extra", ip="198.51.100.51")
+        self.assertEqual(response.status_code, 201)
+
+    def test_mutations_require_trusted_origin(self):
+        payload = {"username": "Alice_01", "password": "correct-horse", "questions": self.QUESTIONS}
+        for label, kwargs in (
+            ("foreign origin", {"origin": "https://evil.example"}),
+            ("null origin", {"origin": "null"}),
+            ("foreign referer", {"origin": None, "referer": "https://evil.example/page"}),
+            ("host mismatch", {"origin": "https://www.pinhaoke.love", "host": "pinhaoke.love"}),
+        ):
+            with self.subTest(label):
+                with self.assertRaises(app.HTTPException) as ctx:
+                    app.register_account(self.request(**kwargs), payload)
+                self.assertEqual(ctx.exception.status_code, 403)
+        self.assertFalse(app.ACCOUNTS_DB_PATH.exists())
+        same_referer = self.request(origin=None, referer="https://www.pinhaoke.love/?term=fall")
+        self.assertEqual(app.register_account(same_referer, payload).status_code, 201)
+        no_headers = self.request(origin=None, ip="198.51.100.61")
+        self.assertEqual(app.logout_account(no_headers).status_code, 204)
+
+    def test_logout_revokes_session_and_is_idempotent(self):
+        _, token = self.register()
+        response = app.logout_account(self.request(cookie=token))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertIn("Max-Age=0", response.headers["set-cookie"])
+        self.assertEqual(self.body(app.get_account(self.request(cookie=token))), {"authenticated": False})
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.list_favorites(self.request(cookie=token))
+        self.assertEqual(ctx.exception.status_code, 401)
+        self.assertEqual(app.logout_account(self.request(cookie=token)).status_code, 204)
+        with self.db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+
+    def test_login_rotates_token_and_drops_the_previous_session(self):
+        _, first = self.register()
+        response, second = self.login(cookie=first)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.body(app.get_account(self.request(cookie=first))), {"authenticated": False})
+        self.assertTrue(self.body(app.get_account(self.request(cookie=second)))["authenticated"])
+        with self.db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 1)
+
+    def test_expired_sessions_are_rejected_and_purged(self):
+        _, token = self.register()
+        with self.db() as conn:
+            conn.execute("UPDATE sessions SET expires_at = 1")
+            conn.commit()
+        response = app.get_account(self.request(cookie=token))
+        self.assertEqual(self.body(response), {"authenticated": False})
+        self.assertIn("Max-Age=0", response.headers["set-cookie"])
+        with self.db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+
+    def test_account_lookup_slides_expiry_once_a_day(self):
+        _, token = self.register()
+        fresh = app.get_account(self.request(cookie=token))
+        self.assertNotIn("set-cookie", fresh.headers)
+        with self.db() as conn:
+            stale_seen = int(time.time()) - 2 * 86400
+            conn.execute(
+                "UPDATE sessions SET last_seen_at = ?, expires_at = ?",
+                (stale_seen, stale_seen + app.SESSION_TTL_SECONDS),
+            )
+            conn.commit()
+        refreshed = app.get_account(self.request(cookie=token))
+        refreshed_token, header = _session_cookie(refreshed)
+        self.assertEqual(refreshed_token, token)
+        self.assertIn("HttpOnly", header)
+        with self.db() as conn:
+            row = conn.execute("SELECT last_seen_at, expires_at FROM sessions").fetchone()
+        self.assertGreater(row[0], stale_seen)
+        self.assertGreater(row[1], stale_seen + app.SESSION_TTL_SECONDS)
+
+    def test_password_reset_flow_with_security_question(self):
+        _, token = self.register()
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.reset_questions(self.request(ip="198.51.100.70"), {"username": "nobody_99"})
+        self.assertEqual(ctx.exception.status_code, 404)
+        lookup = app.reset_questions(self.request(ip="198.51.100.70"), {"username": "ALICE_01"})
+        self.assertEqual(
+            self.body(lookup),
+            {"username": "Alice_01", "questions": [{"position": 1, "question": "最喜欢的课？"}]},
+        )
+        self.assertNotIn(b"answer", lookup.body)
+
+        def attempt(username="alice_01", position=1, answer="wrong answer", ip="198.51.100.71"):
+            return app.reset_password(
+                self.request(ip=ip),
+                {"username": username, "position": position, "answer": answer, "new_password": "brand-new-pass"},
+            )
+
+        details = set()
+        for kwargs in (
+            {},
+            {"position": 2},
+            {"username": "nobody_99"},
+        ):
+            with self.assertRaises(app.HTTPException) as ctx:
+                attempt(**kwargs)
+            self.assertEqual(ctx.exception.status_code, 401)
+            details.add(ctx.exception.detail)
+        self.assertEqual(len(details), 1)
+        for bad in ({"position": 0}, {"position": "1"}, {"position": True}, {"answer": ""}):
+            with self.subTest(bad), self.assertRaises(app.HTTPException) as ctx:
+                attempt(**bad)
+            self.assertEqual(ctx.exception.status_code, 422)
+
+        # 答案不区分大小写、全半角与空白
+        response = attempt(answer="ＨＥＬＬＯ world")
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.body(app.get_account(self.request(cookie=token))), {"authenticated": False})
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.login(password="correct-horse", ip="198.51.100.72")
+        self.assertEqual(ctx.exception.status_code, 401)
+        response, _ = self.login(password="brand-new-pass", ip="198.51.100.72")
+        self.assertEqual(response.status_code, 200)
+
+    def test_password_reset_locks_username_after_repeated_failures(self):
+        self.register()
+        _, limit = app.AUTH_RATE_LIMITS["reset_fail_user"][0]
+        payload = {"username": "alice_01", "position": 1, "answer": "wrong", "new_password": "brand-new-pass"}
+        for index in range(limit):
+            with self.assertRaises(app.HTTPException) as ctx:
+                app.reset_password(self.request(ip=f"198.51.104.{index}"), payload)
+            self.assertEqual(ctx.exception.status_code, 401)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.reset_password(
+                self.request(ip="198.51.104.100"), dict(payload, answer="helloworld")
+            )
+        self.assertEqual(ctx.exception.status_code, 429)
+        # 用户名查询限流按 IP 计数
+        _, lookup_limit = app.AUTH_RATE_LIMITS["reset_lookup_ip"][0]
+        for _ in range(lookup_limit):
+            app.reset_questions(self.request(ip="198.51.105.1"), {"username": "alice_01"})
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.reset_questions(self.request(ip="198.51.105.1"), {"username": "alice_01"})
+        self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_change_password_requires_current_and_revokes_other_sessions(self):
+        _, phone = self.register()
+        _, laptop = self.login(ip="198.51.100.80")
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.change_password(
+                self.request(cookie=laptop),
+                {"current_password": "wrong-password", "new_password": "third-password"},
+            )
+        self.assertEqual(ctx.exception.status_code, 401)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.change_password(
+                self.request(cookie=laptop),
+                {"current_password": "correct-horse", "new_password": "short"},
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.change_password(
+                self.request(), {"current_password": "correct-horse", "new_password": "third-password"}
+            )
+        self.assertEqual(ctx.exception.status_code, 401)
+        response = app.change_password(
+            self.request(cookie=laptop),
+            {"current_password": "correct-horse", "new_password": "third-password"},
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertTrue(self.body(app.get_account(self.request(cookie=laptop)))["authenticated"])
+        self.assertEqual(self.body(app.get_account(self.request(cookie=phone))), {"authenticated": False})
+        response, _ = self.login(password="third-password", ip="198.51.100.81")
+        self.assertEqual(response.status_code, 200)
+
+    def test_change_questions_requires_current_password_and_replaces_all(self):
+        _, token = self.register()
+        new_questions = [
+            {"question": "第一门课", "answer": "高数"},
+            {"question": "宿舍楼", "answer": " 45 楼 "},
+        ]
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.change_questions(
+                self.request(cookie=token),
+                {"current_password": "wrong-password", "questions": new_questions},
+            )
+        self.assertEqual(ctx.exception.status_code, 401)
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.change_questions(
+                self.request(cookie=token), {"current_password": "correct-horse", "questions": []}
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+        response = app.change_questions(
+            self.request(cookie=token),
+            {"current_password": "correct-horse", "questions": new_questions},
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(
+            self.body(app.get_account(self.request(cookie=token)))["questions"],
+            [{"position": 1, "question": "第一门课"}, {"position": 2, "question": "宿舍楼"}],
+        )
+        with self.assertRaises(app.HTTPException):
+            app.reset_password(
+                self.request(ip="198.51.100.90"),
+                {"username": "alice_01", "position": 1, "answer": "helloworld", "new_password": "brand-new-pass"},
+            )
+        response = app.reset_password(
+            self.request(ip="198.51.100.91"),
+            {"username": "alice_01", "position": 2, "answer": "45楼", "new_password": "brand-new-pass"},
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_delete_account_cascades_and_clears_cookie(self):
+        _, token = self.register()
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.delete_account(self.request(cookie=token), {"password": "wrong-password"})
+        self.assertEqual(ctx.exception.status_code, 401)
+        response = app.delete_account(self.request(cookie=token), {"password": "correct-horse"})
+        self.assertEqual(response.status_code, 204)
+        self.assertIn("Max-Age=0", response.headers["set-cookie"])
+        with self.db() as conn:
+            for table in ("users", "sessions", "security_questions", "favorites"):
+                self.assertEqual(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0, table)
+        self.assertEqual(self.body(app.get_account(self.request(cookie=token))), {"authenticated": False})
+        response, _ = self.register(ip="198.51.100.95")
+        self.assertEqual(response.status_code, 201)
+
+    def test_secret_hash_helpers(self):
+        self.assertTrue(hasattr(hashlib, "scrypt"))
+        self.assertEqual(self.production_scrypt, {"n": 2 ** 14, "r": 8, "p": 1})
+        stored = app._hash_secret("correct-horse")
+        self.assertTrue(stored.startswith("scrypt$16$8$1$"))
+        self.assertTrue(app._verify_secret("correct-horse", stored))
+        self.assertFalse(app._verify_secret("Correct-horse", stored))
+        self.assertFalse(app._verify_secret("correct-horse", stored[:-3] + "xyz"))
+        self.assertFalse(app._verify_secret("correct-horse", "plaintext"))
+        self.assertFalse(app._verify_secret("correct-horse", "scrypt$16$8$1$!!$!!"))
+        self.assertFalse(app._verify_secret(None, stored))
+        self.assertFalse(app._secret_needs_rehash(stored))
+        with patch.object(app, "SCRYPT_PARAMS", {"n": 8, "r": 8, "p": 1}):
+            legacy = app._hash_secret("correct-horse")
+        self.assertTrue(app._verify_secret("correct-horse", legacy))
+        self.assertTrue(app._secret_needs_rehash(legacy))
+        self.assertTrue(app._secret_needs_rehash("garbage"))
+        self.assertEqual(app._normalize_answer("  Hello　World "), "helloworld")
+        self.assertEqual(app._normalize_answer("ＨＥＬＬＯ"), "hello")
+        self.assertEqual(app._normalize_answer("四十五 楼"), "四十五楼")
+
+    def test_login_upgrades_legacy_password_hashes(self):
+        with patch.object(app, "SCRYPT_PARAMS", {"n": 8, "r": 8, "p": 1}):
+            self.register()
+        with self.db() as conn:
+            self.assertTrue(conn.execute("SELECT password_hash FROM users").fetchone()[0].startswith("scrypt$8$"))
+        response, _ = self.login(ip="198.51.100.99")
+        self.assertEqual(response.status_code, 200)
+        with self.db() as conn:
+            self.assertTrue(conn.execute("SELECT password_hash FROM users").fetchone()[0].startswith("scrypt$16$"))
+
+    def test_accounts_db_is_separate_and_versioned(self):
+        self.register()
+        self.assertNotEqual(app.ACCOUNTS_DB_PATH.parent, app.DB_DIR)
+        with self.db() as conn:
+            tables = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 1)
+        self.assertTrue({"users", "security_questions", "sessions", "favorites", "auth_events"} <= tables)
+        self.assertNotIn("basic_info", tables)
+        self.assertNotIn("messages", tables)
+
+
+class FavoritesApiTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(setattr, app, "ACCOUNTS_DB_PATH", app.ACCOUNTS_DB_PATH)
+        app.ACCOUNTS_DB_PATH = Path(self._tmp.name) / "账户.db"
+        patcher = patch.object(app, "SCRYPT_PARAMS", {"n": 16, "r": 8, "p": 1})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(setattr, app, "_DUMMY_SECRET_HASH", None)
+        app._DUMMY_SECRET_HASH = None
+        self.course_db = Path(self._tmp.name) / "2026秋季学期本科生课程.db"
+        _build_course_db(self.course_db, FIXTURE_COURSES)
+        term_patcher = patch.dict(app.TERM_DBS, {"fall": [("main", self.course_db, "a")]}, clear=True)
+        term_patcher.start()
+        self.addCleanup(term_patcher.stop)
+        self.token = self.register("Alice_01", "203.0.113.9")
+
+    request = staticmethod(_account_request)
+
+    def register(self, username, ip):
+        response = app.register_account(
+            self.request(ip=ip),
+            {
+                "username": username,
+                "password": "correct-horse",
+                "questions": [{"question": "q", "answer": "abc"}],
+            },
+        )
+        token, _ = _session_cookie(response)
+        return token
+
+    @staticmethod
+    def body(response):
+        return json.loads(response.body)
+
+    def add(self, course_id, token=None, ip="203.0.113.9"):
+        return app.add_favorite(self.request(ip=ip, cookie=token or self.token), {"id": course_id})
+
+    def favorites(self, token=None):
+        return self.body(app.list_favorites(self.request(cookie=token or self.token)))["favorites"]
+
+    def test_favorites_require_login(self):
+        for call in (
+            lambda: app.list_favorites(self.request()),
+            lambda: app.add_favorite(self.request(), {"id": "a1"}),
+            lambda: app.remove_favorite(self.request(), {"fav_key": "fall|ug|04831180|1|张三(教授)"}),
+        ):
+            with self.assertRaises(app.HTTPException) as ctx:
+                call()
+            self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_add_builds_snapshot_on_the_server(self):
+        response = app.add_favorite(
+            self.request(cookie=self.token),
+            {"id": "a1", "course_name": "客户端伪造", "teacher": "伪造", "fav_key": "x"},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        payload = self.body(response)
+        self.assertEqual(set(payload), {"favorites", "limit"})
+        self.assertEqual(payload["limit"], app.FAVORITES_MAX)
+        item = payload["favorites"][0]
+        self.assertEqual(
+            set(item),
+            {
+                "fav_key", "id", "available", "term", "term_label", "level", "course_code",
+                "class_no", "teacher", "course_name", "credits", "schedule", "department", "added_at",
+            },
+        )
+        self.assertEqual(item["fav_key"], "fall|ug|04831180|1|张三(教授)")
+        self.assertEqual(item["id"], "a1")
+        self.assertTrue(item["available"])
+        self.assertEqual(item["term"], "fall")
+        self.assertEqual(item["term_label"], "2026秋季学期")
+        self.assertEqual(item["level"], "ug")
+        self.assertEqual(item["course_name"], "PSoC应用开发基础实验")
+        self.assertEqual(item["teacher"], "张三(教授)")
+        self.assertEqual(item["credits"], 2.0)
+        self.assertEqual(item["schedule"], "1~16周 每周周三3~4节")
+        self.assertEqual(item["department"], "信息科学技术学院")
+        self.assertNotIn(b"user_id", response.body)
+        # 空教师写成空段，客户端只需按同一规则拼接
+        empty_teacher = self.body(self.add("a2"))["favorites"][0]
+        self.assertEqual(empty_teacher["fav_key"], "fall|ug|00131520|2|")
+        self.assertEqual(app._favorite_key("fall", "ug", "00131520", 2, None), "fall|ug|00131520|2|")
+
+    def test_invalid_and_missing_course_ids(self):
+        for bad in ("x1", "a0", "a01", 12, None, "a1 "):
+            with self.subTest(bad), self.assertRaises(app.HTTPException) as ctx:
+                app.add_favorite(self.request(cookie=self.token), {"id": bad})
+            self.assertEqual(ctx.exception.status_code, 422)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.add("a99")
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(self.favorites(), [])
+
+    def test_duplicate_add_keeps_added_at_and_returns_200(self):
+        first = self.body(self.add("a1"))["favorites"][0]
+        with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH)) as conn:
+            conn.execute("UPDATE favorites SET added_at = 1700000000, course_name = '旧名'")
+            conn.commit()
+        again = self.add("a1")
+        self.assertEqual(again.status_code, 200)
+        items = self.body(again)["favorites"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["added_at"], 1700000000)
+        self.assertEqual(items[0]["course_name"], first["course_name"])
+
+    def test_limit_is_enforced_without_touching_existing_rows(self):
+        with patch.object(app, "FAVORITES_MAX", 1):
+            self.assertEqual(self.add("a1").status_code, 201)
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.add("a2")
+            self.assertEqual(ctx.exception.status_code, 409)
+            self.assertEqual(self.add("a1").status_code, 200)
+            self.assertEqual([item["id"] for item in self.favorites()], ["a1"])
+            self.assertEqual(self.body(app.list_favorites(self.request(cookie=self.token)))["limit"], 1)
+
+    def test_users_only_see_their_own_favorites(self):
+        other = self.register("Bob_02", "198.51.100.2")
+        self.add("a1")
+        self.add("a2", token=other, ip="198.51.100.2")
+        self.assertEqual([item["id"] for item in self.favorites()], ["a1"])
+        self.assertEqual([item["id"] for item in self.favorites(other)], ["a2"])
+        account = self.body(app.get_account(self.request(cookie=other)))
+        self.assertEqual([item["id"] for item in account["favorites"]], ["a2"])
+
+    def test_remove_is_idempotent(self):
+        key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        self.add("a2")
+        response = app.remove_favorite(self.request(cookie=self.token), {"fav_key": key})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in self.body(response)["favorites"]], ["a2"])
+        response = app.remove_favorite(self.request(cookie=self.token), {"fav_key": key})
+        self.assertEqual([item["id"] for item in self.body(response)["favorites"]], ["a2"])
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.remove_favorite(self.request(cookie=self.token), {"fav_key": ""})
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_list_is_newest_first(self):
+        self.add("a1")
+        self.add("a2")
+        with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH)) as conn:
+            conn.execute("UPDATE favorites SET added_at = 1700000000 WHERE course_id = 'a1'")
+            conn.execute("UPDATE favorites SET added_at = 1800000000 WHERE course_id = 'a2'")
+            conn.commit()
+        self.assertEqual([item["id"] for item in self.favorites()], ["a2", "a1"])
+
+    def test_refresh_rewrites_drifted_ids_after_rebuild(self):
+        self.add("a1")
+        rebuilt = [dict(FIXTURE_COURSES[0], id=7), dict(FIXTURE_COURSES[1], id=8)]
+        _build_course_db(self.course_db, rebuilt)
+        items = self.favorites()
+        self.assertEqual(items[0]["id"], "a7")
+        self.assertTrue(items[0]["available"])
+        with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH)) as conn:
+            self.assertEqual(conn.execute("SELECT course_id FROM favorites").fetchone()[0], "a7")
+        detail = app.get_course_detail("a7", "zh")
+        self.assertEqual(detail["course_name"], "PSoC应用开发基础实验")
+
+    def test_refresh_marks_missing_courses_unavailable(self):
+        self.add("a1")
+        _build_course_db(self.course_db, [FIXTURE_COURSES[1]])
+        items = self.favorites()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["id"], "a1")
+        self.assertFalse(items[0]["available"])
+        self.assertEqual(items[0]["course_name"], "PSoC应用开发基础实验")
+
+    def test_refresh_marks_next_year_term_unavailable(self):
+        self.add("a1")
+        next_year = Path(self._tmp.name) / "2027秋季学期本科生课程.db"
+        _build_course_db(next_year, FIXTURE_COURSES)
+        with patch.dict(app.TERM_DBS, {"fall": [("main", next_year, "a")]}, clear=True):
+            self.assertEqual(app._term_label("fall"), "2027秋季学期")
+            items = self.favorites()
+        self.assertFalse(items[0]["available"])
+        self.assertEqual(items[0]["term_label"], "2026秋季学期")
+        self.assertEqual(items[0]["id"], "a1")
+        self.assertEqual(app._term_label("fall"), "2026秋季学期")
+        self.assertEqual(app._term_label("winter"), "winter")
+
+    def test_favorite_writes_are_rate_limited_per_ip(self):
+        limits = dict(app.AUTH_RATE_LIMITS)
+        limits["favorite_write_ip"] = ((3600, 2),)
+        with patch.object(app, "AUTH_RATE_LIMITS", limits):
+            self.add("a1")
+            self.add("a2")
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.add("a1")
+            self.assertEqual(ctx.exception.status_code, 429)
+            other = self.register("Bob_02", "198.51.100.2")
+            self.assertEqual(self.add("a1", token=other, ip="198.51.100.2").status_code, 201)
+        self.assertEqual(len(self.favorites()), 2)
 
 
 class ReviewApiTests(unittest.TestCase):

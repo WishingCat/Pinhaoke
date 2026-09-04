@@ -21,18 +21,22 @@ queries use ATTACH + UNION ALL. Each row carries a prefixed string id:
 The prefix alone determines which DB the detail endpoint opens, so callers do
 NOT need to pass ?term= when fetching a specific course.
 """
+import base64
 from contextlib import contextmanager
 import hashlib
+import hmac
 import math
 import os
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 import threading
 import time
 import unicodedata
+from urllib.parse import urlsplit
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -62,6 +66,41 @@ STATS_DB_PATH = Path(
 # 访问按北京时间分日，同一 IP 哈希当日只算一名访客、浏览量累加。
 STATS_TZ_OFFSET_SECONDS = 8 * 3600
 STATS_TREND_DAYS = 7
+
+# 账户库：第三份可写数据，保存账号、密保、会话与课程收藏，不进入仓库。
+ACCOUNTS_DB_PATH = Path(
+    os.environ.get("PINHAOKE_ACCOUNTS_DB", "") or (BASE_DIR / "账户.db")
+)
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_MAX_LENGTH = 128
+SECURITY_QUESTION_MIN = 1
+SECURITY_QUESTION_MAX = 3
+SECURITY_QUESTION_TEXT_MAX = 60
+SECURITY_ANSWER_MIN = 2
+SECURITY_ANSWER_MAX = 64
+# 每次 scrypt 约占 16 MiB 内存；n 提到 2**15 会超出 hashlib 默认 maxmem。
+SCRYPT_PARAMS = {"n": 2 ** 14, "r": 8, "p": 1}
+# 每个 worker 最多两次并发哈希，防止线程池并发把 2G 内存打爆。
+_SCRYPT_GATE = threading.BoundedSemaphore(2)
+_DUMMY_SECRET_HASH = None
+SESSION_COOKIE = "pinhaoke_session"
+SESSION_TTL_SECONDS = 180 * 86400
+SESSION_REFRESH_SECONDS = 86400
+FAVORITES_MAX = 300
+# kind -> ((窗口秒数, 上限), ...)；subject 为 IP 哈希、username_key 或固定 "*"。
+AUTH_RATE_LIMITS = {
+    "register_ip": ((3600, 3), (86400, 10)),
+    "login_fail_ip": ((900, 10),),
+    "login_fail_user": ((900, 10),),
+    "reset_lookup_ip": ((3600, 10),),
+    "reset_fail_ip": ((3600, 20),),
+    "reset_fail_user": ((3600, 5),),
+    "secret_verify_global": ((60, 300),),
+    "favorite_write_ip": ((3600, 300),),
+}
+AUTH_EVENT_RETENTION_SECONDS = 2 * 86400
+_TERM_LABEL_RE = re.compile(r"^\d{4}(?:春季学期|暑期|秋季学期)")
 
 # (alias, path, id_prefix)
 TERM_DBS = {
@@ -193,6 +232,82 @@ def get_stats_db():
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_visit_days_day ON visit_days(day)"
         )
+        yield conn
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+_ACCOUNTS_SCHEMA_V1 = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    username_key TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    password_changed_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS security_questions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    answer_hash TEXT NOT NULL,
+    PRIMARY KEY (user_id, position)
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS favorites (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fav_key TEXT NOT NULL,
+    course_id TEXT NOT NULL,
+    term TEXT NOT NULL,
+    term_label TEXT NOT NULL,
+    level TEXT NOT NULL,
+    course_code TEXT NOT NULL,
+    class_no TEXT NOT NULL,
+    teacher TEXT NOT NULL,
+    course_name TEXT NOT NULL,
+    credits REAL,
+    schedule TEXT,
+    department TEXT,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, fav_key)
+);
+CREATE TABLE IF NOT EXISTS auth_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_events_lookup ON auth_events(kind, subject, at);
+CREATE INDEX IF NOT EXISTS idx_auth_events_at ON auth_events(at);
+"""
+
+
+def _migrate_accounts_db(conn) -> None:
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version < 1:
+        conn.executescript(_ACCOUNTS_SCHEMA_V1)
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+
+
+@contextmanager
+def get_accounts_db():
+    conn = None
+    try:
+        conn = sqlite3.connect(ACCOUNTS_DB_PATH, timeout=5)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA foreign_keys = ON")
+        _migrate_accounts_db(conn)
         yield conn
     finally:
         if conn is not None:
@@ -1678,6 +1793,777 @@ def list_messages(
 def create_message(request: Request, payload: dict = Body(...)):
     content = _validate_message_content(payload)
     return _insert_message(content, _client_ip_hash(request))
+
+
+# Accounts and favorites ----------------------------------------------------------
+#
+# 第三个可写库。服务器是收藏的唯一事实来源：客户端只提交课程 ID，快照由服务器从只读
+# 课程库读取；密码与密保答案只存 scrypt 哈希，会话只存 sha256，任何响应都不含 IP、
+# 哈希、token 明文或密保答案。
+
+
+def _scrypt(secret: str, salt: bytes, params: dict) -> bytes:
+    with _SCRYPT_GATE:
+        return hashlib.scrypt(secret.encode("utf-8"), salt=salt, dklen=32, **params)
+
+
+def _hash_secret(secret: str) -> str:
+    params = SCRYPT_PARAMS
+    salt = secrets.token_bytes(16)
+    digest = _scrypt(secret, salt, params)
+    return "scrypt${}${}${}${}${}".format(
+        params["n"],
+        params["r"],
+        params["p"],
+        base64.b64encode(salt).decode("ascii"),
+        base64.b64encode(digest).decode("ascii"),
+    )
+
+
+def _parse_secret_hash(stored):
+    try:
+        scheme, n, r, p, salt_b64, hash_b64 = stored.split("$")
+        if scheme != "scrypt":
+            return None
+        params = {"n": int(n), "r": int(r), "p": int(p)}
+        salt = base64.b64decode(salt_b64, validate=True)
+        digest = base64.b64decode(hash_b64, validate=True)
+    except (ValueError, AttributeError, TypeError):
+        return None
+    if not salt or not digest:
+        return None
+    return params, salt, digest
+
+
+def _verify_secret(secret: str, stored: str) -> bool:
+    parsed = _parse_secret_hash(stored)
+    if parsed is None or not isinstance(secret, str):
+        return False
+    params, salt, expected = parsed
+    try:
+        digest = _scrypt(secret, salt, params)
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(digest, expected)
+
+
+def _secret_needs_rehash(stored: str) -> bool:
+    parsed = _parse_secret_hash(stored)
+    return parsed is None or parsed[0] != SCRYPT_PARAMS
+
+
+def _dummy_secret_hash() -> str:
+    # 用户不存在时也对它校验一次，让“用户不存在”与“密码错误”耗时接近。
+    global _DUMMY_SECRET_HASH
+    if _DUMMY_SECRET_HASH is None or _secret_needs_rehash(_DUMMY_SECRET_HASH):
+        _DUMMY_SECRET_HASH = _hash_secret(secrets.token_urlsafe(16))
+    return _DUMMY_SECRET_HASH
+
+
+def _normalize_answer(text: str) -> str:
+    # 答案不区分大小写、全半角与空白。
+    return "".join(unicodedata.normalize("NFKC", text).casefold().split())
+
+
+def _invalid_account_payload():
+    return HTTPException(status_code=422, detail="Invalid account payload")
+
+
+def _payload_dict(payload) -> dict:
+    if not isinstance(payload, dict):
+        raise _invalid_account_payload()
+    return payload
+
+
+def _validate_username(value):
+    if not isinstance(value, str):
+        raise _invalid_account_payload()
+    username = value.strip()
+    if not USERNAME_RE.fullmatch(username):
+        raise _invalid_account_payload()
+    return username, username.lower()
+
+
+def _validate_password(value, username_key: str) -> str:
+    if not isinstance(value, str):
+        raise _invalid_account_payload()
+    if not PASSWORD_MIN_LENGTH <= len(value) <= PASSWORD_MAX_LENGTH:
+        raise _invalid_account_payload()
+    if value.casefold() == username_key:
+        raise _invalid_account_payload()
+    return value
+
+
+def _validate_password_input(value) -> str:
+    # 校验已有密码时只检查形状，不重复套用注册规则。
+    if not isinstance(value, str) or not 1 <= len(value) <= PASSWORD_MAX_LENGTH:
+        raise _invalid_account_payload()
+    return value
+
+
+def _validate_questions(value, username_key: str):
+    if not isinstance(value, list):
+        raise _invalid_account_payload()
+    if not SECURITY_QUESTION_MIN <= len(value) <= SECURITY_QUESTION_MAX:
+        raise _invalid_account_payload()
+    questions = []
+    seen = set()
+    for item in value:
+        if not isinstance(item, dict):
+            raise _invalid_account_payload()
+        question = item.get("question")
+        answer = item.get("answer")
+        if not isinstance(question, str) or not isinstance(answer, str):
+            raise _invalid_account_payload()
+        question = " ".join(question.split())
+        if not 1 <= len(question) <= SECURITY_QUESTION_TEXT_MAX:
+            raise _invalid_account_payload()
+        if question.casefold() in seen:
+            raise _invalid_account_payload()
+        seen.add(question.casefold())
+        normalized = _normalize_answer(answer)
+        if not SECURITY_ANSWER_MIN <= len(normalized) <= SECURITY_ANSWER_MAX:
+            raise _invalid_account_payload()
+        if normalized == username_key:
+            raise _invalid_account_payload()
+        questions.append((question, normalized))
+    return questions
+
+
+def _enforce_rate_limit(conn, kind: str, subject: str, now: int) -> None:
+    for window, limit in AUTH_RATE_LIMITS[kind]:
+        recent = conn.execute(
+            "SELECT COUNT(*) FROM auth_events WHERE kind=? AND subject=? AND at>?",
+            (kind, subject, now - window),
+        ).fetchone()[0]
+        if recent >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many attempts, please retry later",
+                headers={"Retry-After": str(window)},
+            )
+
+
+def _record_event(conn, kind: str, subject: str, now: int, count: int = 1) -> None:
+    conn.executemany(
+        "INSERT INTO auth_events (kind, subject, at) VALUES (?, ?, ?)",
+        [(kind, subject, now)] * count,
+    )
+
+
+def _purge_expired(conn, now: int) -> None:
+    conn.execute(
+        "DELETE FROM auth_events WHERE at < ?", (now - AUTH_EVENT_RETENTION_SECONDS,)
+    )
+    conn.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+
+
+def _session_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _request_token(request) -> str:
+    cookies = getattr(request, "cookies", None)
+    if not cookies:
+        return ""
+    try:
+        token = cookies.get(SESSION_COOKIE)
+    except AttributeError:
+        return ""
+    return token if isinstance(token, str) else ""
+
+
+def _new_session(conn, user_id: int, now: int) -> str:
+    token = secrets.token_urlsafe(32)
+    conn.execute(
+        "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (_session_token_hash(token), user_id, now, now, now + SESSION_TTL_SECONDS),
+    )
+    return token
+
+
+def _current_session(conn, request, now: int):
+    """Return the joined session/user row for a valid cookie, else None."""
+    token = _request_token(request)
+    if not token:
+        return None
+    token_hash = _session_token_hash(token)
+    row = conn.execute(
+        "SELECT s.token_hash, s.user_id, s.last_seen_at, s.expires_at,"
+        " u.username, u.username_key, u.password_hash"
+        " FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash=?",
+        (token_hash,),
+    ).fetchone()
+    if row is None:
+        return None
+    if row["expires_at"] <= now:
+        conn.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
+        conn.commit()
+        return None
+    return row
+
+
+def _require_user(conn, request, now: int):
+    session = _current_session(conn, request, now)
+    if session is None:
+        raise HTTPException(status_code=401, detail="Login required")
+    return session
+
+
+def _cookie_secure(request) -> bool:
+    forwarded = ""
+    try:
+        forwarded = (request.headers.get("x-forwarded-proto") or "").split(",")[0]
+    except AttributeError:
+        forwarded = ""
+    forwarded = forwarded.strip().lower()
+    if forwarded:
+        return forwarded == "https"
+    url = getattr(request, "url", None)
+    return getattr(url, "scheme", "") == "https"
+
+
+def _set_session_cookie(response, request, token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_TTL_SECONDS,
+        path="/",
+        secure=_cookie_secure(request),
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _clear_session_cookie(response, request) -> None:
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/",
+        secure=_cookie_secure(request),
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _request_host(request) -> str:
+    headers = request.headers
+    host = headers.get("x-forwarded-host") or headers.get("host") or ""
+    return host.split(",")[0].strip().lower()
+
+
+def _require_trusted_origin(request) -> None:
+    # SameSite=Lax 之外的第二道 CSRF 防线：浏览器发起的变更请求必带 Origin，
+    # 其主机必须与 Host 一致；两者都缺的非浏览器客户端没有 cookie 可被利用。
+    headers = request.headers
+    source = (headers.get("origin") or "").strip() or (headers.get("referer") or "").strip()
+    if not source:
+        return
+    if source.lower() == "null":
+        raise HTTPException(status_code=403, detail="Untrusted origin")
+    netloc = urlsplit(source).netloc.lower()
+    host = _request_host(request)
+    if not netloc or not host or netloc != host:
+        raise HTTPException(status_code=403, detail="Untrusted origin")
+
+
+def _no_store(payload, status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        payload, status_code=status_code, headers={"Cache-Control": "no-store"}
+    )
+
+
+def _empty_no_store(status_code: int = 204) -> Response:
+    return Response(status_code=status_code, headers={"Cache-Control": "no-store"})
+
+
+def _verify_current_password(conn, session, password: str, request, now: int) -> None:
+    # 已登录用户修改密码、密保或删号前必须再次证明持有密码；失败计入登录失败限流，
+    # 防止被盗会话暴力猜密码。
+    ip_hash = _client_ip_hash(request)
+    _enforce_rate_limit(conn, "login_fail_ip", ip_hash, now)
+    _enforce_rate_limit(conn, "login_fail_user", session["username_key"], now)
+    _enforce_rate_limit(conn, "secret_verify_global", "*", now)
+    _record_event(conn, "secret_verify_global", "*", now)
+    conn.commit()
+    if not _verify_secret(password, session["password_hash"]):
+        _record_event(conn, "login_fail_ip", ip_hash, now)
+        _record_event(conn, "login_fail_user", session["username_key"], now)
+        conn.commit()
+        raise HTTPException(status_code=401, detail="当前密码错误")
+
+
+def _public_questions(conn, user_id: int) -> list:
+    rows = conn.execute(
+        "SELECT position, question FROM security_questions WHERE user_id=? ORDER BY position",
+        (user_id,),
+    ).fetchall()
+    return [{"position": row["position"], "question": row["question"]} for row in rows]
+
+
+def _store_questions(conn, user_id: int, questions) -> None:
+    conn.execute("DELETE FROM security_questions WHERE user_id=?", (user_id,))
+    conn.executemany(
+        "INSERT INTO security_questions (user_id, position, question, answer_hash)"
+        " VALUES (?, ?, ?, ?)",
+        [
+            (user_id, index + 1, question, _hash_secret(answer))
+            for index, (question, answer) in enumerate(questions)
+        ],
+    )
+
+
+def _term_label(term: str) -> str:
+    # 学期槽位（spring/summer/fall）会指向新学年，快照另存 “2026秋季学期” 这样的字面。
+    config = TERM_DBS.get(term)
+    if config:
+        match = _TERM_LABEL_RE.match(config[0][1].stem)
+        if match:
+            return match.group(0)
+    return term
+
+
+def _favorite_key(term, level, course_code, class_no, teacher) -> str:
+    parts = (term, level, course_code, class_no, teacher)
+    return "|".join(("" if part is None else str(part)).strip() for part in parts)
+
+
+def _level_of_prefix(prefix: str) -> str:
+    return "gr" if prefix in ("g", "r") else "ug"
+
+
+def _favorite_snapshot(course_id: str) -> dict:
+    term, prefix, _ = _parse_id(course_id)
+    if prefix is None:
+        raise HTTPException(status_code=422, detail="Invalid course id")
+    detail = get_course_detail(course_id, "zh")
+    level = _level_of_prefix(prefix)
+    course_code = str(detail.get("course_code") or "").strip()
+    class_no = str(detail.get("class_no") or "").strip()
+    teacher = str(detail.get("teacher") or "").strip()
+    return {
+        "fav_key": _favorite_key(term, level, course_code, class_no, teacher),
+        "course_id": course_id,
+        "term": term,
+        "term_label": _term_label(term),
+        "level": level,
+        "course_code": course_code,
+        "class_no": class_no,
+        "teacher": teacher,
+        "course_name": str(detail.get("course_name") or "").strip(),
+        "credits": detail.get("credits"),
+        "schedule": detail.get("schedule") or "",
+        "department": detail.get("department") or "",
+    }
+
+
+def _favorites_list(conn, user_id: int) -> list:
+    rows = conn.execute(
+        "SELECT fav_key, course_id, term, term_label, level, course_code, class_no,"
+        " teacher, course_name, credits, schedule, department, added_at"
+        " FROM favorites WHERE user_id=? ORDER BY added_at DESC, fav_key",
+        (user_id,),
+    ).fetchall()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["id"] = item.pop("course_id")
+        item["available"] = True
+        items.append(item)
+    return items
+
+
+def _refresh_favorite_ids(conn, user_id: int, items: list) -> None:
+    """课程库重建后 ID 会漂移；按稳定键回写新 ID，学期字面变化时标记不可用。"""
+    by_term = {}
+    for item in items:
+        by_term.setdefault(item["term"], []).append(item)
+    changed = False
+    for term, group in by_term.items():
+        config = TERM_DBS.get(term)
+        if config is None:
+            for item in group:
+                item["available"] = False
+            continue
+        alias_by_prefix = {prefix: alias for alias, _, prefix in config}
+        current_label = _term_label(term)
+        try:
+            with get_db(term) as course_conn:
+                for item in group:
+                    if item["term_label"] != current_label:
+                        item["available"] = False
+                        continue
+                    _, prefix, local_id = _parse_id(item["id"])
+                    alias = alias_by_prefix.get(prefix)
+                    if alias is None:
+                        item["available"] = False
+                        continue
+                    exists = course_conn.execute(
+                        f"SELECT 1 FROM {alias}.basic_info WHERE id=?", (local_id,)
+                    ).fetchone()
+                    if exists:
+                        continue
+                    row = course_conn.execute(
+                        f"SELECT MIN(id) FROM {alias}.basic_info"
+                        " WHERE course_code=? AND CAST(class_no AS TEXT)=?"
+                        " AND COALESCE(teacher, '')=?",
+                        (item["course_code"], item["class_no"], item["teacher"]),
+                    ).fetchone()
+                    if row is None or row[0] is None:
+                        item["available"] = False
+                        continue
+                    new_id = f"{prefix}{row[0]}"
+                    conn.execute(
+                        "UPDATE favorites SET course_id=? WHERE user_id=? AND fav_key=?",
+                        (new_id, user_id, item["fav_key"]),
+                    )
+                    item["id"] = new_id
+                    changed = True
+        except (sqlite3.Error, OSError, HTTPException):
+            for item in group:
+                item["available"] = False
+    if changed:
+        conn.commit()
+
+
+def _favorites_payload(conn, user_id: int) -> dict:
+    items = _favorites_list(conn, user_id)
+    _refresh_favorite_ids(conn, user_id, items)
+    return {"favorites": items, "limit": FAVORITES_MAX}
+
+
+@app.get("/api/account")
+def get_account(request: Request):
+    now = int(time.time())
+    if not _request_token(request):
+        # 匿名访客不碰账户库。
+        return _no_store({"authenticated": False})
+    with get_accounts_db() as conn:
+        session = _current_session(conn, request, now)
+        if session is None:
+            response = _no_store({"authenticated": False})
+            _clear_session_cookie(response, request)
+            return response
+        refreshed = False
+        if now - session["last_seen_at"] >= SESSION_REFRESH_SECONDS:
+            conn.execute(
+                "UPDATE sessions SET last_seen_at=?, expires_at=? WHERE token_hash=?",
+                (now, now + SESSION_TTL_SECONDS, session["token_hash"]),
+            )
+            conn.commit()
+            refreshed = True
+        payload = {
+            "authenticated": True,
+            "username": session["username"],
+            "questions": _public_questions(conn, session["user_id"]),
+        }
+        payload.update(_favorites_payload(conn, session["user_id"]))
+    response = _no_store(payload)
+    if refreshed:
+        _set_session_cookie(response, request, _request_token(request))
+    return response
+
+
+@app.post("/api/auth/register", status_code=201)
+def register_account(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    username, username_key = _validate_username(data.get("username"))
+    password = _validate_password(data.get("password"), username_key)
+    questions = _validate_questions(data.get("questions"), username_key)
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        _enforce_rate_limit(conn, "register_ip", ip_hash, now)
+        _enforce_rate_limit(conn, "secret_verify_global", "*", now)
+        _record_event(conn, "register_ip", ip_hash, now)
+        conn.commit()
+        taken = conn.execute(
+            "SELECT 1 FROM users WHERE username_key=?", (username_key,)
+        ).fetchone()
+        if taken:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        _record_event(conn, "secret_verify_global", "*", now, count=1 + len(questions))
+        conn.commit()
+        password_hash = _hash_secret(password)
+        try:
+            cursor = conn.execute(
+                "INSERT INTO users (username, username_key, password_hash,"
+                " created_at, password_changed_at) VALUES (?, ?, ?, ?, ?)",
+                (username, username_key, password_hash, now, now),
+            )
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Username already taken")
+        user_id = cursor.lastrowid
+        _store_questions(conn, user_id, questions)
+        token = _new_session(conn, user_id, now)
+        _purge_expired(conn, now)
+        conn.commit()
+    response = _no_store({"username": username}, status_code=201)
+    _set_session_cookie(response, request, token)
+    return response
+
+
+@app.post("/api/auth/login")
+def login_account(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    username, username_key = _validate_username(data.get("username"))
+    password = _validate_password_input(data.get("password"))
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        _enforce_rate_limit(conn, "login_fail_ip", ip_hash, now)
+        _enforce_rate_limit(conn, "login_fail_user", username_key, now)
+        _enforce_rate_limit(conn, "secret_verify_global", "*", now)
+        _record_event(conn, "secret_verify_global", "*", now)
+        conn.commit()
+        user = conn.execute(
+            "SELECT id, username, password_hash FROM users WHERE username_key=?",
+            (username_key,),
+        ).fetchone()
+        stored = user["password_hash"] if user is not None else _dummy_secret_hash()
+        verified = _verify_secret(password, stored)
+        if user is None or not verified:
+            _record_event(conn, "login_fail_ip", ip_hash, now)
+            _record_event(conn, "login_fail_user", username_key, now)
+            conn.commit()
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
+        old_token = _request_token(request)
+        if old_token:
+            conn.execute(
+                "DELETE FROM sessions WHERE token_hash=?", (_session_token_hash(old_token),)
+            )
+        if _secret_needs_rehash(stored):
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (_hash_secret(password), user["id"]),
+            )
+        token = _new_session(conn, user["id"], now)
+        _purge_expired(conn, now)
+        conn.commit()
+    response = _no_store({"username": user["username"]})
+    _set_session_cookie(response, request, token)
+    return response
+
+
+@app.post("/api/auth/logout", status_code=204)
+def logout_account(request: Request):
+    _require_trusted_origin(request)
+    token = _request_token(request)
+    if token:
+        with get_accounts_db() as conn:
+            conn.execute(
+                "DELETE FROM sessions WHERE token_hash=?", (_session_token_hash(token),)
+            )
+            conn.commit()
+    response = _empty_no_store()
+    _clear_session_cookie(response, request)
+    return response
+
+
+@app.post("/api/auth/password", status_code=204)
+def change_password(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        current = _validate_password_input(data.get("current_password"))
+        new_password = _validate_password(data.get("new_password"), session["username_key"])
+        _verify_current_password(conn, session, current, request, now)
+        conn.execute(
+            "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
+            (_hash_secret(new_password), now, session["user_id"]),
+        )
+        conn.execute(
+            "DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
+            (session["user_id"], session["token_hash"]),
+        )
+        conn.commit()
+    return _empty_no_store()
+
+
+@app.post("/api/auth/questions", status_code=204)
+def change_questions(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        current = _validate_password_input(data.get("current_password"))
+        questions = _validate_questions(data.get("questions"), session["username_key"])
+        _verify_current_password(conn, session, current, request, now)
+        _record_event(conn, "secret_verify_global", "*", now, count=len(questions))
+        _store_questions(conn, session["user_id"], questions)
+        conn.commit()
+    return _empty_no_store()
+
+
+@app.post("/api/auth/reset/questions")
+def reset_questions(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    _, username_key = _validate_username(data.get("username"))
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        _enforce_rate_limit(conn, "reset_lookup_ip", ip_hash, now)
+        _record_event(conn, "reset_lookup_ip", ip_hash, now)
+        conn.commit()
+        user = conn.execute(
+            "SELECT id, username FROM users WHERE username_key=?", (username_key,)
+        ).fetchone()
+        if user is None:
+            raise HTTPException(status_code=404, detail="Account not found")
+        questions = _public_questions(conn, user["id"])
+    return _no_store({"username": user["username"], "questions": questions})
+
+
+@app.post("/api/auth/reset", status_code=204)
+def reset_password(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    _, username_key = _validate_username(data.get("username"))
+    position = data.get("position")
+    if (
+        isinstance(position, bool)
+        or not isinstance(position, int)
+        or not 1 <= position <= SECURITY_QUESTION_MAX
+    ):
+        raise _invalid_account_payload()
+    answer = data.get("answer")
+    if not isinstance(answer, str) or not 1 <= len(answer) <= 200:
+        raise _invalid_account_payload()
+    new_password = _validate_password(data.get("new_password"), username_key)
+    normalized = _normalize_answer(answer)
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        _enforce_rate_limit(conn, "reset_fail_ip", ip_hash, now)
+        _enforce_rate_limit(conn, "reset_fail_user", username_key, now)
+        _enforce_rate_limit(conn, "secret_verify_global", "*", now)
+        _record_event(conn, "secret_verify_global", "*", now)
+        conn.commit()
+        row = conn.execute(
+            "SELECT u.id, q.answer_hash FROM users u"
+            " LEFT JOIN security_questions q ON q.user_id = u.id AND q.position=?"
+            " WHERE u.username_key=?",
+            (position, username_key),
+        ).fetchone()
+        stored = row["answer_hash"] if row is not None and row["answer_hash"] else None
+        verified = _verify_secret(normalized, stored or _dummy_secret_hash())
+        if stored is None or not verified:
+            _record_event(conn, "reset_fail_ip", ip_hash, now)
+            _record_event(conn, "reset_fail_user", username_key, now)
+            conn.commit()
+            raise HTTPException(status_code=401, detail="密保答案错误")
+        conn.execute(
+            "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
+            (_hash_secret(new_password), now, row["id"]),
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id=?", (row["id"],))
+        conn.execute(
+            "DELETE FROM auth_events WHERE kind='reset_fail_user' AND subject=?",
+            (username_key,),
+        )
+        _purge_expired(conn, now)
+        conn.commit()
+    return _empty_no_store()
+
+
+@app.post("/api/auth/delete", status_code=204)
+def delete_account(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        password = _validate_password_input(data.get("password"))
+        _verify_current_password(conn, session, password, request, now)
+        # 外键级联删除会话、密保与收藏。
+        conn.execute("DELETE FROM users WHERE id=?", (session["user_id"],))
+        conn.commit()
+    response = _empty_no_store()
+    _clear_session_cookie(response, request)
+    return response
+
+
+@app.get("/api/favorites")
+def list_favorites(request: Request):
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        payload = _favorites_payload(conn, session["user_id"])
+    return _no_store(payload)
+
+
+@app.post("/api/favorites")
+def add_favorite(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    course_id = data.get("id")
+    if not isinstance(course_id, str) or not COURSE_ID_RE.fullmatch(course_id):
+        raise HTTPException(status_code=422, detail="Invalid course id")
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, "favorite_write_ip", ip_hash, now)
+        _record_event(conn, "favorite_write_ip", ip_hash, now)
+        conn.commit()
+        snapshot = _favorite_snapshot(course_id)
+        user_id = session["user_id"]
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
+            "SELECT 1 FROM favorites WHERE user_id=? AND fav_key=?",
+            (user_id, snapshot["fav_key"]),
+        ).fetchone()
+        if existing is None:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM favorites WHERE user_id=?", (user_id,)
+            ).fetchone()[0]
+            if count >= FAVORITES_MAX:
+                conn.rollback()
+                raise HTTPException(status_code=409, detail="Favorites limit reached")
+        conn.execute(
+            "INSERT INTO favorites (user_id, fav_key, course_id, term, term_label, level,"
+            " course_code, class_no, teacher, course_name, credits, schedule, department,"
+            " added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(user_id, fav_key) DO UPDATE SET"
+            " course_id=excluded.course_id, term_label=excluded.term_label,"
+            " course_name=excluded.course_name, credits=excluded.credits,"
+            " schedule=excluded.schedule, department=excluded.department",
+            (
+                user_id, snapshot["fav_key"], snapshot["course_id"], snapshot["term"],
+                snapshot["term_label"], snapshot["level"], snapshot["course_code"],
+                snapshot["class_no"], snapshot["teacher"], snapshot["course_name"],
+                snapshot["credits"], snapshot["schedule"], snapshot["department"], now,
+            ),
+        )
+        conn.commit()
+        payload = _favorites_payload(conn, user_id)
+    return _no_store(payload, status_code=200 if existing else 201)
+
+
+@app.post("/api/favorites/remove")
+def remove_favorite(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    fav_key = data.get("fav_key")
+    if not isinstance(fav_key, str) or not 1 <= len(fav_key) <= 300:
+        raise _invalid_account_payload()
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        conn.execute(
+            "DELETE FROM favorites WHERE user_id=? AND fav_key=?",
+            (session["user_id"], fav_key),
+        )
+        conn.commit()
+        payload = _favorites_payload(conn, session["user_id"])
+    return _no_store(payload)
 
 
 # Static files ------------------------------------------------------------------

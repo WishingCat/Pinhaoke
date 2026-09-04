@@ -1402,6 +1402,175 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 .stats-status { min-height: 1em; margin: 4px 18px 0; font-size: 0.72rem; color: var(--ink-3); text-align: center; }
 .stats-note { margin: 6px 18px 16px; font-size: 0.7rem; line-height: 1.7; color: var(--ink-3); }
 
+/* ===== Favorites & account ===== */
+.card-top-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.fav-btn svg { width: 15px; height: 15px; }
+.fav-btn:hover { border-color: var(--c-major-border); color: var(--c-major); background: var(--c-major-soft); }
+.fav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fav-btn.is-on { color: var(--c-major); border-color: var(--c-major-border); background: var(--c-major-soft); }
+.fav-btn.is-on svg { fill: currentColor; }
+.modal-action.is-on { color: var(--c-major); border-color: var(--c-major-border); background: var(--c-major-soft); }
+.modal-action.is-on svg { fill: currentColor; }
+#favBtn.is-on svg { fill: var(--c-major); stroke: var(--c-major); }
+
+.fav-panel { max-width: 560px; max-height: min(720px, 92vh); }
+.fav-count { margin-left: 8px; font-family: var(--f-mono); font-size: 0.72rem; font-weight: 500; color: var(--ink-3); }
+.fav-status { min-height: 1.2em; margin: 0; padding: 0 18px 8px; font-size: 0.74rem; line-height: 1.5; color: var(--accent); }
+.fav-status.is-error { color: var(--c-grad); }
+.fav-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.fav-seg { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 12px; }
+.fav-seg button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fav-seg button:hover { border-color: var(--ink-3); color: var(--ink); }
+.fav-seg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-mist); }
+
+.fav-form { display: flex; flex-direction: column; gap: 10px; padding: 0 18px 16px; }
+.fav-form-inline { padding-top: 12px; border-bottom: 1px solid var(--border); }
+.fav-field { display: flex; flex-direction: column; gap: 4px; }
+.fav-field-label { font-size: 0.74rem; color: var(--ink-3); }
+.fav-form input, .fav-form select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.fav-form input:focus, .fav-form select:focus { outline: none; border-color: var(--accent); }
+.fav-form input:disabled, .fav-form select:disabled { opacity: 0.6; }
+.fav-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.fav-form-note { margin: 0; font-size: 0.74rem; line-height: 1.6; color: var(--ink-3); }
+.fav-form-note.is-danger { color: var(--c-grad); }
+.fav-mono { font-family: var(--f-mono); font-weight: 600; color: var(--ink); }
+.fav-submit {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fav-submit:hover { filter: brightness(0.95); }
+.fav-submit:disabled { opacity: 0.55; cursor: default; }
+.fav-submit.is-danger { border-color: var(--c-grad); background: var(--c-grad); }
+html[data-theme="dark"] .fav-submit { color: #0E1013; }
+.fav-ghost {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fav-ghost:hover { border-color: var(--ink-3); color: var(--ink); }
+.fav-ghost.is-danger { color: var(--c-grad); }
+.fav-ghost.is-danger:hover { border-color: var(--c-grad-border); background: var(--c-grad-soft); }
+.fav-ghost[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-mist); }
+.fav-link { padding: 0; border: none; background: none; color: var(--ink-3); font-size: 0.72rem; cursor: pointer; text-decoration: underline; }
+.fav-link:hover { color: var(--c-grad); }
+.fav-qa-section { display: flex; flex-direction: column; gap: 8px; }
+.fav-qa-list { display: flex; flex-direction: column; gap: 8px; }
+.fav-qa { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.fav-qa input { background: var(--surface); }
+.fav-qa-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
+.fav-add-qa { align-self: flex-start; }
+
+.fav-account { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 0 18px 10px; font-size: 0.85rem; color: var(--ink-2); }
+.fav-manage { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 12px; border-bottom: 1px solid var(--border); }
+.fav-manage-form { padding: 0; }
+.fav-list { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px 16px; }
+.fav-group-title { margin-top: 4px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
+.fav-item { display: flex; align-items: stretch; gap: 8px; }
+.fav-item-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.fav-item-open:hover { border-color: var(--accent); }
+.fav-item-open:disabled { cursor: default; opacity: 0.72; }
+.fav-item-name { font-size: 0.9rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.fav-level { display: inline-block; margin-left: 6px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.64rem; font-weight: 600; color: var(--ink-3); vertical-align: middle; }
+.fav-item-meta { font-family: var(--f-mono); font-size: 0.68rem; line-height: 1.5; color: var(--ink-3); overflow-wrap: anywhere; }
+.fav-item-note { font-size: 0.7rem; color: var(--c-major); }
+.fav-item-remove {
+  flex-shrink: 0;
+  width: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.fav-item-remove:hover { border-color: var(--c-grad-border); color: var(--c-grad); background: var(--c-grad-soft); }
+.fav-item-remove svg { width: 15px; height: 15px; }
+.fav-empty { margin: 14px 0; font-size: 0.8rem; line-height: 1.7; color: var(--ink-3); text-align: center; }
+
+.fav-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+  z-index: 1200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.fav-toast.show { opacity: 1; }
+
 /* ===== Sponsor panel ===== */
 .sponsor-panel { display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(760px, 92vh); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-xl); }
 .sponsor-sec { margin: 0 18px 8px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
@@ -1860,6 +2029,8 @@ html[data-theme="dark"] .site-footer::after {
   .modal-grid { grid-template-columns: 1fr; gap: 12px; }
   .modal-action span { display: none; }
   .modal-action { padding: 7px 9px; }
+  .fav-btn { width: 30px; height: 30px; }
+  .fav-status, .fav-seg, .fav-form, .fav-account, .fav-manage, .fav-list { padding-left: 14px; padding-right: 14px; }
   .back-top { right: 14px; bottom: 18px; }
   /* 小屏上悬浮提示卡改为固定定位、屏内居中，避免超出屏幕左缘 */
   .tip-wrap .tip-card {
@@ -1949,6 +2120,9 @@ window._hmt.push(['_trackPageview', location.pathname]);
           <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
         </div>
       </div>
+      <button class="icon-btn" id="favBtn" onclick="openFavorites()" aria-label="我的收藏" title="我的收藏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </button>
       <button class="icon-btn" id="statsBtn" onclick="openStats()" aria-label="访问统计" title="访问统计">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       </button>
@@ -2211,6 +2385,19 @@ window._hmt.push(['_trackPageview', location.pathname]);
   </div>
 </div>
 
+<!-- Favorites & account -->
+<div class="modal-overlay" id="favOverlay" role="dialog" aria-modal="true" aria-labelledby="favTitle" onclick="if(event.target===this)closeFavorites()">
+  <div class="msg-panel fav-panel">
+    <div class="msg-head">
+      <span class="modal-title" id="favTitle">我的收藏<span class="fav-count" id="favCount"></span></span>
+      <button class="modal-close" onclick="closeFavorites()" aria-label="关闭我的收藏">&times;</button>
+    </div>
+    <p class="fav-status" id="favStatus" role="status" aria-live="polite"></p>
+    <div class="fav-body" id="favBody"></div>
+  </div>
+</div>
+<div class="fav-toast" id="favToast" role="status" aria-live="polite"></div>
+
 <script>
 /* ===== i18n ===== */
 const i18n = {
@@ -2230,6 +2417,7 @@ const i18n = {
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
     filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制', closeModal: '关闭课程详情',
+    favAdd: '加入收藏', favRemove: '取消收藏', myFavorites: '我的收藏',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
@@ -2270,6 +2458,7 @@ const i18n = {
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
     filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied', closeModal: 'Close course details',
+    favAdd: 'Add to favorites', favRemove: 'Remove from favorites', myFavorites: 'My favorites',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
@@ -2310,6 +2499,7 @@ const i18n = {
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
     filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました', closeModal: '授業詳細を閉じる',
+    favAdd: 'お気に入りに追加', favRemove: 'お気に入りから削除', myFavorites: 'お気に入り',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
@@ -2350,6 +2540,7 @@ const i18n = {
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
     filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨', closeModal: '강좌 상세 닫기',
+    favAdd: '즐겨찾기에 추가', favRemove: '즐겨찾기에서 제거', myFavorites: '내 즐겨찾기',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
@@ -2390,6 +2581,7 @@ const i18n = {
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
     filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9', closeModal: 'Fermer les d\u00e9tails du cours',
+    favAdd: 'Ajouter aux favoris', favRemove: 'Retirer des favoris', myFavorites: 'Mes favoris',
     loadingText: 'Chargement des donn\u00e9es...',
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
@@ -2430,6 +2622,7 @@ const i18n = {
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
     filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert', closeModal: 'Kursdetails schlie\u00dfen',
+    favAdd: 'Zu Favoriten hinzuf\u00fcgen', favRemove: 'Aus Favoriten entfernen', myFavorites: 'Meine Favoriten',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
@@ -2470,6 +2663,7 @@ const i18n = {
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
     filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado', closeModal: 'Cerrar detalles del curso',
+    favAdd: 'A\u00f1adir a favoritos', favRemove: 'Quitar de favoritos', myFavorites: 'Mis favoritos',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
@@ -2510,6 +2704,7 @@ const i18n = {
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
     filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано', closeModal: 'Закрыть сведения о курсе',
+    favAdd: 'В избранное', favRemove: 'Убрать из избранного', myFavorites: 'Моё избранное',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
@@ -2812,6 +3007,8 @@ const ICONS = {
   time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   room: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   empty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>',
 };
 
@@ -2943,6 +3140,7 @@ function applyI18n() {
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : currentLang;
   updateResultsCount();
   renderChips();
+  refreshFavoriteButtons();
 }
 
 /* ===== Data ===== */
@@ -3021,6 +3219,7 @@ async function init() {
   }, { passive: true });
 
   applyThemeMeta();
+  initFavorites();
 
   try {
     const filtersLoaded = await loadFiltersForCurrentTerm();
@@ -3618,7 +3817,10 @@ function createCard(course) {
         <h3 class="course-name">${esc(trCourseName(course))}</h3>
         ${codeBits.length ? `<div class="card-code">${codeBits.join(' &middot; ')}</div>` : ''}
       </div>
-      <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
+      <div class="card-top-right">
+        <span class="badge badge-credits">${fmtCredits(course.credits)} ${esc(lang.fieldCredits)}</span>
+        <button class="fav-btn" type="button" aria-pressed="false"></button>
+      </div>
     </div>
     <div class="card-badges">
       ${courseTypeBadgesHTML(course.course_type)}
@@ -3639,6 +3841,22 @@ function createCard(course) {
     <span class="card-arrow" aria-hidden="true">${esc(lang.detailBtn)} &rarr;</span>`;
 
   card.innerHTML = html;
+  // 收藏星标：阻止冒泡，点击或按键只切换收藏，不打开详情
+  const favBtn = card.querySelector('.fav-btn');
+  favBtn.innerHTML = ICONS.star;
+  favBtn.dataset.key = favoriteKey(course);
+  syncFavButton(favBtn, lang);
+  favBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFavorite(course, favBtn);
+  });
+  favBtn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFavorite(course, favBtn);
+    }
+  });
   card.addEventListener('click', () => {
     card.focus();
     showDetail(course.id);
@@ -3737,6 +3955,7 @@ async function showDetail(courseId) {
       <div class="modal-head">
         <span class="modal-title" id="modalTitle">${esc(trCourseName(c))}</span>
         <div class="modal-head-actions">
+          <button class="modal-action" id="favToggleBtn" type="button" aria-pressed="false" data-key="${esc(favoriteKey(c))}" aria-label="${esc(lang.favAdd)}">${ICONS.star}<span>${esc(lang.favAdd)}</span></button>
           <button class="modal-action" id="copyLinkBtn" onclick="copyCourseLink()" aria-label="${esc(lang.copyLink)}">${ICONS.link}<span>${esc(lang.copyLink)}</span></button>
           <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
         </div>
@@ -3844,6 +4063,9 @@ async function showDetail(courseId) {
 
     content.innerHTML = html;
     content.scrollTop = 0;
+    const favToggle = document.getElementById('favToggleBtn');
+    favToggle.addEventListener('click', () => toggleFavorite(c, favToggle));
+    syncFavButton(favToggle, lang);
     if (!overlay.contains(document.activeElement)) focusModalClose();
   } catch (e) {
     if (e.name === 'AbortError') return;
@@ -4201,6 +4423,967 @@ function trapMsgFocus(event) {
   }
 }
 
+/* ===== Favorites & account =====
+   服务器是收藏的唯一事实来源：客户端只提交课程 ID 与稳定键，快照由后端从课程库读取。
+   会话是 HttpOnly cookie，脚本读不到；localStorage 里的 pinhaoke_fav_mode 只是
+   “可能已登录”的标记，让匿名访客不用多请求一次 /api/account。 */
+const TERM_BY_PREFIX = { u: 'spring', g: 'spring', s: 'summer', a: 'fall', r: 'fall' };
+const LEVEL_BY_PREFIX = { u: 'ug', g: 'gr', s: 'ug', a: 'ug', r: 'gr' };
+const FAV_MODE_KEY = 'pinhaoke_fav_mode';
+const FAV_TERM_ORDER = ['spring', 'summer', 'fall'];
+const FAV_USERNAME_PATTERN = '[A-Za-z0-9_]{3,20}';
+
+let favUser = null;              // { username, questions } | null
+const favItems = new Map();      // fav_key -> favorite snapshot
+let favLimit = 300;
+let pendingFavoriteId = null;    // 未登录时点的那门课，登录成功后自动补收藏
+let favReturnFocus = null;
+let favStackedOnModal = false;   // 面板叠在课程详情弹窗之上打开
+let favTab = 'login';
+let favResetState = null;        // 找回密码第二步：{ username, questions }
+let favPrefillUsername = '';
+let favInitStarted = false;
+let favBusy = false;
+let favToastTimer = null;
+
+function favoriteKey(course) {
+  const id = String(course.id || '');
+  const prefix = id.charAt(0);
+  const clean = value => (value === null || value === undefined) ? '' : String(value).trim();
+  return [
+    TERM_BY_PREFIX[prefix] || '',
+    LEVEL_BY_PREFIX[prefix] || '',
+    clean(course.course_code),
+    clean(course.class_no),
+    clean(course.teacher),
+  ].join('|');
+}
+
+function favModeGet() {
+  try { return localStorage.getItem(FAV_MODE_KEY); } catch (e) { return null; }
+}
+
+function favModeSet(value) {
+  try {
+    if (value) localStorage.setItem(FAV_MODE_KEY, value);
+    else localStorage.removeItem(FAV_MODE_KEY);
+  } catch (e) {}
+}
+
+async function favApi(method, path, body, options = {}) {
+  const init = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
+  if (body !== undefined) {
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  let resp;
+  try {
+    resp = await fetch(path, init);
+  } catch (e) {
+    return { ok: false, status: 0, data: null };
+  }
+  let data = null;
+  if (resp.status !== 204) {
+    try { data = await resp.json(); } catch (e) { data = null; }
+  }
+  if (resp.status === 401 && favUser && !options.keepSession) {
+    setFavUser(null);
+    favToast('登录已过期，请重新登录');
+  }
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+function favErrorText(res, overrides = {}) {
+  if (overrides[res.status]) return overrides[res.status];
+  if (res.status === 0) return '网络异常，请稍后再试';
+  if (res.status === 429) return '操作太频繁，请稍后再试';
+  if (res.status === 403) return '请求来源不可信，请刷新页面后重试';
+  if (res.status === 401) return '登录已过期，请重新登录';
+  if (res.status === 422) return '输入格式不正确，请检查后重试';
+  if (res.data && typeof res.data.detail === 'string' && /[一-鿿]/.test(res.data.detail)) {
+    return res.data.detail;
+  }
+  return '操作失败，请稍后再试';
+}
+
+function replaceFavorites(list, limit) {
+  favItems.clear();
+  (list || []).forEach(item => favItems.set(item.fav_key, item));
+  if (limit) favLimit = limit;
+  refreshFavoriteButtons();
+}
+
+function applyAccount(data) {
+  favUser = { username: data.username, questions: data.questions || [] };
+  favModeSet('user');
+  replaceFavorites(data.favorites, data.limit);
+}
+
+function setFavUser(user) {
+  favUser = user;
+  if (!user) {
+    favItems.clear();
+    favModeSet(null);
+    favResetState = null;
+  }
+  refreshFavoriteButtons();
+  if (document.getElementById('favOverlay').classList.contains('open')) renderFavoritesPanel();
+}
+
+function initFavorites() {
+  if (favInitStarted) return;
+  favInitStarted = true;
+  refreshFavoriteButtons();
+  if (favModeGet() !== 'user') return;
+  favApi('GET', '/api/account').then(res => {
+    if (res.ok && res.data && res.data.authenticated) {
+      applyAccount(res.data);
+      if (document.getElementById('favOverlay').classList.contains('open')) renderFavoritesPanel();
+    } else if (res.status && res.status !== 0) {
+      setFavUser(null);
+    }
+  });
+}
+
+async function refreshAccount() {
+  const res = await favApi('GET', '/api/account');
+  if (res.ok && res.data && res.data.authenticated) {
+    applyAccount(res.data);
+    return true;
+  }
+  if (res.ok) setFavUser(null);
+  return false;
+}
+
+function syncFavButton(btn, lang) {
+  const on = favItems.has(btn.dataset.key);
+  const label = on ? lang.favRemove : lang.favAdd;
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  const span = btn.querySelector('span');
+  if (span) span.textContent = label;
+}
+
+function refreshFavoriteButtons() {
+  const lang = i18n[currentLang];
+  document.querySelectorAll('.fav-btn[data-key], #favToggleBtn[data-key]').forEach(btn => {
+    syncFavButton(btn, lang);
+  });
+  const favBtn = document.getElementById('favBtn');
+  if (favBtn) {
+    favBtn.classList.toggle('is-on', !!favUser);
+    favBtn.setAttribute('aria-label', lang.myFavorites);
+    favBtn.title = lang.myFavorites;
+  }
+}
+
+function favToast(text) {
+  const toast = document.getElementById('favToast');
+  if (!toast) return;
+  toast.textContent = text;
+  toast.classList.add('show');
+  if (favToastTimer) clearTimeout(favToastTimer);
+  favToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    favToastTimer = null;
+  }, 2600);
+}
+
+function setFavStatus(text, isError = false) {
+  const status = document.getElementById('favStatus');
+  status.textContent = text || '';
+  status.classList.toggle('is-error', !!isError && !!text);
+}
+
+async function toggleFavorite(course, sourceBtn) {
+  if (sourceBtn && typeof sourceBtn.focus === 'function') sourceBtn.focus();
+  const name = trCourseName(course);
+  if (!favUser) {
+    pendingFavoriteId = course.id;
+    favTab = 'login';
+    openFavorites();
+    setFavStatus(`登录或注册后会自动收藏「${name}」`);
+    return;
+  }
+  const key = favoriteKey(course);
+  const wasOn = favItems.has(key);
+  const previous = favItems.get(key);
+  if (wasOn) favItems.delete(key);
+  else favItems.set(key, { fav_key: key, id: course.id, course_name: name, pending: true });
+  refreshFavoriteButtons();
+  const res = wasOn
+    ? await favApi('POST', '/api/favorites/remove', { fav_key: key })
+    : await favApi('POST', '/api/favorites', { id: course.id });
+  if (res.ok && res.data) {
+    replaceFavorites(res.data.favorites, res.data.limit);
+    favToast(wasOn ? `已取消收藏「${name}」` : `已收藏「${name}」`);
+    if (document.getElementById('favOverlay').classList.contains('open')) renderFavList();
+    return;
+  }
+  // 失败回滚
+  if (wasOn) favItems.set(key, previous);
+  else favItems.delete(key);
+  refreshFavoriteButtons();
+  if (res.status !== 401) {
+    favToast(favErrorText(res, {
+      404: '课程不存在或已下架',
+      409: `收藏已达上限（${favLimit} 门）`,
+    }));
+  }
+}
+
+async function addPendingFavorite(courseId) {
+  const res = await favApi('POST', '/api/favorites', { id: courseId });
+  if (res.ok && res.data) {
+    replaceFavorites(res.data.favorites, res.data.limit);
+    const item = [...favItems.values()].find(entry => entry.id === courseId);
+    setFavStatus(item ? `已收藏「${item.course_name}」` : '已收藏');
+    renderFavList();
+  } else if (res.status !== 401) {
+    setFavStatus(favErrorText(res, { 404: '课程不存在或已下架', 409: `收藏已达上限（${favLimit} 门）` }), true);
+  }
+}
+
+/* ---- Panel open / close ---- */
+function openFavorites() {
+  const overlay = document.getElementById('favOverlay');
+  if (overlay.classList.contains('open')) return;
+  favReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const courseModal = document.getElementById('modalOverlay');
+  favStackedOnModal = courseModal.classList.contains('open');
+  // 叠在课程详情之上时背景已经 inert，只需再冻结详情弹窗本身
+  if (favStackedOnModal) courseModal.inert = true;
+  else setModalBackgroundInert(true);
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setFavStatus('');
+  renderFavoritesPanel();
+  requestAnimationFrame(() => document.querySelector('#favOverlay .modal-close').focus());
+  if (favUser) {
+    refreshAccount().then(ok => {
+      if (ok && overlay.classList.contains('open')) {
+        document.getElementById('favCount').textContent = `${favItems.size} / ${favLimit}`;
+        renderFavList();
+      }
+    });
+  }
+}
+
+function closeFavorites({ returnFocus = true } = {}) {
+  const overlay = document.getElementById('favOverlay');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  const courseModal = document.getElementById('modalOverlay');
+  if (favStackedOnModal && courseModal.classList.contains('open')) {
+    courseModal.inert = false;
+  } else {
+    document.body.style.overflow = '';
+    setModalBackgroundInert(false);
+  }
+  favStackedOnModal = false;
+  pendingFavoriteId = null;
+  const returnTarget = favReturnFocus;
+  favReturnFocus = null;
+  if (returnFocus && returnTarget && returnTarget.isConnected) {
+    requestAnimationFrame(() => returnTarget.focus());
+  }
+}
+
+function trapFavFocus(event) {
+  if (event.key !== 'Tab') return;
+  const overlay = document.getElementById('favOverlay');
+  const focusable = [...overlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+/* ---- Panel rendering (DOM API only; every string goes through textContent) ---- */
+function favEl(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+function favInput(attrs) {
+  const input = document.createElement('input');
+  input.type = attrs.type || 'text';
+  Object.keys(attrs).forEach(key => {
+    if (key === 'type') return;
+    if (key === 'required') { input.required = !!attrs[key]; return; }
+    input.setAttribute(key, attrs[key]);
+  });
+  return input;
+}
+
+function favField(labelText, attrs) {
+  const label = favEl('label', 'fav-field');
+  label.appendChild(favEl('span', 'fav-field-label', labelText));
+  label.appendChild(favInput(attrs));
+  return label;
+}
+
+function favButton(text, className, onClick) {
+  const button = favEl('button', className, text);
+  button.type = 'button';
+  if (onClick) button.addEventListener('click', onClick);
+  return button;
+}
+
+function favSubmit(text) {
+  const button = favEl('button', 'fav-submit', text);
+  button.type = 'submit';
+  return button;
+}
+
+function favSetBusy(form, busy) {
+  favBusy = busy;
+  form.querySelectorAll('button, input, select').forEach(element => { element.disabled = busy; });
+}
+
+function renderFavoritesPanel(options = {}) {
+  const body = document.getElementById('favBody');
+  body.textContent = '';
+  // 面板重绘会丢弃正在提交的表单，必须同时复位忙碌标记，否则退出后无法再次登录
+  favBusy = false;
+  document.getElementById('favCount').textContent = favUser ? `${favItems.size} / ${favLimit}` : '';
+  if (favUser) renderFavAccount(body);
+  else renderFavAuth(body);
+  if (options.focusTab) {
+    const active = body.querySelector('.fav-seg button[aria-pressed="true"]');
+    if (active) active.focus();
+  } else if (options.focusFirstInput) {
+    const input = body.querySelector('input');
+    if (input) input.focus();
+  }
+}
+
+function renderFavAuth(body) {
+  body.appendChild(favEl('p', 'msg-hint',
+    '登录后收藏会同步到你的所有设备。用户名建议与真实身份无关，不收集邮箱或手机号；忘记密码只能靠密保问题找回。'));
+  const seg = favEl('div', 'fav-seg');
+  seg.setAttribute('aria-label', '账号操作');
+  [['login', '登录'], ['register', '注册'], ['reset', '找回密码']].forEach(([key, label]) => {
+    const button = favButton(label, '', () => {
+      favTab = key;
+      favResetState = null;
+      setFavStatus('');
+      renderFavoritesPanel({ focusTab: true });
+    });
+    button.setAttribute('aria-pressed', favTab === key ? 'true' : 'false');
+    seg.appendChild(button);
+  });
+  body.appendChild(seg);
+  if (favTab === 'register') body.appendChild(buildRegisterForm());
+  else if (favTab === 'reset') body.appendChild(buildResetForm());
+  else body.appendChild(buildLoginForm());
+}
+
+function buildLoginForm() {
+  const form = favEl('form', 'fav-form');
+  form.appendChild(favField('用户名', {
+    name: 'username', autocomplete: 'username', pattern: FAV_USERNAME_PATTERN,
+    minlength: '3', maxlength: '20', required: true, value: favPrefillUsername,
+    placeholder: '3 到 20 位字母、数字或下划线', autocapitalize: 'off', spellcheck: 'false',
+  }));
+  form.appendChild(favField('密码', {
+    name: 'password', type: 'password', autocomplete: 'current-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '至少 8 位',
+  }));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favEl('span', 'fav-form-note', '没有账号？点上方“注册”'));
+  foot.appendChild(favSubmit('登录'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const username = form.elements.username.value.trim();
+    const password = form.elements.password.value;
+    favSetBusy(form, true);
+    setFavStatus('正在登录…');
+    const res = await favApi('POST', '/api/auth/login', { username, password });
+    if (!res.ok) {
+      favSetBusy(form, false);
+      setFavStatus(favErrorText(res, {
+        401: '用户名或密码错误',
+        422: '用户名或密码格式不正确',
+        429: '尝试次数过多，请 15 分钟后再试',
+      }), true);
+      form.elements.password.focus();
+      return;
+    }
+    favPrefillUsername = username;
+    favSetBusy(form, false);
+    await afterFavAuth('已登录');
+  });
+  return form;
+}
+
+function favQaBlock(container, index, removable) {
+  const block = favEl('div', 'fav-qa');
+  const head = favEl('div', 'fav-qa-head');
+  head.appendChild(favEl('span', 'fav-qa-title', `密保问题 ${index}`));
+  if (removable) {
+    head.appendChild(favButton('删除', 'fav-link', () => {
+      block.remove();
+      favRenumberQa(container);
+    }));
+  }
+  block.appendChild(head);
+  block.appendChild(favInput({
+    name: 'question', maxlength: '60', required: true, autocomplete: 'off',
+    placeholder: '问题，例如：我大一最喜欢的一门课', 'aria-label': `密保问题 ${index}`,
+  }));
+  block.appendChild(favInput({
+    name: 'answer', maxlength: '64', required: true, autocomplete: 'off',
+    placeholder: '答案，至少 2 个字，不区分大小写和空格', 'aria-label': `密保答案 ${index}`,
+  }));
+  return block;
+}
+
+function favRenumberQa(container) {
+  const blocks = [...container.querySelectorAll('.fav-qa')];
+  blocks.forEach((block, position) => {
+    const index = position + 1;
+    block.querySelector('.fav-qa-title').textContent = `密保问题 ${index}`;
+    block.querySelector('[name="question"]').setAttribute('aria-label', `密保问题 ${index}`);
+    block.querySelector('[name="answer"]').setAttribute('aria-label', `密保答案 ${index}`);
+    const remove = block.querySelector('.fav-link');
+    if (remove) remove.hidden = blocks.length <= 1;
+  });
+  const add = container.parentNode.querySelector('.fav-add-qa');
+  if (add) add.hidden = blocks.length >= 3;
+}
+
+function collectQuestions(container) {
+  return [...container.querySelectorAll('.fav-qa')].map(block => ({
+    question: block.querySelector('[name="question"]').value.trim(),
+    answer: block.querySelector('[name="answer"]').value,
+  }));
+}
+
+function normalizeAnswerLength(answer) {
+  return answer.normalize('NFKC').replace(/\s+/g, '').length;
+}
+
+function buildQuestionsSection(existing) {
+  const section = favEl('div', 'fav-qa-section');
+  const intro = favEl('p', 'fav-form-note',
+    '密保问题 1 到 3 个，找回密码时答对任意一个即可。答案不区分大小写和空格，不要用别人查得到的信息；忘记密码又答不出任何问题时，账号无法找回。');
+  section.appendChild(intro);
+  const container = favEl('div', 'fav-qa-list');
+  section.appendChild(container);
+  const initial = Math.max(1, Math.min(3, existing || 1));
+  for (let index = 1; index <= initial; index += 1) {
+    container.appendChild(favQaBlock(container, index, true));
+  }
+  const add = favButton('再加一个问题', 'fav-ghost fav-add-qa', () => {
+    const count = container.querySelectorAll('.fav-qa').length;
+    if (count >= 3) return;
+    container.appendChild(favQaBlock(container, count + 1, true));
+    favRenumberQa(container);
+    container.lastElementChild.querySelector('input').focus();
+  });
+  section.appendChild(add);
+  favRenumberQa(container);
+  return section;
+}
+
+function validateQuestionsClientSide(questions, usernameKey) {
+  if (!questions.length || questions.length > 3) return '请至少填写一个密保问题';
+  const seen = new Set();
+  for (const item of questions) {
+    if (!item.question) return '密保问题不能为空';
+    const key = item.question.toLowerCase();
+    if (seen.has(key)) return '密保问题不能重复';
+    seen.add(key);
+    const length = normalizeAnswerLength(item.answer);
+    if (length < 2) return '密保答案至少 2 个字（不含空格）';
+    if (length > 64) return '密保答案不能超过 64 个字';
+    if (item.answer.normalize('NFKC').replace(/\s+/g, '').toLowerCase() === usernameKey) {
+      return '密保答案不能与用户名相同';
+    }
+  }
+  return '';
+}
+
+function buildRegisterForm() {
+  const form = favEl('form', 'fav-form');
+  form.appendChild(favField('用户名', {
+    name: 'username', autocomplete: 'username', pattern: FAV_USERNAME_PATTERN,
+    minlength: '3', maxlength: '20', required: true,
+    placeholder: '3 到 20 位字母、数字或下划线', autocapitalize: 'off', spellcheck: 'false',
+  }));
+  form.appendChild(favField('密码', {
+    name: 'password', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '8 到 128 位，不能与用户名相同',
+  }));
+  form.appendChild(favField('确认密码', {
+    name: 'confirm', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '再输入一次密码',
+  }));
+  form.appendChild(buildQuestionsSection(1));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favEl('span', 'fav-form-note', '注册后自动登录'));
+  foot.appendChild(favSubmit('注册'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const username = form.elements.username.value.trim();
+    const password = form.elements.password.value;
+    const confirm = form.elements.confirm.value;
+    if (password !== confirm) {
+      setFavStatus('两次输入的密码不一致', true);
+      form.elements.confirm.focus();
+      return;
+    }
+    if (password.toLowerCase() === username.toLowerCase()) {
+      setFavStatus('密码不能与用户名相同', true);
+      form.elements.password.focus();
+      return;
+    }
+    const questions = collectQuestions(form.querySelector('.fav-qa-list'));
+    const problem = validateQuestionsClientSide(questions, username.toLowerCase());
+    if (problem) {
+      setFavStatus(problem, true);
+      return;
+    }
+    favSetBusy(form, true);
+    setFavStatus('正在注册…');
+    const res = await favApi('POST', '/api/auth/register', { username, password, questions });
+    if (!res.ok) {
+      favSetBusy(form, false);
+      setFavStatus(favErrorText(res, {
+        409: '用户名已被使用，换一个试试',
+        422: '请检查用户名、密码和密保格式',
+        429: '注册太频繁，请稍后再试',
+      }), true);
+      return;
+    }
+    favPrefillUsername = username;
+    favSetBusy(form, false);
+    await afterFavAuth('注册成功，已登录');
+  });
+  return form;
+}
+
+function buildResetForm() {
+  const form = favEl('form', 'fav-form');
+  if (!favResetState) {
+    form.appendChild(favField('用户名', {
+      name: 'username', autocomplete: 'username', pattern: FAV_USERNAME_PATTERN,
+      minlength: '3', maxlength: '20', required: true, value: favPrefillUsername,
+      placeholder: '先输入用户名查询密保问题', autocapitalize: 'off', spellcheck: 'false',
+    }));
+    const foot = favEl('div', 'fav-form-foot');
+    foot.appendChild(favEl('span', 'fav-form-note', '答对任意一个密保问题即可重置密码'));
+    foot.appendChild(favSubmit('查询密保问题'));
+    form.appendChild(foot);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (favBusy) return;
+      const username = form.elements.username.value.trim();
+      favSetBusy(form, true);
+      setFavStatus('正在查询…');
+      const res = await favApi('POST', '/api/auth/reset/questions', { username });
+      favSetBusy(form, false);
+      if (!res.ok || !res.data) {
+        setFavStatus(favErrorText(res, { 404: '用户名不存在', 429: '查询太频繁，请稍后再试' }), true);
+        return;
+      }
+      favResetState = { username: res.data.username, questions: res.data.questions || [] };
+      favPrefillUsername = res.data.username;
+      setFavStatus('');
+      renderFavoritesPanel({ focusFirstInput: true });
+    });
+    return form;
+  }
+
+  const who = favEl('p', 'fav-form-note');
+  who.appendChild(document.createTextNode('账号：'));
+  who.appendChild(favEl('strong', 'fav-mono', favResetState.username));
+  form.appendChild(who);
+  const pick = favEl('label', 'fav-field');
+  pick.appendChild(favEl('span', 'fav-field-label', '选择一个密保问题'));
+  const select = document.createElement('select');
+  select.name = 'position';
+  select.required = true;
+  favResetState.questions.forEach(question => {
+    const option = document.createElement('option');
+    option.value = String(question.position);
+    option.textContent = question.question;
+    select.appendChild(option);
+  });
+  pick.appendChild(select);
+  form.appendChild(pick);
+  form.appendChild(favField('答案', {
+    name: 'answer', maxlength: '64', required: true, autocomplete: 'off', placeholder: '不区分大小写和空格',
+  }));
+  form.appendChild(favField('新密码', {
+    name: 'password', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '8 到 128 位，不能与用户名相同',
+  }));
+  form.appendChild(favField('确认新密码', {
+    name: 'confirm', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '再输入一次新密码',
+  }));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favButton('换个用户名', 'fav-ghost', () => {
+    favResetState = null;
+    renderFavoritesPanel({ focusFirstInput: true });
+  }));
+  foot.appendChild(favSubmit('重置密码'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const password = form.elements.password.value;
+    if (password !== form.elements.confirm.value) {
+      setFavStatus('两次输入的新密码不一致', true);
+      form.elements.confirm.focus();
+      return;
+    }
+    if (password.toLowerCase() === favResetState.username.toLowerCase()) {
+      setFavStatus('新密码不能与用户名相同', true);
+      return;
+    }
+    favSetBusy(form, true);
+    setFavStatus('正在重置…');
+    const res = await favApi('POST', '/api/auth/reset', {
+      username: favResetState.username,
+      position: Number(form.elements.position.value),
+      answer: form.elements.answer.value,
+      new_password: password,
+    });
+    favSetBusy(form, false);
+    if (!res.ok) {
+      setFavStatus(favErrorText(res, {
+        401: '密保答案错误',
+        422: '请检查答案和新密码格式',
+        429: '尝试次数过多，请一小时后再试',
+      }), true);
+      form.elements.answer.focus();
+      return;
+    }
+    favResetState = null;
+    favTab = 'login';
+    renderFavoritesPanel({ focusFirstInput: true });
+    setFavStatus('密码已重置，请用新密码登录');
+  });
+  return form;
+}
+
+async function afterFavAuth(message) {
+  const ok = await refreshAccount();
+  if (!ok) {
+    setFavStatus('登录状态同步失败，请刷新页面后重试', true);
+    renderFavoritesPanel();
+    return;
+  }
+  renderFavoritesPanel();
+  setFavStatus(message);
+  requestAnimationFrame(() => document.querySelector('#favOverlay .modal-close').focus());
+  if (pendingFavoriteId) {
+    const courseId = pendingFavoriteId;
+    pendingFavoriteId = null;
+    await addPendingFavorite(courseId);
+  }
+}
+
+function renderFavAccount(body) {
+  const account = favEl('div', 'fav-account');
+  const who = favEl('span', 'fav-account-name');
+  who.appendChild(document.createTextNode('已登录：'));
+  who.appendChild(favEl('strong', 'fav-mono', favUser.username));
+  account.appendChild(who);
+  account.appendChild(favButton('退出登录', 'fav-ghost', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const res = await favApi('POST', '/api/auth/logout');
+    if (res.ok || res.status === 401) {
+      setFavUser(null);
+      setFavStatus('已退出登录');
+      requestAnimationFrame(() => document.querySelector('#favOverlay .modal-close').focus());
+    } else {
+      button.disabled = false;
+      setFavStatus(favErrorText(res), true);
+    }
+  }));
+  body.appendChild(account);
+
+  const manage = favEl('div', 'fav-manage');
+  const manageForm = favEl('div', 'fav-manage-form');
+  manageForm.hidden = true;
+  const builders = {
+    password: buildChangePasswordForm,
+    questions: buildChangeQuestionsForm,
+    delete: buildDeleteForm,
+  };
+  [['password', '修改密码'], ['questions', '修改密保'], ['delete', '删除账号']].forEach(([key, label]) => {
+    const button = favButton(label, 'fav-ghost' + (key === 'delete' ? ' is-danger' : ''), () => {
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      manage.querySelectorAll('button').forEach(other => other.setAttribute('aria-expanded', 'false'));
+      manageForm.textContent = '';
+      setFavStatus('');
+      if (expanded) {
+        manageForm.hidden = true;
+        return;
+      }
+      button.setAttribute('aria-expanded', 'true');
+      manageForm.appendChild(builders[key](() => {
+        manageForm.hidden = true;
+        manageForm.textContent = '';
+        button.setAttribute('aria-expanded', 'false');
+        button.focus();
+      }));
+      manageForm.hidden = false;
+      const first = manageForm.querySelector('input');
+      if (first) first.focus();
+    });
+    button.setAttribute('aria-expanded', 'false');
+    manage.appendChild(button);
+  });
+  body.appendChild(manage);
+  body.appendChild(manageForm);
+
+  const list = favEl('div', 'fav-list');
+  list.id = 'favList';
+  list.setAttribute('aria-label', '收藏的课程');
+  body.appendChild(list);
+  renderFavList();
+}
+
+function favTermLabel(term, fallback) {
+  const lang = i18n[currentLang];
+  if (term === 'spring') return lang.termSpring;
+  if (term === 'summer') return lang.termSummer;
+  if (term === 'fall') return lang.termFall;
+  return fallback || term;
+}
+
+function renderFavList() {
+  const list = document.getElementById('favList');
+  if (!list) return;
+  list.textContent = '';
+  document.getElementById('favCount').textContent = favUser ? `${favItems.size} / ${favLimit}` : '';
+  const items = [...favItems.values()].filter(item => !item.pending);
+  if (!items.length) {
+    list.appendChild(favEl('p', 'fav-empty', '还没有收藏。点课程卡片右上角的星标即可收藏，多端同步。'));
+    return;
+  }
+  const groups = new Map();
+  items.forEach(item => {
+    const key = FAV_TERM_ORDER.includes(item.term) ? item.term : item.term_label;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  const ordered = [...groups.keys()].sort((a, b) => {
+    const ia = FAV_TERM_ORDER.indexOf(a);
+    const ib = FAV_TERM_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || String(a).localeCompare(String(b));
+  });
+  ordered.forEach(key => {
+    const group = groups.get(key);
+    const label = FAV_TERM_ORDER.includes(key) ? favTermLabel(key) : key;
+    const title = favEl('div', 'fav-group-title', `${label} · ${group.length}`);
+    list.appendChild(title);
+    group
+      .sort((a, b) => (b.added_at || 0) - (a.added_at || 0) || String(a.fav_key).localeCompare(String(b.fav_key)))
+      .forEach(item => list.appendChild(buildFavItem(item)));
+  });
+}
+
+function buildFavItem(item) {
+  const lang = i18n[currentLang];
+  const row = favEl('div', 'fav-item');
+  const open = favEl('button', 'fav-item-open');
+  open.type = 'button';
+  const name = favEl('span', 'fav-item-name', item.course_name || item.id);
+  name.appendChild(favEl('span', 'fav-level', item.level === 'gr' ? '研究生' : '本科'));
+  open.appendChild(name);
+  const metaBits = [];
+  if (item.course_code) metaBits.push(item.course_code);
+  if (item.class_no) metaBits.push(`${lang.modalClassNo} ${item.class_no}`);
+  if (item.teacher) metaBits.push(item.teacher);
+  if (item.schedule) metaBits.push(item.schedule);
+  if (item.credits !== null && item.credits !== undefined && item.credits !== '') {
+    metaBits.push(`${fmtCredits(item.credits)} ${lang.fieldCredits}`);
+  }
+  open.appendChild(favEl('span', 'fav-item-meta', metaBits.join(' · ')));
+  if (item.available === false) {
+    open.appendChild(favEl('span', 'fav-item-note', `${item.term_label || ''} 课程库已更新，仅保留记录`));
+    open.disabled = true;
+    open.setAttribute('aria-disabled', 'true');
+  } else {
+    open.setAttribute('aria-label', `打开课程详情：${item.course_name || item.id}`);
+    open.addEventListener('click', () => openFavoriteItem(item));
+  }
+  row.appendChild(open);
+  const remove = favButton('', 'fav-item-remove', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const res = await favApi('POST', '/api/favorites/remove', { fav_key: item.fav_key });
+    if (res.ok && res.data) {
+      replaceFavorites(res.data.favorites, res.data.limit);
+      setFavStatus(`已移除「${item.course_name}」`);
+      renderFavList();
+      const closeButton = document.querySelector('#favOverlay .modal-close');
+      const next = document.querySelector('#favList .fav-item-remove');
+      requestAnimationFrame(() => (next || closeButton).focus());
+    } else if (res.status !== 401) {
+      button.disabled = false;
+      setFavStatus(favErrorText(res), true);
+    }
+  });
+  remove.innerHTML = ICONS.close;
+  remove.setAttribute('aria-label', `移除收藏：${item.course_name || item.id}`);
+  remove.title = '移除收藏';
+  row.appendChild(remove);
+  return row;
+}
+
+function openFavoriteItem(item) {
+  const stacked = favStackedOnModal;
+  closeFavorites({ returnFocus: false });
+  if (!stacked) {
+    const favBtn = document.getElementById('favBtn');
+    if (favBtn) favBtn.focus();
+  }
+  showDetail(item.id);
+}
+
+function buildChangePasswordForm(done) {
+  const form = favEl('form', 'fav-form fav-form-inline');
+  form.appendChild(favField('当前密码', {
+    name: 'current', type: 'password', autocomplete: 'current-password',
+    minlength: '1', maxlength: '128', required: true,
+  }));
+  form.appendChild(favField('新密码', {
+    name: 'password', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true, placeholder: '8 到 128 位，不能与用户名相同',
+  }));
+  form.appendChild(favField('确认新密码', {
+    name: 'confirm', type: 'password', autocomplete: 'new-password',
+    minlength: '8', maxlength: '128', required: true,
+  }));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favEl('span', 'fav-form-note', '修改后其它设备需要重新登录'));
+  foot.appendChild(favSubmit('保存新密码'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const password = form.elements.password.value;
+    if (password !== form.elements.confirm.value) {
+      setFavStatus('两次输入的新密码不一致', true);
+      return;
+    }
+    if (password.toLowerCase() === favUser.username.toLowerCase()) {
+      setFavStatus('新密码不能与用户名相同', true);
+      return;
+    }
+    favSetBusy(form, true);
+    const res = await favApi('POST', '/api/auth/password', {
+      current_password: form.elements.current.value,
+      new_password: password,
+    }, { keepSession: true });
+    favSetBusy(form, false);
+    if (!res.ok) {
+      setFavStatus(favErrorText(res, { 401: '当前密码错误', 422: '新密码至少 8 位，且不能与用户名相同' }), true);
+      return;
+    }
+    done();
+    setFavStatus('密码已修改，其它设备需要重新登录');
+  });
+  return form;
+}
+
+function buildChangeQuestionsForm(done) {
+  const form = favEl('form', 'fav-form fav-form-inline');
+  const current = favEl('p', 'fav-form-note');
+  current.textContent = '当前密保问题：' + (favUser.questions || []).map(item => item.question).join('；');
+  form.appendChild(current);
+  form.appendChild(favField('当前密码', {
+    name: 'current', type: 'password', autocomplete: 'current-password',
+    minlength: '1', maxlength: '128', required: true,
+  }));
+  form.appendChild(buildQuestionsSection(Math.max(1, (favUser.questions || []).length)));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favEl('span', 'fav-form-note', '保存后将整体替换现有密保'));
+  foot.appendChild(favSubmit('保存密保'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const questions = collectQuestions(form.querySelector('.fav-qa-list'));
+    const problem = validateQuestionsClientSide(questions, favUser.username.toLowerCase());
+    if (problem) {
+      setFavStatus(problem, true);
+      return;
+    }
+    favSetBusy(form, true);
+    const res = await favApi('POST', '/api/auth/questions', {
+      current_password: form.elements.current.value,
+      questions,
+    }, { keepSession: true });
+    favSetBusy(form, false);
+    if (!res.ok) {
+      setFavStatus(favErrorText(res, { 401: '当前密码错误', 422: '请检查密保格式' }), true);
+      return;
+    }
+    await refreshAccount();
+    done();
+    setFavStatus('密保已更新');
+  });
+  return form;
+}
+
+function buildDeleteForm(done) {
+  const form = favEl('form', 'fav-form fav-form-inline');
+  form.appendChild(favEl('p', 'fav-form-note is-danger',
+    '删除后账号、密保和全部收藏都会被清除，无法恢复。'));
+  form.appendChild(favField('输入密码以确认删除', {
+    name: 'password', type: 'password', autocomplete: 'current-password',
+    minlength: '1', maxlength: '128', required: true,
+  }));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favButton('取消', 'fav-ghost', () => done()));
+  const submit = favSubmit('确认删除账号');
+  submit.classList.add('is-danger');
+  foot.appendChild(submit);
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    favSetBusy(form, true);
+    const res = await favApi('POST', '/api/auth/delete', {
+      password: form.elements.password.value,
+    }, { keepSession: true });
+    favSetBusy(form, false);
+    if (!res.ok) {
+      setFavStatus(favErrorText(res, { 401: '密码错误' }), true);
+      return;
+    }
+    setFavUser(null);
+    setFavStatus('账号已删除');
+    requestAnimationFrame(() => document.querySelector('#favOverlay .modal-close').focus());
+  });
+  return form;
+}
+
 /* ===== Misc ===== */
 function esc(str) {
   if (!str) return '';
@@ -4227,11 +5410,19 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  const favOpen = document.getElementById('favOverlay').classList.contains('open');
   const sponsorOpen = document.getElementById('sponsorOverlay').classList.contains('open');
   const statsOpen = document.getElementById('statsOverlay').classList.contains('open');
   const msgOpen = document.getElementById('msgOverlay').classList.contains('open');
   const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
-  if (sponsorOpen) {
+  if (favOpen) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeFavorites();
+    } else {
+      trapFavFocus(e);
+    }
+  } else if (sponsorOpen) {
     if (e.key === 'Escape') {
       e.preventDefault();
       closeSponsor();

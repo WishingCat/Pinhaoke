@@ -18,7 +18,7 @@
 - `venv` 为 `root:root`，目录 `0755`，普通文件 `0644`，`bin/` 可执行文件 `0755`
 - 五个课程数据库和一个树洞评测数据库均由应用以 SQLite `mode=ro` 和 `PRAGMA query_only = ON` 打开
 - systemd 使用 `ProtectSystem=strict`、`ReadOnlyPaths=/opt/pinhaoke`、`NoNewPrivileges=true`、私有临时目录、空 capability 和 `UMask=0027`
-- 留言板数据库是唯一可写数据：unit 通过 `StateDirectory=pinhaoke` 让 systemd 自动创建 `/var/lib/pinhaoke` 并归服务用户所有，`PINHAOKE_MESSAGES_DB` 指向其中的 `留言板.db`，`PINHAOKE_STATS_DB` 指向访问统计库 `访问统计.db`。它们不在仓库和 `/opt/pinhaoke` 内，更新与回滚不触碰这些数据，备份需单独处理。
+- 留言板、访问统计与账户数据库是仅有的三份可写数据：unit 通过 `StateDirectory=pinhaoke` 让 systemd 自动创建 `/var/lib/pinhaoke` 并归服务用户所有，`StateDirectoryMode=0750` 限制目录仅服务用户与组可读；`PINHAOKE_MESSAGES_DB` 指向其中的 `留言板.db`，`PINHAOKE_STATS_DB` 指向 `访问统计.db`，`PINHAOKE_ACCOUNTS_DB` 指向保存账号、密保哈希、会话哈希与课程收藏的 `账户.db`。它们不在仓库和 `/opt/pinhaoke` 内，更新与回滚不触碰这些数据，备份需单独处理，例如 `sqlite3 /var/lib/pinhaoke/账户.db ".backup /root/backup/账户-$(date +%F).db"`。部署前可用 `python3 -c "import hashlib; hashlib.scrypt"` 确认服务器 Python 带 OpenSSL 的 scrypt 支持。
 
 不要对 `/opt/pinhaoke` 执行递归 `chown www-data`。更新脚本会避开 `.git`、staging、备份/诊断 venv 和活动 venv，使用 symlink-safe 的权限处理。
 

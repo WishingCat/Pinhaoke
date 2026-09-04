@@ -610,8 +610,10 @@ class DeployContractTests(unittest.TestCase):
             "UMask=0027",
             "ReadOnlyPaths=/opt/pinhaoke",
             "StateDirectory=pinhaoke",
+            "StateDirectoryMode=0750",
             "Environment=PINHAOKE_MESSAGES_DB=/var/lib/pinhaoke/留言板.db",
             "Environment=PINHAOKE_STATS_DB=/var/lib/pinhaoke/访问统计.db",
+            "Environment=PINHAOKE_ACCOUNTS_DB=/var/lib/pinhaoke/账户.db",
         ):
             self.assertIn(setting, self.service)
         self.assertNotIn("ReadWritePaths=/opt/pinhaoke", self.service)

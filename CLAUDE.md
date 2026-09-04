@@ -2,14 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-拼好课 V2 由 FastAPI、两个无构建步骤的 HTML 页面、五个课程 SQLite 数据库和一个树洞评测数据库组成。生产应用对课程与评测数据只读，唯一可写数据是独立的留言板数据库；课程抓取必须复用已登录的 Chrome 页面，翻译任务不得自动产生 API 费用。以代码、数据库契约和测试为最终事实来源；用户入口与功能简介见 [README.md](README.md)，抓取、翻译、数据和部署的详细操作分别由各目录 README 负责。
+拼好课 V2 由 FastAPI、两个无构建步骤的 HTML 页面、五个课程 SQLite 数据库和一个树洞评测数据库组成。生产应用对课程与评测数据只读，可写数据只有留言板、访问统计与账户三个独立数据库；课程抓取必须复用已登录的 Chrome 页面，翻译任务不得自动产生 API 费用。以代码、数据库契约和测试为最终事实来源；用户入口与功能简介见 [README.md](README.md)，抓取、翻译、数据和部署的详细操作分别由各目录 README 负责。
 
 ## 项目定位
 
 拼好课 V2 是北京大学课程搜索与树洞课程评测应用：
 
-- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以两个独立可写 SQLite 库提供公开留言板和访问统计。
+- `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以三个独立可写 SQLite 库提供公开留言板、访问统计以及账号与课程收藏。
 - 课程页与评测页顶栏都有访问统计与留言板两个按钮（课程页位于语言切换旁，评测页位于主题切换前）。统计按钮打开悬浮面板，展示今日/近 7 天/累计的访问量与访客数及近 7 天柱状趋势，每 20 秒刷新。留言板按钮打开简洁的悬浮面板：顶部一句话提示欢迎写问题反馈、功能建议和想对开发者说的话，下方是发布输入框和可滚动的公开留言列表。
+- 课程页顶栏在语言切换与访问统计之间另有“我的收藏”星形按钮，打开悬浮收藏面板：未登录时提供登录、注册与找回密码三个表单，已登录时显示用户名、退出登录、账号管理折叠区和按春季、暑期、秋季分组的收藏列表。课程卡片右上角与课程详情弹窗各有一个星标切换按钮；必须登录才能收藏，收藏保存在服务器端的账户库并随账号在多端同步。评测页没有收藏入口。
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
@@ -48,7 +49,7 @@ tests/                          标准库 unittest 回归测试
 
 ### 页面结构与交互
 
-- 两页共享吸顶顶栏、品牌标题、顶栏右侧动作（访问统计、留言板、主题切换、关于悬浮卡）、学期控件、独立评测入口、搜索框宽度、浅色/深色主题、页脚和回到顶部按钮；语言切换只在课程页。GitHub 链接与赞助按钮并列放在关于悬浮卡“纯公益项目 · 每学期更新”下方，赞助按钮不带悬浮文字，按钮下方注明“纯公益项目，承诺永久免费服务”。学期控件固定按春季、暑期、秋季排列，秋季默认；树洞入口与学期同级但不属于学期值。
+- 两页共享吸顶顶栏、品牌标题、顶栏右侧动作（访问统计、留言板、主题切换、关于悬浮卡）、学期控件、独立评测入口、搜索框宽度、浅色/深色主题、页脚和回到顶部按钮；语言切换与我的收藏只在课程页。GitHub 链接与赞助按钮并列放在关于悬浮卡“纯公益项目 · 每学期更新”下方，赞助按钮不带悬浮文字，按钮下方注明“纯公益项目，承诺永久免费服务”。学期控件固定按春季、暑期、秋季排列，秋季默认；树洞入口与学期同级但不属于学期值。
 - 课程页的筛选网格桌面为四列，`900px` 下三列，`720px` 下由居中、全宽、加粗的筛选按钮折叠，并至少保持两列筛选项。按钮使用与搜索框一致的白色表面和 `14px` 圆角，不使用绿色描边或按钮渐变。筛选项依次为课程类型、课程类别、学分、开课单位、成绩记载方式、星期几、上课节时和教室；上课节时的候选项来自 `/api/filters` 的 `periods`，与星期几同时选中时匹配同一节课。
 - 课程卡片按公选、通识、专业、研究生类型使用不同颜色的完整边框，不使用左侧彩条。卡片点击或 Enter/Space 打开课程详情；详情弹窗包含可分享链接并恢复关闭前焦点。
 - 评测搜索输入经过 `300 ms` 防抖，不显示联想下拉，也没有独立搜索按钮。“热门课程”按钮单独请求前 `24` 门课程并展开菜单。日期范围与评测数据量以小字备注显示在“最新课程评测”标题右侧，不设独立统计区。
@@ -57,11 +58,13 @@ tests/                          标准库 unittest 回归测试
 - 项目开发人员悬浮卡在触发按钮或卡片上 hover/focus 时保持显示，文本允许选择和复制；联系方式 `tuzengji` 及欢迎联系文案同时保留在页脚。
 - 两页顶栏的留言板按钮打开悬浮留言面板：面板包含一句话提示、`500` 字上限的输入框、可滚动的公开留言列表和“加载更多”按钮。面板遵循与课程详情弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；留言正文和时间只能通过 `textContent` 渲染。
 - 两页顶栏的访问统计按钮打开悬浮统计面板：面板展示今日/近 7 天/累计的访问量与访客数、近 7 天柱状趋势和隐私说明，打开时拉取 `/api/stats` 并每 20 秒轮询，关闭时清除定时器。数字用 `textContent`、柱状高度用数值渲染，遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求。
+- 课程页顶栏的“我的收藏”按钮打开 `#favOverlay` 收藏面板，内容全部由 `renderFavoritesPanel()` 用 DOM API 生成，用户名、问题文本、状态提示与课程快照只通过 `textContent` 写入，唯一的 `innerHTML` 是移除按钮的图标常量。登录、注册、找回、修改密码、修改密保和删除账号表单使用 `autocomplete` 的 `username`、`current-password`、`new-password` 语义，用户名输入带 `pattern`，密码输入带 `minlength` 与 `maxlength`。面板遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；从课程详情弹窗打开时叠在详情之上，此时把详情弹窗设为 `inert`，关闭后恢复并把焦点还给详情内的收藏按钮。课程卡片右上角的星标是卡片内的独立按钮，click 与 Enter/Space 都必须 `stopPropagation()`，只切换 `aria-pressed` 与 `is-on`，不得打开详情；未登录时点击星标记录待收藏课程并打开登录表单，登录或注册成功后自动补做该次收藏。从面板打开某条收藏时先关闭面板并把焦点放到顶栏收藏按钮，再调用 `showDetail()`。
 - 关于悬浮卡中的赞助按钮不跳转 GitHub，而是打开站内赞助面板：面板依次展示微信赞助码、支付宝赞助码、开发者微信二维码和鸣谢赞助名单，图片直接引用 `/Images/` 下的 `wechat_sponsor.jpg`、`alipay_sponsor.jpg` 与 `MyWeChat.jpg`；Nginx 对 `/Images/` 设置 30 天 immutable 缓存，替换过内容的图片必须像两个赞助码一样带 `?v=N` 版本参数并在更换时递增，鸣谢名单必须与 README“鸣谢赞助”表一致并由前端契约测试校验。面板遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；赞助按钮位于默认隐藏的悬浮卡内，因此恢复焦点前先给 `.tip-wrap` 加 `tip-pinned` 临时显示悬浮卡，聚焦后立即移除。
 
 ### 状态、安全与无障碍
 
 - `pinhaoke_theme` 保存共享主题；课程页另用 `pinhaoke_lang` 保存语言。课程页 URL 保存学期、搜索、筛选、排序、语言和课程详情；评测页 URL 保存 `q`。使用 `history.replaceState`，不要让每次输入污染浏览历史。
+- 收藏与账号状态不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
 - 搜索、筛选、热门课程和详情请求使用 `AbortController` 或请求序号拒绝过时响应。修改时不得重新引入快速切换导致旧请求覆盖新状态的竞态。
 - 卡片、筛选组合框、弹窗和图标按钮必须有语义角色、`aria-*` 标签及可见焦点。弹窗打开时使背景 `inert`，锁定焦点，支持 Escape/背景关闭，并在关闭后把焦点还给原触发元素。
 - 课程页所有插入模板的数据先经过 `esc()`；评测正文与高亮必须通过 `textContent` 或文本节点分段，禁止把树洞正文拼入 `innerHTML`。原树洞链接只允许 PKU 树洞主机。
@@ -113,13 +116,15 @@ git diff --check
 
 验收口径可写作 `fall=4421`、`spring=3701`、`summer=160`。这些是列表合并后的卡片数，不是数据库原始行数。
 
-`get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写课程或评测数据库；唯一允许的写入是留言板 API 对留言库的插入。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
+`get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写课程或评测数据库；允许的写入只有留言板 API 对留言库的插入、`record_visit()` 对统计库的累加，以及账号与收藏 API 对账户库的读写。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
 
 `get_reviews_db()` 以相同的 SQLite URI `mode=ro` 和 `PRAGMA query_only = ON` 打开 `树洞课程评测.db`。`GET /api/health` 检查五个课程库的表、详情行数、ID 集合、外键与完整性，同时检查评测库的必需表、元数据行数、外键和完整性。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
 
-`get_messages_db()` 打开唯一可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表；六个正式库保持只读，`GET /api/health` 不检查留言库。
+`get_messages_db()` 打开可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表；六个正式库保持只读，`GET /api/health` 不检查留言库。
 
 `get_stats_db()` 以同样方式打开可写的访问统计数据库：路径来自 `PINHAOKE_STATS_DB`，本地默认仓库根目录 `访问统计.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/访问统计.db`，首次使用时自建 `visit_days(day, ip_hash, views, last_at)` 表。`record_visit()` 在 `/` 和 `/reviews` 页面路由中记录访问，按北京时间分日、以 IP 哈希对当日访客去重、`views` 累加，并过滤明显的 bot User-Agent；任何异常都被吞掉，绝不影响页面返回。`GET /api/health` 不检查统计库。
+
+`get_accounts_db()` 打开可写的账户数据库：路径来自 `PINHAOKE_ACCOUNTS_DB`，本地默认仓库根目录 `账户.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/账户.db`。连接启用 WAL、`busy_timeout` 与 `PRAGMA foreign_keys = ON`，由 `_migrate_accounts_db()` 按 `PRAGMA user_version` 迁移，版本 1 建 `users`、`security_questions`、`sessions`、`favorites`、`auth_events` 五张表，删除用户时级联删除密保、会话与收藏。密码与密保答案用标准库 `hashlib.scrypt` 加盐哈希，参数 `SCRYPT_PARAMS` 为 n=2^14、r=8、p=1，序列化为 `scrypt$n$r$p$salt$hash` 并随记录保存，登录成功时低于当前参数的哈希会重算；所有 scrypt 调用经过 `_SCRYPT_GATE`，每个进程最多两个并发。会话令牌由 `secrets.token_urlsafe(32)` 生成，库内只存 SHA-256；cookie `pinhaoke_session` 为 HttpOnly、SameSite=Lax、Path=/，只在 `X-Forwarded-Proto` 或请求 scheme 为 https 时带 Secure，有效期 180 天，`GET /api/account` 每天最多顺延一次。`auth_events(kind, subject, at)` 只保存 IP 哈希、`username_key` 或 `*` 作为限流主体，两天后清除。`GET /api/health` 不检查账户库。
 
 ## API 契约
 
@@ -135,6 +140,18 @@ git diff --check
 | `GET /api/messages` | 返回 `{total, page, page_size, messages}`，公开留言按发布时间倒序分页。 |
 | `POST /api/messages` | 发布一条公开留言，body 为 `{content}`；成功返回 201 和新留言。 |
 | `GET /api/stats` | 返回今日/近 7 天/累计的访问量与访客数及近 7 天每日趋势；`no-store`。 |
+| `GET /api/account` | 返回 `{authenticated}`；已登录时另含 `username`、`questions`（只含 `position` 与 `question`）、`favorites` 与 `limit`。 |
+| `POST /api/auth/register` | body `{username, password, questions}`；成功 201 返回 `{username}` 并签发会话 cookie，用户名已占用 409。 |
+| `POST /api/auth/login` | body `{username, password}`；成功 200 返回 `{username}` 并签发新会话，失败统一 401。 |
+| `POST /api/auth/logout` | 删除当前会话并清除 cookie，204，幂等。 |
+| `POST /api/auth/password` | body `{current_password, new_password}`；204，同时吊销当前会话以外的全部会话。 |
+| `POST /api/auth/questions` | body `{current_password, questions}`；204，整体替换密保问题。 |
+| `POST /api/auth/reset/questions` | body `{username}`；返回 `{questions}`，用户名不存在 404。 |
+| `POST /api/auth/reset` | body `{username, position, answer, new_password}`；答对任意一个问题即 204 并吊销该用户全部会话，答错 401。 |
+| `POST /api/auth/delete` | body `{password}`；204，级联删除密保、会话与收藏并清除 cookie。 |
+| `GET /api/favorites` | 返回 `{favorites, limit}`，需登录。 |
+| `POST /api/favorites` | body `{id}`；服务器从课程库生成快照，新增 201、已存在 200，都返回全量 `{favorites, limit}`，课程不存在 404，超过上限 409。 |
+| `POST /api/favorites/remove` | body `{fav_key}`；200 返回全量 `{favorites, limit}`，幂等。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
@@ -174,6 +191,16 @@ git diff --check
 - `record_visit()` 只在 `/` 和 `/reviews` 页面路由调用，过滤含 `bot/spider/crawl/curl/wget/python-` 等标记或空的 User-Agent，并把所有异常吞掉；页面返回不得因统计失败而受影响。
 - `GET /api/stats` 返回当日、近 `7` 天、累计三组 `{views, visitors}`，以及 `trend`（近 `7` 天每日 `{day, views}`，按日期升序、末位为当日），响应 `no-store`。IP 哈希只用于去重，绝不进入响应。
 - 前端统计数字用 `textContent`、柱状高度用数值渲染，禁止把统计数据拼入 `innerHTML`。
+
+账号与收藏契约：
+
+- 用户名 `strip()` 后必须匹配 `^[A-Za-z0-9_]{3,20}$`，按注册时写法显示，以小写 `username_key` 判定唯一，大小写变体注册返回 409。密码为 8 到 128 字符，`casefold()` 后不得等于用户名。
+- 密保问题 1 到 3 个，问题 `strip()` 后 1 到 60 字且互不重复；答案经 NFKC 规范化、去除全部空白并 `casefold()` 后为 2 到 64 字，且不得等于 `username_key`。找回密码只需答对任意一个问题，成功后吊销该用户全部会话。
+- 所有 `POST` 端点先经 `_require_trusted_origin()`：有 `Origin` 时其主机必须等于 `Host`（尊重 `X-Forwarded-Host`），`Origin: null` 返回 403；无 `Origin` 时按 `Referer` 判定；两者都缺失放行。请求体只接受 JSON。
+- 登录失败与用户名不存在返回同一 401 文案，不存在的用户名也对假哈希校验一次；全部限流检查在 scrypt 之前执行，`AUTH_RATE_LIMITS` 的注册、登录失败、找回、全局校验与收藏写入窗口超限返回 429 并带 `Retry-After`。按用户名限流只按字符串计数，不泄露用户是否存在。
+- 账号与收藏响应一律 `Cache-Control: no-store`，不得包含用户主键、IP、任何哈希、令牌明文或密保答案。
+- 收藏稳定键为 `term|level|course_code|class_no|teacher`，各段 `strip()`，前端 `favoriteKey()` 与后端 `_favorite_key()` 必须保持同一规范化。客户端只提交课程 ID，快照字段由服务器通过 `get_course_detail()` 读取，`term_label` 取自学期主库文件名前缀；重复收藏只刷新快照并保留原 `added_at`；每账号上限 `FAVORITES_MAX = 300`，超限 409。
+- 收藏条目字段为 `fav_key`、`id`、`available`、`term`、`term_label`、`level`、`course_code`、`class_no`、`teacher`、`course_name`、`credits`、`schedule`、`department`、`added_at`，按 `added_at` 倒序、`fav_key` 收尾。`_refresh_favorite_ids()` 在返回前确认课程 ID 仍存在，漂移的条目按 `(course_code, class_no, teacher)` 在同一学期库重新解析并回写新 ID，只有 `term_label` 与快照相同时才回写，否则标记 `available: false` 且不落库。
 
 ## 课程 ID
 
@@ -274,7 +301,7 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 
 不要手工 `git pull` 后重启，不要绕过预检，不要让 `www-data` 持有代码、Git、虚拟环境或六个正式数据库。更新脚本部署精确 `origin/main`，在停服前完成目标工作树、LFS 和候选 venv 预检，激活失败或收到 INT/TERM 时自动恢复旧提交、旧 unit、旧 venv 和原服务状态。
 
-留言板数据库是唯一例外：它位于 `/var/lib/pinhaoke/留言板.db`，由 systemd `StateDirectory` 自动创建并归服务用户所有，不在仓库和 `/opt/pinhaoke` 内。`deploy/update.sh` 与回滚不触碰留言数据，备份需单独处理。访问统计库 `/var/lib/pinhaoke/访问统计.db` 同理。
+留言板、访问统计与账户三个可写数据库是仅有的例外：它们位于 `/var/lib/pinhaoke/留言板.db`、`/var/lib/pinhaoke/访问统计.db` 与 `/var/lib/pinhaoke/账户.db`，由 systemd `StateDirectory` 自动创建并归服务用户所有，`StateDirectoryMode=0750` 限制目录权限，不在仓库和 `/opt/pinhaoke` 内。`deploy/update.sh` 与回滚不触碰这些数据，备份需单独处理。
 
 `deploy/nginx.conf` 只是与 Certbot 共存的站点模板，必须手工安装并先运行 `nginx -t`；`deploy/update.sh` 不覆盖 Nginx。任何任务只有用户明确要求后才可 push 或部署。本地通过测试不代表生产已更新。
 

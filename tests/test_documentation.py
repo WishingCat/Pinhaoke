@@ -66,6 +66,10 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("### 留言板", text)
         self.assertIn("公开留言", text)
         self.assertIn("### 访问统计", text)
+        self.assertIn("### 收藏与账号", text)
+        self.assertIn("多端同步", text)
+        self.assertIn("POST /api/auth/register", text)
+        self.assertIn("POST /api/favorites/remove", text)
         self.assertIn("### 赞助面板", text)
         self.assertIn("不再跳转 GitHub", text)
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
@@ -130,7 +134,24 @@ class DocumentationTests(unittest.TestCase):
             "两节课的区间",
             "PINHAOKE_MESSAGES_DB",
             "PINHAOKE_STATS_DB",
+            "PINHAOKE_ACCOUNTS_DB",
             "StateDirectory",
+            "StateDirectoryMode=0750",
+            "GET /api/account",
+            "POST /api/auth/register",
+            "POST /api/auth/login",
+            "POST /api/auth/reset/questions",
+            "POST /api/auth/reset",
+            "POST /api/auth/delete",
+            "GET /api/favorites",
+            "POST /api/favorites/remove",
+            "hashlib.scrypt",
+            "pinhaoke_session",
+            "pinhaoke_fav_mode",
+            "_require_trusted_origin",
+            "FAVORITES_MAX = 300",
+            "账号与收藏契约",
+            "renderFavoritesPanel()",
             "热门课程",
             "树洞课程评测.db",
             "47843",
@@ -245,6 +266,8 @@ class DocumentationTests(unittest.TestCase):
             "/api/reviews/{pid}",
             "StateDirectory=pinhaoke",
             "PINHAOKE_MESSAGES_DB",
+            "PINHAOKE_ACCOUNTS_DB",
+            "StateDirectoryMode=0750",
             "五类本机 API 契约",
             "review-detail 五类烟测",
         ):
@@ -255,6 +278,20 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("V1", archive)
         self.assertIn("只读参考", archive)
         self.assertIn("严禁用于生产", archive)
+
+    def test_gitignore_excludes_all_writable_databases(self):
+        lines = read(".gitignore").splitlines()
+        for pattern in ("留言板.db*", "访问统计.db*", "账户.db*"):
+            self.assertIn(pattern, lines)
+        result = subprocess.run(
+            ["git", "ls-files", "-z", "--", "*.db"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        )
+        tracked = {item.decode("utf-8") for item in result.stdout.split(b"\0") if item}
+        writable = {"留言板.db", "访问统计.db", "账户.db"}
+        self.assertFalse({Path(path).name for path in tracked} & writable, tracked)
 
     def test_documents_do_not_use_relative_time_words(self):
         forbidden = re.compile(

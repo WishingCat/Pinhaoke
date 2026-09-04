@@ -698,6 +698,7 @@ class FrontendContractTests(unittest.TestCase):
             const document = {{ getElementById: () => element, querySelectorAll: () => [] }};
             const window = {{ addEventListener() {{}} }};
             function readURLState() {{ return 'a1'; }}
+            function initFavorites() {{}}
             function refreshTermToggleUI() {{}}
             function refreshLangSelectorUI() {{}}
             function applyI18n() {{ counts.i18n += 1; }}
@@ -971,6 +972,103 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("hm.src", HTML)
         self.assertIn("_hmt.push(['_setAutoPageview', false])", HTML)
         self.assertIn("_hmt.push(['_trackPageview', location.pathname])", HTML)
+
+    def test_favorites_button_panel_and_account_contract(self):
+        # 课程页顶栏：语言切换 < 我的收藏 < 访问统计；评测页不提供收藏
+        lang = HTML.index('id="langSelector"')
+        fav = HTML.index('id="favBtn"')
+        self.assertLess(lang, fav)
+        self.assertLess(fav, HTML.index('id="statsBtn"'))
+        self.assertNotIn('id="favBtn"', REVIEWS_HTML)
+        self.assertNotIn("favOverlay", REVIEWS_HTML)
+        # 面板语义、状态区与滚动容器
+        self.assertIn('id="favOverlay" role="dialog" aria-modal="true" aria-labelledby="favTitle"', HTML)
+        self.assertIn('aria-label="关闭我的收藏"', HTML)
+        self.assertIn('id="favStatus" role="status" aria-live="polite"', HTML)
+        self.assertIn(".fav-body { flex: 1; min-height: 0; overflow-y: auto;", HTML)
+        self.assertIn("function trapFavFocus", HTML)
+        self.assertIn("closeFavorites()", HTML)
+        keydown = HTML[HTML.index("document.addEventListener('keydown'"):]
+        self.assertLess(keydown.index("favOverlay"), keydown.index("sponsorOverlay"))
+        self.assertIn("if (favOpen) {", keydown)
+        # 面板内容只用 DOM API 与 textContent 渲染
+        self.assertIn("node.textContent = text", function_body("favEl"))
+        for name in (
+            "renderFavoritesPanel", "renderFavAuth", "renderFavAccount", "renderFavList",
+            "buildLoginForm", "buildRegisterForm", "buildResetForm", "buildChangePasswordForm",
+            "buildChangeQuestionsForm", "buildDeleteForm", "setFavStatus", "favToast",
+        ):
+            self.assertNotIn("innerHTML", function_body(name), name)
+        item = function_body("buildFavItem")
+        self.assertEqual(item.count("innerHTML"), 1)
+        self.assertIn("remove.innerHTML = ICONS.close", item)
+        self.assertIn("favEl('span', 'fav-item-name', item.course_name || item.id)", item)
+        # 卡片星标与详情弹窗按钮
+        card = function_body("createCard")
+        self.assertIn('<button class="fav-btn" type="button" aria-pressed="false"></button>', card)
+        self.assertIn("favBtn.dataset.key = favoriteKey(course)", card)
+        self.assertEqual(card.count("e.stopPropagation()"), 2)
+        detail = function_body("showDetail")
+        self.assertIn('id="favToggleBtn"', detail)
+        self.assertIn('data-key="${esc(favoriteKey(c))}"', detail)
+        self.assertIn("toggleFavorite(c, favToggle)", detail)
+        self.assertIn("refreshFavoriteButtons();", function_body("applyI18n"))
+        self.assertIn("initFavorites();", function_body("init"))
+        # 八种语言的按钮文案
+        for key in ("favAdd:", "favRemove:", "myFavorites:"):
+            self.assertEqual(HTML.count(key), 8, key)
+        # 表单语义与请求方式
+        for token in (
+            "autocomplete: 'username'", "autocomplete: 'current-password'",
+            "autocomplete: 'new-password'", "minlength: '8'", "maxlength: '128'",
+            "pattern: FAV_USERNAME_PATTERN", "FAV_USERNAME_PATTERN = '[A-Za-z0-9_]{3,20}'",
+        ):
+            self.assertIn(token, HTML)
+        api = function_body("favApi")
+        self.assertIn("credentials: 'same-origin'", api)
+        self.assertIn("cache: 'no-store'", api)
+        self.assertIn("pinhaoke_fav_mode", HTML)
+        self.assertIn("favModeGet() !== 'user'", function_body("initFavorites"))
+        self.assertNotIn("fav", function_body("syncURL").lower())
+        self.assertNotIn("fav", function_body("readURLState").lower())
+        # 必须登录才能收藏：未登录只记录待收藏课程并打开面板，不落 localStorage
+        toggle = function_body("toggleFavorite")
+        self.assertIn("if (!favUser) {", toggle)
+        self.assertIn("pendingFavoriteId = course.id", toggle)
+        self.assertIn("openFavorites()", toggle)
+        self.assertNotIn("localStorage", toggle)
+        self.assertIn("pendingFavoriteId", function_body("afterFavAuth"))
+        # 成功登录或注册后重绘面板前复位忙碌标记，退出后仍可再次登录
+        self.assertIn("favBusy = false;", function_body("renderFavoritesPanel"))
+        self.assertEqual(HTML.count("favSetBusy(form, false);\n    await afterFavAuth("), 2)
+        # 叠在课程详情之上时冻结详情弹窗，关闭时恢复
+        self.assertIn("favStackedOnModal = courseModal.classList.contains('open')", function_body("openFavorites"))
+        self.assertIn("courseModal.inert = true", function_body("openFavorites"))
+        self.assertIn("courseModal.inert = false", function_body("closeFavorites"))
+        # 星标为实体表面，不使用渐变；主按钮实色
+        self.assertNotIn("gradient", HTML[HTML.index(".fav-btn {"):HTML.index(".fav-toast {")])
+
+    def test_favorite_key_matches_server_normalization(self):
+        term_map = re.search(r"const TERM_BY_PREFIX = \{[^}]*\};", HTML).group(0)
+        level_map = re.search(r"const LEVEL_BY_PREFIX = \{[^}]*\};", HTML).group(0)
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            {term_map}
+            {level_map}
+            {function_source("favoriteKey")}
+            assert.equal(
+              favoriteKey({{ id: 'a1', course_code: '04831180', class_no: 1, teacher: ' 张三(教授) ' }}),
+              'fall|ug|04831180|1|张三(教授)'
+            );
+            assert.equal(favoriteKey({{ id: 'r12', course_code: 'X', class_no: '2', teacher: '' }}), 'fall|gr|X|2|');
+            assert.equal(favoriteKey({{ id: 'u5', course_code: 'C', class_no: null, teacher: null }}), 'spring|ug|C||');
+            assert.equal(favoriteKey({{ id: 'g5', course_code: 'C', class_no: '1', teacher: 't' }}), 'spring|gr|C|1|t');
+            assert.equal(favoriteKey({{ id: 's5', course_code: 'C', class_no: '1', teacher: 't' }}), 'summer|ug|C|1|t');
+            assert.equal(favoriteKey({{ id: 'a7', course_code: 'C', class_no: 1, teacher: 't' }}),
+                         favoriteKey({{ id: 'a9', course_code: 'C', class_no: '1', teacher: 't ' }}));
+            """
+        )
 
 
 if __name__ == "__main__":
