@@ -49,7 +49,7 @@ tests/                          标准库 unittest 回归测试
 ### 页面结构与交互
 
 - 两页共享吸顶顶栏、品牌标题、顶栏右侧动作（访问统计、留言板、主题切换、关于悬浮卡）、学期控件、独立评测入口、搜索框宽度、浅色/深色主题、页脚和回到顶部按钮；语言切换只在课程页。GitHub 与赞助按钮并列放在关于悬浮卡“纯公益项目 · 每学期更新”下方，赞助按钮不带悬浮文字，按钮下方注明“需要能访问 GitHub · 纯公益项目，承诺永久免费服务”。学期控件固定按春季、暑期、秋季排列，秋季默认；树洞入口与学期同级但不属于学期值。
-- 课程页的筛选网格桌面为四列，`900px` 下三列，`720px` 下由居中、全宽、加粗的筛选按钮折叠，并至少保持两列筛选项。按钮使用与搜索框一致的白色表面和 `14px` 圆角，不使用绿色描边或按钮渐变。
+- 课程页的筛选网格桌面为四列，`900px` 下三列，`720px` 下由居中、全宽、加粗的筛选按钮折叠，并至少保持两列筛选项。按钮使用与搜索框一致的白色表面和 `14px` 圆角，不使用绿色描边或按钮渐变。筛选项依次为课程类型、课程类别、学分、开课单位、成绩记载方式、星期几、上课节时和教室；上课节时的候选项来自 `/api/filters` 的 `periods`，与星期几同时选中时匹配同一节课。
 - 课程卡片按公选、通识、专业、研究生类型使用不同颜色的完整边框，不使用左侧彩条。卡片点击或 Enter/Space 打开课程详情；详情弹窗包含可分享链接并恢复关闭前焦点。
 - 评测搜索输入经过 `300 ms` 防抖，不显示联想下拉，也没有独立搜索按钮。“热门课程”按钮单独请求前 `24` 门课程并展开菜单。日期范围与评测数据量以小字备注显示在“最新课程评测”标题右侧，不设独立统计区。
 - 树洞卡片按结果索引在六组颜色间轮换，使用完整 `1.5px` 边框，不使用左侧彩条。卡片点击或 Enter/Space 按需请求 `/api/reviews/{pid}`；原树洞链接、课程标签、展开按钮和文本选择不得误触发弹窗。
@@ -124,7 +124,7 @@ git diff --check
 
 | Endpoint | 契约 |
 |---|---|
-| `GET /api/filters` | 参数 `term=fall\|spring\|summer`，默认 `fall`。返回 `course_types`、`categories`、`departments`、`credits`、`gradings`、`weekdays`。 |
+| `GET /api/filters` | 参数 `term=fall\|spring\|summer`，默认 `fall`。返回 `course_types`、`categories`、`departments`、`credits`、`gradings`、`weekdays`、`periods`。`periods` 是从当前学期 `schedule` 文本提取的全部 `N-M` 节次区间，两节课的区间（如 `1-2`、`3-4`、`10-11`）排在最前，其余区间随后，两组内部都按起止节次排序，每个候选项至少命中一门课。 |
 | `GET /api/courses` | 返回 `{total, page, page_size, courses}`。支持搜索、筛选、排序、语言和分页。 |
 | `GET /api/courses/{id}` | 前缀已包含学期与学段，不接受 `term`；支持 `lang`。 |
 | `GET /api/reviews` | 返回 `{total, page, page_size, query, threads}`。无搜索词时先置顶 2026 年质量分最高的 `10` 个树洞，其余按时间倒序；有搜索词时全部按时间倒序。 |
@@ -141,13 +141,14 @@ git diff --check
 - `term`：`fall`、`spring`、`summer`，默认 `fall`
 - `q`：课程名、目标语言课程名、英文名、教师、教室、目标语言教室、课程号
 - `classroom`：教室专用模糊搜索，可与 `q` 组合
-- `type`、`category`、`credits`、`department`、`weekday`、`grading`
+- `type`、`category`、`credits`、`department`、`weekday`、`period`、`grading`
+- `period`：形如 `3-4` 的节次区间，只匹配 `schedule` 中同一时段的 `周X3~4节`（`LIKE '%周_3~4节%'`，以 `周X` 作为左边界，避免 `1~12节` 误命中 `11~12节`）；与 `weekday` 同时给出时两者必须落在同一节课上，即 `周三3~4节`
 - `sort`：`name_asc`、`name_desc`、`credits_asc`、`credits_desc`、`time_asc`、`random`；兼容旧值 `pinyin`、`pinyin_desc`
 - `random_seed`：使随机排序跨页稳定
 - `lang`：`zh`、`en`、`ja`、`ko`、`fr`、`de`、`es`、`ru`
 - `page`：1 到 10000；`page_size`：1 到 200
 
-非法学期、语言、星期、排序、学分、页码或 canonical ID 必须返回 422/404，不得把未经允许的值拼进 SQL。
+非法学期、语言、星期、节次、排序、学分、页码或 canonical ID 必须返回 422/404，不得把未经允许的值拼进 SQL。
 
 树洞评测 API 参数：
 

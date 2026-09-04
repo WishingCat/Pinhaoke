@@ -592,6 +592,7 @@ class CourseListTests(unittest.TestCase):
             credits="",
             department="",
             weekday="",
+            period="",
             grading="",
             classroom="",
             sort="",
@@ -632,6 +633,89 @@ class CourseListTests(unittest.TestCase):
             and course["class_no"] == class_no
             and course["teacher"] == teacher
         )
+
+    def filters_payload(self, term):
+        return json.loads(app.get_filters(term).body)
+
+    def test_period_options_list_two_period_ranges_before_the_rest(self):
+        schedules = [
+            "1~16周 每周周三7~8节",
+            "1~16周 每周周一1~4节\n1~16周 双周周四10~11节(习题或上机)",
+            "1~8周 每周周五7~7节",
+            "1~16周 每周周二1~2节",
+            None,
+            "",
+            "1~16周 每周周日3~4节",
+        ]
+        self.assertEqual(
+            app._period_options(schedules),
+            ["1-2", "3-4", "7-8", "10-11", "1-4", "7-7"],
+        )
+
+    def test_filters_expose_period_ranges_two_period_first_and_each_matches_a_course(self):
+        for term in ("fall", "spring", "summer"):
+            with self.subTest(term=term):
+                periods = self.filters_payload(term)["periods"]
+                self.assertTrue(periods)
+                self.assertTrue(all(app.PERIOD_RANGE_RE.match(period) for period in periods))
+                bounds = [tuple(int(part) for part in period.split("-")) for period in periods]
+                self.assertEqual(len(bounds), len(set(bounds)))
+                self.assertEqual(bounds, sorted(bounds, key=app._period_option_sort_key))
+                two_period = [pair for pair in bounds if pair[1] - pair[0] == 1]
+                self.assertTrue(two_period)
+                self.assertEqual(bounds[: len(two_period)], two_period)
+                self.assertEqual(periods[0], "1-2")
+                for period in periods:
+                    total = self.call(term=term, period=period, page_size=1)["total"]
+                    self.assertGreater(total, 0, period)
+
+    def test_every_scheduled_card_range_is_an_offered_period_option(self):
+        for term in ("fall", "summer"):
+            with self.subTest(term=term):
+                offered = set(self.filters_payload(term)["periods"])
+                seen = set()
+                for course in self.all_courses(term=term):
+                    for start, end in app.SCHEDULE_PERIOD_RE.findall(course["schedule"] or ""):
+                        seen.add(f"{int(start)}-{int(end)}")
+                self.assertTrue(seen)
+                self.assertLessEqual(seen, offered)
+
+    def test_period_filter_matches_the_same_session_as_weekday(self):
+        alone = self.all_courses(term="fall", period="10-12")
+        self.assertTrue(alone)
+        for course in alone:
+            self.assertRegex(course["schedule"], r"周[一二三四五六日]10~12节")
+        coupled = self.all_courses(term="fall", weekday="周二", period="10-12")
+        self.assertTrue(coupled)
+        coupled_ids = set()
+        for course in coupled:
+            self.assertIn("周二10~12节", course["schedule"])
+            coupled_ids.add(course["id"])
+        # Completeness: every Tuesday course with a 周二10~12节 slot is in the coupled result,
+        # and a course meeting Tuesday elsewhere plus 10~12 on another day is not.
+        for course in self.all_courses(term="fall", weekday="周二"):
+            self.assertEqual(
+                course["id"] in coupled_ids,
+                "周二10~12节" in (course["schedule"] or ""),
+                course["id"],
+            )
+
+    def test_period_like_pattern_anchors_on_the_weekday_token(self):
+        where, params = app._build_source_where({"period": (1, 12)})
+        self.assertEqual(where, " WHERE s.schedule LIKE ?")
+        self.assertEqual(params, ["%周_1~12节%"])
+        with closing(sqlite3.connect(":memory:")) as conn:
+            for schedule, expected in (
+                ("1~16周 每周周三1~12节", 1),
+                ("1~16周 每周周三11~12节", 0),
+                ("1~16周 每周周三1~2节", 0),
+                ("1~16周 每周周一3~4节\n1~16周 单周周五1~12节", 1),
+            ):
+                got = conn.execute("SELECT ? LIKE ?", (schedule, params[0])).fetchone()[0]
+                self.assertEqual(got, expected, schedule)
+        where, params = app._build_source_where({"weekday": "周三", "period": (3, 4)})
+        self.assertEqual(where, " WHERE s.weekdays LIKE ? AND s.schedule LIKE ?")
+        self.assertEqual(params, ["%周三%", "%周三3~4节%"])
 
     def test_card_totals_keep_undergrad_and_graduate_separate(self):
         self.assertEqual(self.call(term="fall", page_size=1)["total"], 4421)
@@ -962,6 +1046,7 @@ class CourseListTests(unittest.TestCase):
             "credits": "",
             "department": "",
             "weekday": "",
+            "period": "",
             "grading": "",
             "classroom": "",
         }
@@ -988,6 +1073,7 @@ class ValidationAndDetailTests(unittest.TestCase):
             "credits": "",
             "department": "",
             "weekday": "",
+            "period": "",
             "grading": "",
             "classroom": "",
             "sort": "",
@@ -1014,6 +1100,13 @@ class ValidationAndDetailTests(unittest.TestCase):
             ("credits", False),
             ("credits", []),
             ("weekday", "%"),
+            ("period", "1~2"),
+            ("period", "0-2"),
+            ("period", "5-3"),
+            ("period", "15-16"),
+            ("period", "%"),
+            ("period", "3-4 OR 1=1"),
+            ("period", True),
             ("lang", "xx"),
             ("sort", "drop"),
             ("term", "winter"),

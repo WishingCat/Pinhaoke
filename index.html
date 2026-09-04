@@ -826,7 +826,8 @@ html[data-theme="dark"] .filters::before {
 #labelCredits { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 10L12 5 2 10l10 5 10-5z'/%3E%3Cpath d='M6 12.5V17c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5'/%3E%3C/svg%3E"); }
 #labelDepartment { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21h18'/%3E%3Cpath d='M5 21V7l7-4 7 4v14'/%3E%3Cpath d='M9 21v-6h6v6'/%3E%3C/svg%3E"); }
 #labelGrading { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2'/%3E%3Crect x='9' y='3' width='6' height='4' rx='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E"); }
-#labelWeekday { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E"); }
+#labelWeekday { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E"); }
+#labelPeriod { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E"); }
 #labelClassroom { --fl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E"); }
 
 .filter-group input,
@@ -2033,8 +2034,12 @@ window._hmt.push(['_trackPageview', location.pathname]);
         <div class="custom-select" id="csGrading" data-filter="filterGrading"></div>
       </div>
       <div class="filter-group">
-        <label id="labelWeekday">上课时间</label>
+        <label id="labelWeekday">星期几</label>
         <div class="custom-select" id="csWeekday" data-filter="filterWeekday"></div>
+      </div>
+      <div class="filter-group">
+        <label id="labelPeriod">上课节时</label>
+        <div class="custom-select" id="csPeriod" data-filter="filterPeriod"></div>
       </div>
       <div class="filter-group">
         <label id="labelClassroom">教室</label>
@@ -2159,7 +2164,7 @@ const i18n = {
     labelCredits: '学分', labelDepartment: '开课单位',
     labelGrading: '成绩记载方式', labelSort: '排序',
     sortDefault: '默认', sortNameAsc: '课程名正序', sortNameDesc: '课程名倒序', sortCreditsAsc: '学分 低→高', sortCreditsDesc: '学分 高→低', sortTimeAsc: '上课时间 早→晚', sortRandom: '随机',
-    labelWeekday: '上课时间', labelClassroom: '教室',
+    labelWeekday: '星期几', labelPeriod: '上课节时', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
     filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制', closeModal: '关闭课程详情',
@@ -2169,6 +2174,7 @@ const i18n = {
     all: '全部',
     courseTypes: { '公选课': '公选课', '通识课': '通识课', '专业课': '专业课', '研究生课': '研究生课', '英语课': '英语课', '体育课': '体育课', '劳动教育课': '劳动教育课', '政治课': '政治课', '计算机基础课': '计算机基础课', '思政选择性必修课': '思政选择性必修课' },
     weekdays: ['周一','周二','周三','周四','周五','周六','周日'],
+    periodLabel: (a, b) => a === b ? `第${a}节` : `${a}-${b}节`,
     fieldTeacher: '教师', fieldDepartment: '开课单位',
     fieldTime: '上课时间', fieldClassroom: '教室', fieldNotes: '备注',
     fieldCredits: '学分', fieldEnrollment: '选课人数', fieldPNP: 'PNP',
@@ -2198,7 +2204,7 @@ const i18n = {
     labelCredits: 'Credits', labelDepartment: 'Department',
     labelGrading: 'Grading', labelSort: 'Sort',
     sortDefault: 'Default', sortNameAsc: 'Course name ascending', sortNameDesc: 'Course name descending', sortCreditsAsc: 'Credits ↑', sortCreditsDesc: 'Credits ↓', sortTimeAsc: 'Earliest first', sortRandom: 'Random',
-    labelWeekday: 'Schedule', labelClassroom: 'Classroom',
+    labelWeekday: 'Weekday', labelPeriod: 'Periods', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
     filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied', closeModal: 'Close course details',
@@ -2208,6 +2214,7 @@ const i18n = {
     all: 'All',
     courseTypes: { '公选课': 'Elective', '通识课': 'General Ed', '专业课': 'Major', '研究生课': 'Graduate', '英语课': 'English', '体育课': 'PE', '劳动教育课': 'Labor Ed', '政治课': 'Politics', '计算机基础课': 'CS Basics', '思政选择性必修课': 'Civic selective requirement' },
     weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    periodLabel: (a, b) => a === b ? `Period ${a}` : `Periods ${a}-${b}`,
     fieldTeacher: 'Teacher', fieldDepartment: 'Dept.',
     fieldTime: 'Schedule', fieldClassroom: 'Room', fieldNotes: 'Notes',
     fieldCredits: 'Credits', fieldEnrollment: 'Enrollment', fieldPNP: 'P/NP',
@@ -2237,7 +2244,7 @@ const i18n = {
     labelCredits: '単位', labelDepartment: '開講部局',
     labelGrading: '成績評価方法', labelSort: '並び替え',
     sortDefault: 'デフォルト', sortNameAsc: '科目名の昇順', sortNameDesc: '科目名の降順', sortCreditsAsc: '単位 ↑', sortCreditsDesc: '単位 ↓', sortTimeAsc: '早い時間順', sortRandom: 'ランダム',
-    labelWeekday: '曜日', labelClassroom: '教室',
+    labelWeekday: '曜日', labelPeriod: '時限', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
     filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました', closeModal: '授業詳細を閉じる',
@@ -2247,6 +2254,7 @@ const i18n = {
     all: 'すべて',
     courseTypes: { '公选课': '公選課', '通识课': '一般教養', '专业课': '専門課', '研究生课': '大学院', '英语课': '英語', '体育课': '体育', '劳动教育课': '勤労教育', '政治课': '政治', '计算机基础课': '情報基礎', '思政选择性必修课': '思想政治選択必修' },
     weekdays: ['月','火','水','木','金','土','日'],
+    periodLabel: (a, b) => a === b ? `${a}限` : `${a}〜${b}限`,
     fieldTeacher: '教員', fieldDepartment: '開講部局',
     fieldTime: '時間割', fieldClassroom: '教室', fieldNotes: '備考',
     fieldCredits: '単位', fieldEnrollment: '登録者数', fieldPNP: 'P/NP',
@@ -2276,7 +2284,7 @@ const i18n = {
     labelCredits: '학점', labelDepartment: '개설 학과',
     labelGrading: '성적 방식', labelSort: '정렬',
     sortDefault: '기본', sortNameAsc: '강좌명 오름차순', sortNameDesc: '강좌명 내림차순', sortCreditsAsc: '학점 ↑', sortCreditsDesc: '학점 ↓', sortTimeAsc: '이른 시간순', sortRandom: '무작위',
-    labelWeekday: '요일', labelClassroom: '강의실',
+    labelWeekday: '요일', labelPeriod: '교시', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
     filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨', closeModal: '강좌 상세 닫기',
@@ -2286,6 +2294,7 @@ const i18n = {
     all: '전체',
     courseTypes: { '公选课': '선택', '通识课': '교양', '专业课': '전공', '研究生课': '대학원', '英语课': '영어', '体育课': '체육', '劳动教育课': '노동교육', '政治课': '정치', '计算机基础课': '컴퓨터기초', '思政选择性必修课': '사상정치 선택필수' },
     weekdays: ['월','화','수','목','금','토','일'],
+    periodLabel: (a, b) => a === b ? `${a}교시` : `${a}~${b}교시`,
     fieldTeacher: '교수', fieldDepartment: '개설 학과',
     fieldTime: '시간', fieldClassroom: '강의실', fieldNotes: '비고',
     fieldCredits: '학점', fieldEnrollment: '수강 인원', fieldPNP: 'P/NP',
@@ -2315,7 +2324,7 @@ const i18n = {
     labelCredits: 'Cr\u00e9dits', labelDepartment: 'D\u00e9partement',
     labelGrading: 'Notation', labelSort: 'Trier',
     sortDefault: 'Par d\u00e9faut', sortNameAsc: 'Nom du cours croissant', sortNameDesc: 'Nom du cours d\u00e9croissant', sortCreditsAsc: 'Cr\u00e9dits ↑', sortCreditsDesc: 'Cr\u00e9dits ↓', sortTimeAsc: 'T\u00f4t \u2192 tard', sortRandom: 'Al\u00e9atoire',
-    labelWeekday: 'Jour', labelClassroom: 'Salle',
+    labelWeekday: 'Jour', labelPeriod: 'Cr\u00e9neau', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
     filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9', closeModal: 'Fermer les d\u00e9tails du cours',
@@ -2325,6 +2334,7 @@ const i18n = {
     all: 'Tous',
     courseTypes: { '公选课': '\u00c9lectif', '通识课': 'G\u00e9n\u00e9ral', '专业课': 'Sp\u00e9cialit\u00e9', '研究生课': 'Master', '英语课': 'Anglais', '体育课': 'Sport', '劳动教育课': '\u00c9d. du travail', '政治课': 'Politique', '计算机基础课': 'Info. base', '思政选择性必修课': 'Option civique obligatoire' },
     weekdays: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
+    periodLabel: (a, b) => a === b ? `Cr\u00e9neau ${a}` : `Cr\u00e9neaux ${a}-${b}`,
     fieldTeacher: 'Enseignant', fieldDepartment: 'D\u00e9pt.',
     fieldTime: 'Horaire', fieldClassroom: 'Salle', fieldNotes: 'Notes',
     fieldCredits: 'Cr\u00e9dits', fieldEnrollment: 'Inscrits', fieldPNP: 'P/NP',
@@ -2354,7 +2364,7 @@ const i18n = {
     labelCredits: 'Credits', labelDepartment: 'Fakult\u00e4t',
     labelGrading: 'Bewertung', labelSort: 'Sortieren',
     sortDefault: 'Standard', sortNameAsc: 'Kursname aufsteigend', sortNameDesc: 'Kursname absteigend', sortCreditsAsc: 'Punkte ↑', sortCreditsDesc: 'Punkte ↓', sortTimeAsc: 'Fr\u00fch \u2192 sp\u00e4t', sortRandom: 'Zuf\u00e4llig',
-    labelWeekday: 'Wochentag', labelClassroom: 'Raum',
+    labelWeekday: 'Wochentag', labelPeriod: 'Stunde', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
     filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert', closeModal: 'Kursdetails schlie\u00dfen',
@@ -2364,6 +2374,7 @@ const i18n = {
     all: 'Alle',
     courseTypes: { '公选课': 'Wahlfach', '通识课': 'Allgemein', '专业课': 'Fachkurs', '研究生课': 'Master', '英语课': 'Englisch', '体育课': 'Sport', '劳动教育课': 'Arbeitserzieh.', '政治课': 'Politik', '计算机基础课': 'Info. Grdl.', '思政选择性必修课': 'Politisches Wahlpflichtfach' },
     weekdays: ['Mo','Di','Mi','Do','Fr','Sa','So'],
+    periodLabel: (a, b) => a === b ? `${a}. Stunde` : `${a}.-${b}. Stunde`,
     fieldTeacher: 'Dozent', fieldDepartment: 'Fakult\u00e4t',
     fieldTime: 'Zeit', fieldClassroom: 'Raum', fieldNotes: 'Hinweise',
     fieldCredits: 'Credits', fieldEnrollment: 'Teilnehmer', fieldPNP: 'P/NP',
@@ -2393,7 +2404,7 @@ const i18n = {
     labelCredits: 'Cr\u00e9ditos', labelDepartment: 'Departamento',
     labelGrading: 'Calificaci\u00f3n', labelSort: 'Ordenar',
     sortDefault: 'Por defecto', sortNameAsc: 'Nombre del curso ascendente', sortNameDesc: 'Nombre del curso descendente', sortCreditsAsc: 'Cr\u00e9ditos ↑', sortCreditsDesc: 'Cr\u00e9ditos ↓', sortTimeAsc: 'Temprano \u2192 tarde', sortRandom: 'Aleatorio',
-    labelWeekday: 'D\u00eda', labelClassroom: 'Aula',
+    labelWeekday: 'D\u00eda', labelPeriod: 'Sesi\u00f3n', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
     filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado', closeModal: 'Cerrar detalles del curso',
@@ -2403,6 +2414,7 @@ const i18n = {
     all: 'Todos',
     courseTypes: { '公选课': 'Electiva', '通识课': 'General', '专业课': 'Especialidad', '研究生课': 'Posgrado', '英语课': 'Ingl\u00e9s', '体育课': 'EF', '劳动教育课': 'Ed. laboral', '政治课': 'Pol\u00edtica', '计算机基础课': 'Info. b\u00e1sica', '思政选择性必修课': 'Optativa c\u00edvica obligatoria' },
     weekdays: ['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'],
+    periodLabel: (a, b) => a === b ? `Sesi\u00f3n ${a}` : `Sesiones ${a}-${b}`,
     fieldTeacher: 'Profesor', fieldDepartment: 'Depto.',
     fieldTime: 'Horario', fieldClassroom: 'Aula', fieldNotes: 'Notas',
     fieldCredits: 'Cr\u00e9ditos', fieldEnrollment: 'Inscritos', fieldPNP: 'P/NP',
@@ -2432,7 +2444,7 @@ const i18n = {
     labelCredits: 'Кредиты', labelDepartment: 'Факультет',
     labelGrading: 'Оценивание', labelSort: 'Сортировка',
     sortDefault: 'По умолчанию', sortNameAsc: 'Название курса по возрастанию', sortNameDesc: 'Название курса по убыванию', sortCreditsAsc: 'Кредиты ↑', sortCreditsDesc: 'Кредиты ↓', sortTimeAsc: 'С раннего', sortRandom: 'Случайно',
-    labelWeekday: 'День', labelClassroom: 'Аудитория',
+    labelWeekday: 'День', labelPeriod: 'Периоды', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
     filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано', closeModal: 'Закрыть сведения о курсе',
@@ -2442,6 +2454,7 @@ const i18n = {
     all: 'Все',
     courseTypes: { '公选课': 'Элективный', '通识课': 'Общий', '专业课': 'Специальный', '研究生课': 'Магистратура', '英语课': 'Английский', '体育课': 'Физкультура', '劳动教育课': 'Труд. восп.', '政治课': 'Политика', '计算机基础课': 'Информатика', '思政选择性必修课': 'Обязательный электив по политике' },
     weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],
+    periodLabel: (a, b) => a === b ? `Период ${a}` : `Периоды ${a}-${b}`,
     fieldTeacher: 'Преподаватель', fieldDepartment: 'Факультет',
     fieldTime: 'Расписание', fieldClassroom: 'Аудитория', fieldNotes: 'Примечания',
     fieldCredits: 'Кредиты', fieldEnrollment: 'Записано', fieldPNP: 'P/NP',
@@ -2773,6 +2786,7 @@ function readURLState() {
   csValues.filterCredits    = p.get('credits') || '';
   csValues.filterDepartment = p.get('dept') || '';
   csValues.filterWeekday    = p.get('day') || '';
+  csValues.filterPeriod     = p.get('period') || '';
   csValues.filterGrading    = p.get('grading') || '';
   csValues.filterSort       = p.get('sort') || '';
   if (csValues.filterSort === 'random') {
@@ -2793,6 +2807,7 @@ function syncURL() {
   if (csValues.filterCredits)    p.set('credits', csValues.filterCredits);
   if (csValues.filterDepartment) p.set('dept', csValues.filterDepartment);
   if (csValues.filterWeekday)    p.set('day', csValues.filterWeekday);
+  if (csValues.filterPeriod)     p.set('period', csValues.filterPeriod);
   if (csValues.filterGrading)    p.set('grading', csValues.filterGrading);
   if (csValues.filterSort) {
     p.set('sort', csValues.filterSort);
@@ -2857,6 +2872,7 @@ function applyI18n() {
   document.getElementById('labelGrading').textContent = lang.labelGrading;
   document.getElementById('labelSort').textContent = lang.labelSort;
   document.getElementById('labelWeekday').textContent = lang.labelWeekday;
+  document.getElementById('labelPeriod').textContent = lang.labelPeriod;
   document.getElementById('labelClassroom').textContent = lang.labelClassroom;
   document.getElementById('filterClassroom').placeholder = lang.classroomPlaceholder;
   document.getElementById('filtersBtnText').textContent = lang.filtersBtn;
@@ -3215,6 +3231,11 @@ function populateFilters(filters) {
   buildCustomSelect('csWeekday',
     WEEKDAYS_CN.map((w, i) => ({ value: w, label: lang.weekdays[i] })),
     lang.all, csValues.filterWeekday);
+
+  // Period ranges come from the term's own schedule text, so the list covers every course.
+  buildCustomSelect('csPeriod',
+    (filters.periods || []).map(p => ({ value: p, label: fmtPeriod(p) })),
+    lang.all, csValues.filterPeriod);
 }
 
 /* ===== Active filter chips ===== */
@@ -3233,6 +3254,7 @@ function chipItems() {
     const idx = WEEKDAYS_CN.indexOf(csValues.filterWeekday);
     items.push({ k: 'filterWeekday', label: idx >= 0 ? lang.weekdays[idx] : csValues.filterWeekday });
   }
+  if (csValues.filterPeriod) items.push({ k: 'filterPeriod', label: fmtPeriod(csValues.filterPeriod) });
   if (csValues.filterGrading) items.push({ k: 'filterGrading', label: tr('gradings', csValues.filterGrading) });
   return items;
 }
@@ -3319,6 +3341,7 @@ async function fetchCourses({ page = 1, append = false } = {}) {
   if (csValues.filterCredits)    params.set('credits', csValues.filterCredits);
   if (csValues.filterDepartment) params.set('department', csValues.filterDepartment);
   if (csValues.filterWeekday)    params.set('weekday', csValues.filterWeekday);
+  if (csValues.filterPeriod)     params.set('period', csValues.filterPeriod);
   if (csValues.filterGrading)    params.set('grading', csValues.filterGrading);
   if (sort) params.set('sort', sort);
   if (sort === 'random' && randomSeed) params.set('random_seed', randomSeed);
@@ -3479,6 +3502,14 @@ function fmtCredits(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '-';
   return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
+}
+
+// "10-11" -> localized "10-11节" / "Periods 10-11"; single-period slots ("7-7") collapse to one number.
+function fmtPeriod(v) {
+  const raw = v == null ? '' : String(v);
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(raw);
+  if (!m) return raw;
+  return i18n[currentLang].periodLabel(Number(m[1]), Number(m[2]));
 }
 
 // List endpoint returns course_type / category as arrays (merged from multiple
@@ -4071,7 +4102,7 @@ function clearAll() {
   document.getElementById('searchClear').classList.add('hidden');
   // Reset filter selects; sort is a view preference, not a filter — keep it.
   ['filterCourseType', 'filterCategory', 'filterCredits',
-   'filterDepartment', 'filterWeekday', 'filterGrading'].forEach(k => { csValues[k] = ''; });
+   'filterDepartment', 'filterWeekday', 'filterPeriod', 'filterGrading'].forEach(k => { csValues[k] = ''; });
   if (cachedFilters) populateFilters(cachedFilters);
   applyFilters();
 }

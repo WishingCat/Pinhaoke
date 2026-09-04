@@ -81,6 +81,12 @@ TERM_DBS = {
 VALID_TERMS = frozenset(TERM_DBS)
 VALID_LANGS = frozenset({"zh", "en", "ja", "ko", "fr", "de", "es", "ru"})
 VALID_WEEKDAYS = frozenset({"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"})
+# Class-period filter values look like "3-4": a session occupying periods 3 through 4.
+# PKU numbers periods 1-13; 14 is accepted as headroom, matching parse_first_period().
+PERIOD_RANGE_RE = re.compile(r"^(?:[1-9]|1[0-4])-(?:[1-9]|1[0-4])$")
+# Every schedule slot is written as "周X" immediately followed by "N~M节" (verified across
+# all five course databases), so the weekday token doubles as the left boundary of a range.
+SCHEDULE_PERIOD_RE = re.compile(r"周[一二三四五六日](\d{1,2})~(\d{1,2})节")
 VALID_SORTS = frozenset({
     "", "name_asc", "name_desc", "pinyin", "pinyin_desc",
     "credits_asc", "credits_desc", "time_asc", "random",
@@ -525,6 +531,43 @@ TERM_LIST_SELECTS = {
 # ---- filters ------------------------------------------------------------------
 
 
+def _period_option_sort_key(bounds: tuple[int, int]) -> tuple[bool, int, int]:
+    """Two-period ranges such as 1-2 and 3-4 come first; every other range follows by start and end."""
+    start, end = bounds
+    return (end - start != 1, start, end)
+
+
+def _period_options(schedules) -> list[str]:
+    """Distinct class-period ranges ("N-M") found in schedule text.
+
+    Two-period ranges (1-2, 3-4, 10-11 ...) are listed first because they cover most classes;
+    the remaining ranges follow. Both groups are sorted by start then end. Options come from the
+    same "周X N~M节" shape the `period` filter matches, so every option returned here selects at
+    least one course of the same term.
+    """
+    ranges = set()
+    for schedule in schedules:
+        for start, end in SCHEDULE_PERIOD_RE.findall(schedule or ""):
+            start, end = int(start), int(end)
+            if 1 <= start <= end <= 14:
+                ranges.add((start, end))
+    return [f"{start}-{end}" for start, end in sorted(ranges, key=_period_option_sort_key)]
+
+
+def _period_bounds(period: object) -> tuple[int, int] | None:
+    """Validate a `period` filter such as "10-11"; return (start, end), or None when empty."""
+    if not isinstance(period, str):
+        raise HTTPException(status_code=422, detail="Invalid period")
+    if not period:
+        return None
+    if not PERIOD_RANGE_RE.match(period):
+        raise HTTPException(status_code=422, detail="Invalid period")
+    start, end = (int(part) for part in period.split("-"))
+    if start > end:
+        raise HTTPException(status_code=422, detail="Invalid period")
+    return start, end
+
+
 @app.get("/api/filters")
 def get_filters(
     term: str = Query(
@@ -591,6 +634,16 @@ def get_filters(
 
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
+        if has_graduate_db:
+            schedules = col(
+                """SELECT schedule FROM basic_info WHERE schedule != ''
+                   UNION ALL
+                   SELECT schedule FROM gr.basic_info WHERE schedule != ''"""
+            )
+        else:
+            schedules = col("SELECT schedule FROM basic_info WHERE schedule != ''")
+        periods = _period_options(schedules)
+
     payload = {
         "course_types": course_types,
         "categories": categories,
@@ -598,6 +651,7 @@ def get_filters(
         "credits": credits,
         "gradings": gradings,
         "weekdays": weekdays,
+        "periods": periods,
     }
     # Filter universes only change when DBs are rebuilt. 1 hour browser cache
     # keeps cold-load fast without making a redeploy require a hard refresh.
@@ -657,6 +711,14 @@ def _build_source_where(filters: dict[str, object]) -> tuple[str, list[object]]:
     if weekday:
         conds.append("s.weekdays LIKE ?")
         params.append(f"%{weekday}%")
+    period = filters.get("period")
+    if period:
+        start, end = period
+        # Slots read "周三10~11节". Anchoring on the weekday token keeps "1~12节" from matching
+        # "11~12节"; with a weekday filter the same slot has to carry both.
+        weekday_token = weekday if weekday else "周_"
+        conds.append("s.schedule LIKE ?")
+        params.append(f"%{weekday_token}{start}~{end}节%")
     grading = str(filters.get("grading") or "")
     if grading:
         conds.append("s.grading = ?")
@@ -970,6 +1032,11 @@ def list_courses(
     credits: str = Query("", description="Credits filter"),
     department: str = Query("", description="Department filter"),
     weekday: str = Query("", description="Weekday filter", pattern=r"^(?:|周[一二三四五六日])$"),
+    period: str = Query(
+        "",
+        description="Class-period filter such as 3-4 (a session occupying periods 3 through 4); with weekday, the same session must match both",
+        pattern=r"^(?:|(?:[1-9]|1[0-4])-(?:[1-9]|1[0-4]))$",
+    ),
     grading: str = Query("", description="Grading filter"),
     classroom: str = Query("", description="Classroom filter (LIKE, classroom column only)"),
     sort: str = Query(
@@ -984,6 +1051,7 @@ def list_courses(
     page_size: int = Query(50, ge=1, le=200),
 ):
     credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
+    period_bounds = _period_bounds(period)
 
     filters = {
         "q": q,
@@ -992,6 +1060,7 @@ def list_courses(
         "credits": credits_value,
         "department": department,
         "weekday": weekday,
+        "period": period_bounds,
         "grading": grading,
         "classroom": classroom,
     }

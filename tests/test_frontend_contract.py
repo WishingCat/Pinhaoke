@@ -736,6 +736,7 @@ class FrontendContractTests(unittest.TestCase):
               filterCredits: '2',
               filterDepartment: '物理学院',
               filterWeekday: '周一',
+              filterPeriod: '3-4',
               filterGrading: '百分制',
               filterSort: 'random',
             }};
@@ -751,13 +752,50 @@ class FrontendContractTests(unittest.TestCase):
             let params = new URL(replaced, 'http://local').searchParams;
             assert.deepEqual(Object.fromEntries(params), {{
               q: 'optics', room: '二教511', type: '专业课', cat: '任选', credits: '2',
-              dept: '物理学院', day: '周一', grading: '百分制', sort: 'random',
+              dept: '物理学院', day: '周一', period: '3-4', grading: '百分制', sort: 'random',
               seed: '731', term: 'spring', lang: 'en', course: 'u42'
             }});
             currentTerm = 'fall';
             syncURL();
             params = new URL(replaced, 'http://local').searchParams;
             assert.equal(params.has('term'), false);
+            """
+        )
+
+    def test_weekday_label_and_period_filter_contract(self):
+        self.assertIn('<label id="labelWeekday">星期几</label>', HTML)
+        self.assertIn('<label id="labelPeriod">上课节时</label>', HTML)
+        self.assertIn('<div class="custom-select" id="csPeriod" data-filter="filterPeriod"></div>', HTML)
+        self.assertLess(HTML.index('id="csWeekday"'), HTML.index('id="csPeriod"'))
+        self.assertLess(HTML.index('id="csPeriod"'), HTML.index('id="filterClassroom"'))
+        self.assertNotIn("labelWeekday: '上课时间'", HTML)
+        self.assertIn("labelWeekday: '星期几', labelPeriod: '上课节时'", HTML)
+        self.assertEqual(HTML.count("labelPeriod:"), 8)
+        self.assertEqual(HTML.count("periodLabel: (a, b) =>"), 8)
+        self.assertIn("#labelPeriod { --fl-icon:", HTML)
+        self.assertIn("csValues.filterPeriod     = p.get('period') || '';", HTML)
+        self.assertIn("p.set('period', csValues.filterPeriod)", HTML)
+        self.assertIn("params.set('period', csValues.filterPeriod)", HTML)
+        self.assertIn("(filters.periods || []).map(p => ({ value: p, label: fmtPeriod(p) }))", HTML)
+        self.assertIn("'filterDepartment', 'filterWeekday', 'filterPeriod', 'filterGrading'", HTML)
+        self.assertIn("document.getElementById('labelPeriod').textContent = lang.labelPeriod;", HTML)
+        self.assertIn("items.push({ k: 'filterPeriod', label: fmtPeriod(csValues.filterPeriod) })", HTML)
+        source = function_source("fmtPeriod")
+        self.run_node(
+            f"""
+            const assert = require('node:assert/strict');
+            let currentLang = 'zh';
+            const i18n = {{
+              zh: {{ periodLabel: (a, b) => a === b ? `第${{a}}节` : `${{a}}-${{b}}节` }},
+              en: {{ periodLabel: (a, b) => a === b ? `Period ${{a}}` : `Periods ${{a}}-${{b}}` }},
+            }};
+            {source}
+            assert.equal(fmtPeriod('10-11'), '10-11节');
+            assert.equal(fmtPeriod('7-7'), '第7节');
+            assert.equal(fmtPeriod('bogus'), 'bogus');
+            assert.equal(fmtPeriod(null), '');
+            currentLang = 'en';
+            assert.equal(fmtPeriod('3-4'), 'Periods 3-4');
             """
         )
 

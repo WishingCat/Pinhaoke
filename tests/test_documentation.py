@@ -70,6 +70,7 @@ class DocumentationTests(unittest.TestCase):
         self.assertLess(text.index("2026 暑期"), text.index("2026 秋季"))
         self.assertIn("秋季为默认学期", text)
         self.assertIn("树洞课程评测", text)
+        self.assertIn("上课节时", text)
         self.assertIn("独立入口", text)
         self.assertIn("手机端", text)
         self.assertIn("课程名、教师名", text)
@@ -118,6 +119,11 @@ class DocumentationTests(unittest.TestCase):
             "GET /api/messages",
             "POST /api/messages",
             "GET /api/stats",
+            "`periods`",
+            "`period`",
+            "上课节时",
+            "星期几",
+            "两节课的区间",
             "PINHAOKE_MESSAGES_DB",
             "PINHAOKE_STATS_DB",
             "StateDirectory",
