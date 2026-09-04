@@ -163,8 +163,8 @@ class FrontendContractTests(unittest.TestCase):
             self.assertIn('id="sponsorOverlay" role="dialog" aria-modal="true"', page)
             # 面板依次展示两个赞助码、微信联系二维码和鸣谢名单，图片来自 /Images/
             for asset in (
-                'src="/Images/wechat_sponsor.jpg" alt="微信赞助码"',
-                'src="/Images/alipay_sponsor.jpg" alt="支付宝赞助码"',
+                'src="/Images/wechat_sponsor.jpg?v=2" alt="微信赞助码"',
+                'src="/Images/alipay_sponsor.jpg?v=2" alt="支付宝赞助码"',
                 'src="/Images/MyWeChat.jpg" alt="微信联系方式"',
             ):
                 self.assertIn(asset, page)
