@@ -66,6 +66,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("### 留言板", text)
         self.assertIn("公开留言", text)
         self.assertIn("### 访问统计", text)
+        self.assertIn("### 赞助面板", text)
+        self.assertIn("不再跳转 GitHub", text)
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
         self.assertLess(text.index("2026 暑期"), text.index("2026 秋季"))
         self.assertIn("秋季为默认学期", text)
@@ -119,6 +121,8 @@ class DocumentationTests(unittest.TestCase):
             "GET /api/messages",
             "POST /api/messages",
             "GET /api/stats",
+            "赞助面板",
+            "tip-pinned",
             "`periods`",
             "`period`",
             "上课节时",

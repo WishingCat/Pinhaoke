@@ -116,7 +116,7 @@ html:not([data-theme="dark"]) .theme-sun { display: none; }
 /* about card: GitHub + sponsor actions */
 .about-links-wrap { padding: 11px 14px; border-bottom: 1px solid var(--border); }
 .about-links { display: flex; gap: 8px; }
-.about-link-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); font-size: 0.78rem; font-weight: 600; text-decoration: none; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.about-link-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); font-size: 0.78rem; font-weight: 600; text-decoration: none; cursor: pointer; font-family: inherit; line-height: 1.4; transition: color 0.15s, border-color 0.15s, background 0.15s; }
 .about-link-btn svg { width: 14px; height: 14px; }
 .about-link-btn:hover { color: var(--ink); border-color: var(--ink-3); background: var(--bg); }
 .about-sponsor { color: #E11D48; border-color: rgba(225, 29, 72, 0.35); }
@@ -129,6 +129,7 @@ html[data-theme="dark"] .about-sponsor:hover { color: #FB7185; border-color: #FB
 .tip-wrap { position: relative; }
 .tip-card { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 250px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); z-index: 600; font-size: 0.78rem; line-height: 1.7; color: var(--ink-2); text-align: left; animation: pop-in 0.15s ease; pointer-events: none; }
 .tip-wrap:hover .tip-card, .tip-wrap:focus-within .tip-card { display: block; }
+.tip-wrap.tip-pinned .tip-card { display: block; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .about-wrap::after { content: ''; display: none; position: absolute; top: 100%; right: 0; width: 246px; height: 8px; }
 .about-wrap:hover::after, .about-wrap:focus-within::after { display: block; }
@@ -384,6 +385,21 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
 .stats-status { min-height: 1em; margin: 4px 18px 0; font-size: 0.72rem; color: var(--ink-3); text-align: center; }
 .stats-note { margin: 6px 18px 16px; font-size: 0.7rem; line-height: 1.7; color: var(--ink-3); }
 
+/* ===== Sponsor panel ===== */
+.sponsor-panel { display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(760px, 92vh); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-xl); }
+.sponsor-sec { margin: 0 18px 8px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
+.sponsor-qr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 18px 14px; }
+.sponsor-figure { margin: 0; text-align: center; }
+.sponsor-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 10px; }
+.sponsor-figure figcaption { margin-top: 6px; font-size: 0.74rem; font-weight: 500; color: var(--ink-2); }
+.sponsor-contact { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 14px; align-items: center; margin: 0 18px 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.sponsor-contact-text { font-size: 0.8rem; line-height: 1.7; color: var(--ink-2); }
+.sponsor-contact-text strong { display: block; margin-bottom: 2px; font-size: 0.86rem; color: var(--ink); }
+.sponsor-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0 18px 18px; list-style: none; }
+.sponsor-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 0.78rem; font-weight: 500; color: var(--ink); }
+.sponsor-amount { font-family: var(--mono); font-weight: 600; color: #E11D48; }
+html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; }
   body::before { animation: none !important; }
@@ -404,6 +420,10 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
   .stat-value { font-size: 1.3rem; }
   .stats-trend, .stats-status, .stats-note { padding-left: 14px; padding-right: 14px; }
   .stats-note { margin-left: 14px; margin-right: 14px; }
+  .sponsor-sec { margin-left: 14px; margin-right: 14px; }
+  .sponsor-qr-grid { gap: 10px; padding: 0 14px 12px; }
+  .sponsor-contact { margin-left: 14px; margin-right: 14px; }
+  .sponsor-list { padding-left: 14px; padding-right: 14px; }
   .page { padding: 0 16px 60px; }
   .page-head { padding: 36px 8px 4px; }
   h1 { font-size: 2.1rem; }
@@ -446,6 +466,8 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
 }
 
 @media (max-width: 320px) {
+  .sponsor-contact { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .sponsor-contact .sponsor-figure { width: min(100%, 150px); }
   .term-nav a { flex-basis: 100%; }
   .top-actions { gap: 4px; }
   .brand-name { font-size: 0.9rem; }
@@ -496,12 +518,12 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
                 <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                 <span>GitHub</span>
               </a>
-              <a class="about-link-btn about-sponsor" href="https://github.com/WishingCat/Pinhaoke#如果有能力的话欢迎赞助-支持网站的运行" target="_blank" rel="noopener" aria-label="赞助">
+              <button class="about-link-btn about-sponsor" type="button" onclick="openSponsor()" aria-label="赞助">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                 <span>赞助</span>
-              </a>
+              </button>
             </div>
-            <div class="about-links-note">需要能访问 GitHub · 纯公益项目，承诺永久免费服务</div>
+            <div class="about-links-note">纯公益项目，承诺永久免费服务</div>
           </div>
           <div class="about-body">
             <div class="about-sec">项目开发</div>
@@ -667,6 +689,43 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
     </div>
     <p class="stats-status" id="statsStatus" role="status" aria-live="polite"></p>
     <p class="stats-note">按北京时间分日统计；同一访客当天多次访问按一位访客计，不收集任何身份信息。</p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sponsorOverlay" role="dialog" aria-modal="true" aria-labelledby="sponsorTitle" onclick="if(event.target===this)closeSponsor()">
+  <div class="sponsor-panel">
+    <div class="msg-head">
+      <span class="modal-title" id="sponsorTitle">赞助与联系</span>
+      <button class="modal-close" onclick="closeSponsor()" aria-label="关闭赞助面板">&times;</button>
+    </div>
+    <p class="msg-hint">拼好课是纯公益项目，承诺永久免费服务。如果有能力的话，欢迎扫码赞助，支持网站运行。</p>
+    <div class="sponsor-sec">赞助二维码</div>
+    <div class="sponsor-qr-grid">
+      <figure class="sponsor-figure">
+        <img src="/Images/wechat_sponsor.jpg" alt="微信赞助码" width="835" height="835" loading="lazy" decoding="async">
+        <figcaption>微信赞助码</figcaption>
+      </figure>
+      <figure class="sponsor-figure">
+        <img src="/Images/alipay_sponsor.jpg" alt="支付宝赞助码" width="643" height="643" loading="lazy" decoding="async">
+        <figcaption>支付宝赞助码</figcaption>
+      </figure>
+    </div>
+    <div class="sponsor-contact">
+      <figure class="sponsor-figure">
+        <img src="/Images/MyWeChat.jpg" alt="微信联系方式" width="1158" height="1579" loading="lazy" decoding="async">
+        <figcaption>微信联系方式</figcaption>
+      </figure>
+      <div class="sponsor-contact-text">
+        <strong>联系开发者</strong>
+        扫码添加微信，问题反馈与功能需求都欢迎，也可以在留言板公开留言。
+      </div>
+    </div>
+    <div class="sponsor-sec">鸣谢赞助</div>
+    <ul class="sponsor-list">
+      <li class="sponsor-chip"><span class="sponsor-name">噬铁侠</span><span class="sponsor-amount">¥300</span></li>
+      <li class="sponsor-chip"><span class="sponsor-name">罗淦-PKU</span><span class="sponsor-amount">¥100</span></li>
+      <li class="sponsor-chip"><span class="sponsor-name">林哲-政管-23MPA</span><span class="sponsor-amount">¥200</span></li>
+    </ul>
   </div>
 </div>
 
@@ -1348,6 +1407,57 @@ function trapStatsFocus(event) {
   }
 }
 
+/* ===== Sponsor panel ===== */
+let sponsorReturnFocus = null;
+
+function focusReturnTarget(target) {
+  // 赞助按钮位于默认隐藏的关于悬浮卡内：先临时钉住悬浮卡再聚焦，
+  // 聚焦成功后 :focus-within 会继续保持显示
+  const tipWrap = target.closest('.tip-wrap');
+  if (tipWrap) tipWrap.classList.add('tip-pinned');
+  target.focus();
+  if (tipWrap) tipWrap.classList.remove('tip-pinned');
+}
+
+function openSponsor() {
+  const overlay = document.getElementById('sponsorOverlay');
+  if (overlay.classList.contains('open')) return;
+  sponsorReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setThreadModalBackgroundInert(true);
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => document.querySelector('#sponsorOverlay .modal-close').focus());
+}
+
+function closeSponsor() {
+  const overlay = document.getElementById('sponsorOverlay');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  setThreadModalBackgroundInert(false);
+  const returnTarget = sponsorReturnFocus;
+  sponsorReturnFocus = null;
+  if (returnTarget && returnTarget.isConnected) requestAnimationFrame(() => focusReturnTarget(returnTarget));
+}
+
+function trapSponsorFocus(event) {
+  if (event.key !== 'Tab') return;
+  const overlay = document.getElementById('sponsorOverlay');
+  const focusable = [...overlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 /* ===== 与课程页一致的留言板面板 ===== */
 let msgReturnFocus = null;
 let msgPage = 0;
@@ -1489,9 +1599,17 @@ function trapMsgFocus(event) {
 }
 
 document.addEventListener('keydown', event => {
+  const sponsorOpen = document.getElementById('sponsorOverlay').classList.contains('open');
   const statsOpen = document.getElementById('statsOverlay').classList.contains('open');
   const msgOpen = document.getElementById('msgOverlay').classList.contains('open');
-  if (statsOpen) {
+  if (sponsorOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSponsor();
+    } else {
+      trapSponsorFocus(event);
+    }
+  } else if (statsOpen) {
     if (event.key === 'Escape') {
       event.preventDefault();
       closeStats();
