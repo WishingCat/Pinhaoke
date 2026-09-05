@@ -68,8 +68,13 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("### 访问统计", text)
         self.assertIn("### 收藏与账号", text)
         self.assertIn("多端同步", text)
+        self.assertIn("个人中心", text)
+        self.assertIn("多个收藏夹", text)
+        self.assertIn("默认收藏夹", text)
         self.assertIn("POST /api/auth/register", text)
         self.assertIn("POST /api/favorites/remove", text)
+        self.assertIn("POST /api/favorites/set-collections", text)
+        self.assertIn("POST /api/collections", text)
         self.assertIn("### 赞助面板", text)
         self.assertIn("不再跳转 GitHub", text)
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
@@ -150,6 +155,15 @@ class DocumentationTests(unittest.TestCase):
             "pinhaoke_fav_mode",
             "_require_trusted_origin",
             "FAVORITES_MAX = 300",
+            "COLLECTIONS_MAX",
+            "favorite_collections",
+            "collections",
+            "POST /api/collections",
+            "POST /api/favorites/set-collections",
+            "accountView",
+            "个人",
+            "is_default",
+            "默认收藏夹",
             "账号与收藏契约",
             "renderFavoritesPanel()",
             "热门课程",

@@ -529,13 +529,22 @@ class AccountApiTests(unittest.TestCase):
         self.assertEqual(account.status_code, 200)
         payload = self.body(account)
         self.assertEqual(
-            set(payload), {"authenticated", "username", "questions", "favorites", "limit"}
+            set(payload),
+            {"authenticated", "username", "questions", "favorites", "limit",
+             "collections", "collections_limit"},
         )
         self.assertTrue(payload["authenticated"])
         self.assertEqual(payload["username"], "Alice_01")
         self.assertEqual(payload["questions"], [{"position": 1, "question": "最喜欢的课？"}])
         self.assertEqual(payload["favorites"], [])
         self.assertEqual(payload["limit"], app.FAVORITES_MAX)
+        self.assertEqual(payload["collections_limit"], app.COLLECTIONS_MAX)
+        self.assertEqual(len(payload["collections"]), 1)
+        self.assertTrue(payload["collections"][0]["is_default"])
+        self.assertEqual(payload["collections"][0]["count"], 0)
+        self.assertEqual(
+            set(payload["collections"][0]), {"id", "name", "is_default", "position", "count"}
+        )
         for forbidden in (b"password_hash", b"answer_hash", b"ip_hash", b"token_hash", b"user_id"):
             self.assertNotIn(forbidden, account.body)
         with self.db() as conn:
@@ -888,7 +897,7 @@ class AccountApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertIn("Max-Age=0", response.headers["set-cookie"])
         with self.db() as conn:
-            for table in ("users", "sessions", "security_questions", "favorites"):
+            for table in ("users", "sessions", "security_questions", "favorites", "collections", "favorite_collections"):
                 self.assertEqual(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0, table)
         self.assertEqual(self.body(app.get_account(self.request(cookie=token))), {"authenticated": False})
         response, _ = self.register(ip="198.51.100.95")
@@ -933,8 +942,11 @@ class AccountApiTests(unittest.TestCase):
                 row[0]
                 for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 1)
-        self.assertTrue({"users", "security_questions", "sessions", "favorites", "auth_events"} <= tables)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertTrue(
+            {"users", "security_questions", "sessions", "favorites", "auth_events",
+             "collections", "favorite_collections"} <= tables
+        )
         self.assertNotIn("basic_info", tables)
         self.assertNotIn("messages", tables)
 
@@ -999,16 +1011,20 @@ class FavoritesApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.headers["Cache-Control"], "no-store")
         payload = self.body(response)
-        self.assertEqual(set(payload), {"favorites", "limit"})
+        self.assertEqual(set(payload), {"favorites", "limit", "collections", "collections_limit"})
         self.assertEqual(payload["limit"], app.FAVORITES_MAX)
+        self.assertEqual(payload["collections_limit"], app.COLLECTIONS_MAX)
         item = payload["favorites"][0]
         self.assertEqual(
             set(item),
             {
                 "fav_key", "id", "available", "term", "term_label", "level", "course_code",
-                "class_no", "teacher", "course_name", "credits", "schedule", "department", "added_at",
+                "class_no", "teacher", "course_name", "credits", "schedule", "department",
+                "added_at", "collection_ids",
             },
         )
+        self.assertEqual(item["collection_ids"], [payload["collections"][0]["id"]])
+        self.assertTrue(payload["collections"][0]["is_default"])
         self.assertEqual(item["fav_key"], "fall|ug|04831180|1|张三(教授)")
         self.assertEqual(item["id"], "a1")
         self.assertTrue(item["available"])
@@ -1134,6 +1150,171 @@ class FavoritesApiTests(unittest.TestCase):
             other = self.register("Bob_02", "198.51.100.2")
             self.assertEqual(self.add("a1", token=other, ip="198.51.100.2").status_code, 201)
         self.assertEqual(len(self.favorites()), 2)
+
+    # ---- 收藏夹（collections）----
+    def account(self, token=None):
+        return self.body(app.get_account(self.request(cookie=token or self.token)))
+
+    def collections(self, token=None):
+        return self.account(token)["collections"]
+
+    def default_collection_id(self, token=None):
+        return next(c["id"] for c in self.collections(token) if c["is_default"])
+
+    def create_coll(self, name, token=None, ip="203.0.113.9"):
+        return app.create_collection(
+            self.request(ip=ip, cookie=token or self.token), {"name": name}
+        )
+
+    def set_colls(self, fav_key, ids, token=None, ip="203.0.113.9"):
+        return app.set_favorite_collections(
+            self.request(ip=ip, cookie=token or self.token),
+            {"fav_key": fav_key, "collection_ids": ids},
+        )
+
+    def test_register_creates_single_default_collection(self):
+        cols = self.collections()
+        self.assertEqual(len(cols), 1)
+        self.assertTrue(cols[0]["is_default"])
+        self.assertEqual(cols[0]["name"], app.DEFAULT_COLLECTION_NAME)
+        self.assertEqual(cols[0]["count"], 0)
+
+    def test_add_maps_course_into_default_collection(self):
+        payload = self.body(self.add("a1"))
+        default_id = payload["collections"][0]["id"]
+        self.assertTrue(payload["collections"][0]["is_default"])
+        self.assertEqual(payload["favorites"][0]["collection_ids"], [default_id])
+        self.assertEqual(payload["collections"][0]["count"], 1)
+
+    def test_create_collection_rename_and_conflicts(self):
+        response = self.create_coll("课程表A")
+        self.assertEqual(response.status_code, 201)
+        cols = self.body(response)["collections"]
+        self.assertEqual(len(cols), 2)
+        custom = next(c for c in cols if not c["is_default"])
+        self.assertEqual(custom["position"], 1)
+        # 撞名 409（与默认夹重名）
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.create_coll(app.DEFAULT_COLLECTION_NAME)
+        self.assertEqual(ctx.exception.status_code, 409)
+        # 改名成功
+        renamed = app.rename_collection(
+            self.request(cookie=self.token), {"collection_id": custom["id"], "name": "课程表B"}
+        )
+        self.assertEqual(renamed.status_code, 200)
+        names = {c["name"] for c in self.body(renamed)["collections"]}
+        self.assertIn("课程表B", names)
+        # 默认夹也可改名
+        default_id = self.default_collection_id()
+        ok = app.rename_collection(
+            self.request(cookie=self.token), {"collection_id": default_id, "name": "我的默认"}
+        )
+        self.assertEqual(ok.status_code, 200)
+        # 改名撞名 409
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.rename_collection(
+                self.request(cookie=self.token), {"collection_id": custom["id"], "name": "我的默认"}
+            )
+        self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_create_collection_name_validation(self):
+        for bad in ("", "   ", "x" * (app.COLLECTION_NAME_MAX + 1), 5, None, ["a"]):
+            with self.subTest(bad=bad), self.assertRaises(app.HTTPException) as ctx:
+                self.create_coll(bad)
+            self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_create_collection_respects_limit(self):
+        with patch.object(app, "COLLECTIONS_MAX", 2):
+            self.assertEqual(self.create_coll("A").status_code, 201)
+            self.assertEqual(self.create_coll("B").status_code, 201)
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.create_coll("C")
+            self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_set_collections_moves_between_folders(self):
+        fav_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        payload = self.body(self.create_coll("课程表A"))
+        custom = next(c for c in payload["collections"] if not c["is_default"])
+        default_id = next(c["id"] for c in payload["collections"] if c["is_default"])
+        # 移出默认，只留自定义，仍是收藏
+        moved = self.body(self.set_colls(fav_key, [custom["id"]]))
+        self.assertEqual(moved["favorites"][0]["collection_ids"], [custom["id"]])
+        counts = {c["id"]: c["count"] for c in moved["collections"]}
+        self.assertEqual(counts[default_id], 0)
+        self.assertEqual(counts[custom["id"]], 1)
+        # 进多个夹仍只占一门课
+        both = self.body(self.set_colls(fav_key, [custom["id"], default_id]))
+        self.assertEqual(len(both["favorites"]), 1)
+        self.assertEqual(sorted(both["favorites"][0]["collection_ids"]), sorted([custom["id"], default_id]))
+        # 取消勾选全部即取消收藏
+        emptied = self.body(self.set_colls(fav_key, []))
+        self.assertEqual(emptied["favorites"], [])
+
+    def test_set_collections_rejects_bad_targets(self):
+        fav_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.set_colls("fall|ug|nope|1|x", [self.default_collection_id()])
+        self.assertEqual(ctx.exception.status_code, 404)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.set_colls(fav_key, [999999])
+        self.assertEqual(ctx.exception.status_code, 404)
+        for bad in ("x", [True], [1.5], [[1]]):
+            with self.subTest(bad=bad), self.assertRaises(app.HTTPException) as ctx:
+                self.set_colls(fav_key, bad)
+            self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_remove_custom_collection_cleans_orphans(self):
+        fav_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        payload = self.body(self.create_coll("仅此夹"))
+        only = next(c for c in payload["collections"] if not c["is_default"])
+        self.set_colls(fav_key, [only["id"]])
+        # a2 留在默认，同时也进该自定义夹
+        fav2 = self.body(self.add("a2"))["favorites"]
+        key2 = next(f["fav_key"] for f in fav2 if f["id"] == "a2")
+        default_id = self.default_collection_id()
+        self.set_colls(key2, [only["id"], default_id])
+        result = self.body(app.remove_collection(self.request(cookie=self.token), {"collection_id": only["id"]}))
+        ids = {f["id"] for f in result["favorites"]}
+        self.assertNotIn("a1", ids)   # 仅在该夹 -> 取消收藏
+        self.assertIn("a2", ids)      # 还在默认 -> 保留
+        self.assertEqual([c for c in result["collections"] if not c["is_default"]], [])
+
+    def test_cannot_remove_default_collection(self):
+        with self.assertRaises(app.HTTPException) as ctx:
+            app.remove_collection(self.request(cookie=self.token), {"collection_id": self.default_collection_id()})
+        self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_collections_are_isolated_between_users(self):
+        alice_default = self.default_collection_id()
+        alice_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        bob = self.register("Bob_02", "198.51.100.2")
+        for call in (
+            lambda: app.rename_collection(self.request(cookie=bob, ip="198.51.100.2"), {"collection_id": alice_default, "name": "x"}),
+            lambda: app.remove_collection(self.request(cookie=bob, ip="198.51.100.2"), {"collection_id": alice_default}),
+        ):
+            with self.assertRaises(app.HTTPException) as ctx:
+                call()
+            self.assertEqual(ctx.exception.status_code, 404)
+        # Bob 无该收藏，且引用 Alice 的夹 id 应被拒
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.set_colls(alice_key, [alice_default], token=bob, ip="198.51.100.2")
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    def test_collection_writes_are_rate_limited_per_ip(self):
+        limits = dict(app.AUTH_RATE_LIMITS)
+        limits["favorite_write_ip"] = ((3600, 2),)
+        with patch.object(app, "AUTH_RATE_LIMITS", limits):
+            self.assertEqual(self.create_coll("A").status_code, 201)
+            self.assertEqual(self.create_coll("B").status_code, 201)
+            with self.assertRaises(app.HTTPException) as ctx:
+                self.create_coll("C")
+            self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_collection_responses_are_no_store(self):
+        for response in (self.create_coll("A"), self.add("a1")):
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
+            for forbidden in (b"user_id", b"ip_hash", b"password_hash"):
+                self.assertNotIn(forbidden, response.body)
 
 
 class ReviewApiTests(unittest.TestCase):

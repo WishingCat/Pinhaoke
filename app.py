@@ -88,6 +88,9 @@ SESSION_COOKIE = "pinhaoke_session"
 SESSION_TTL_SECONDS = 180 * 86400
 SESSION_REFRESH_SECONDS = 86400
 FAVORITES_MAX = 300
+COLLECTIONS_MAX = 50          # 每账号自定义收藏夹上限，不含默认夹
+COLLECTION_NAME_MAX = 30      # 收藏夹名 strip() 后最大长度
+DEFAULT_COLLECTION_NAME = "默认收藏夹"
 # kind -> ((窗口秒数, 上限), ...)；subject 为 IP 哈希、username_key 或固定 "*"。
 AUTH_RATE_LIMITS = {
     "register_ip": ((3600, 3), (86400, 10)),
@@ -289,12 +292,71 @@ CREATE INDEX IF NOT EXISTS idx_auth_events_lookup ON auth_events(kind, subject, 
 CREATE INDEX IF NOT EXISTS idx_auth_events_at ON auth_events(at);
 """
 
+# schema v2：引入收藏夹与多对多映射。逐条 CREATE ... IF NOT EXISTS，供迁移在事务内执行。
+_ACCOUNTS_SCHEMA_V2 = [
+    """
+    CREATE TABLE IF NOT EXISTS collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        UNIQUE(user_id, name)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_one_default"
+    " ON collections(user_id) WHERE is_default = 1",
+    """
+    CREATE TABLE IF NOT EXISTS favorite_collections (
+        user_id INTEGER NOT NULL,
+        fav_key TEXT NOT NULL,
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        added_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, fav_key, collection_id),
+        FOREIGN KEY (user_id, fav_key) REFERENCES favorites(user_id, fav_key) ON DELETE CASCADE
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_fav_coll_collection ON favorite_collections(collection_id)",
+]
+
+# 为每个已有收藏的用户补出默认夹，并把其现有收藏归入默认夹；WHERE NOT EXISTS 保证可重试。
+_BACKFILL_DEFAULT_COLLECTIONS = """
+    INSERT INTO collections (user_id, name, is_default, position, created_at)
+    SELECT DISTINCT f.user_id, :name, 1, 0, :now FROM favorites f
+    WHERE NOT EXISTS (
+        SELECT 1 FROM collections c WHERE c.user_id = f.user_id AND c.is_default = 1
+    )
+"""
+_BACKFILL_DEFAULT_MEMBERSHIPS = """
+    INSERT INTO favorite_collections (user_id, fav_key, collection_id, added_at)
+    SELECT f.user_id, f.fav_key, c.id, :now FROM favorites f
+    JOIN collections c ON c.user_id = f.user_id AND c.is_default = 1
+    WHERE NOT EXISTS (
+        SELECT 1 FROM favorite_collections fc
+        WHERE fc.user_id = f.user_id AND fc.fav_key = f.fav_key AND fc.collection_id = c.id
+    )
+"""
+
 
 def _migrate_accounts_db(conn) -> None:
     version = conn.execute("PRAGMA user_version").fetchone()[0]
     if version < 1:
         conn.executescript(_ACCOUNTS_SCHEMA_V1)
         conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+        version = 1
+    if version < 2:
+        # 需要回填，改用显式事务；锁内重查版本，避免多进程首连重复回填。
+        now = int(time.time())
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 2:
+            for statement in _ACCOUNTS_SCHEMA_V2:
+                conn.execute(statement)
+            conn.execute(_BACKFILL_DEFAULT_COLLECTIONS, {"now": now, "name": DEFAULT_COLLECTION_NAME})
+            conn.execute(_BACKFILL_DEFAULT_MEMBERSHIPS, {"now": now})
+            conn.execute("PRAGMA user_version = 2")
         conn.commit()
 
 
@@ -2226,10 +2288,98 @@ def _refresh_favorite_ids(conn, user_id: int, items: list) -> None:
         conn.commit()
 
 
+def _validate_collection_name(value) -> str:
+    if not isinstance(value, str):
+        raise _invalid_account_payload()
+    name = value.strip()
+    if not 1 <= len(name) <= COLLECTION_NAME_MAX:
+        raise _invalid_account_payload()
+    return name
+
+
+def _ensure_default_collection(conn, user_id: int, now: int) -> int:
+    row = conn.execute(
+        "SELECT id FROM collections WHERE user_id=? AND is_default=1", (user_id,)
+    ).fetchone()
+    if row is not None:
+        return row["id"]
+    cursor = conn.execute(
+        "INSERT INTO collections (user_id, name, is_default, position, created_at)"
+        " VALUES (?, ?, 1, 0, ?)",
+        (user_id, DEFAULT_COLLECTION_NAME, now),
+    )
+    return cursor.lastrowid
+
+
+def _collections_list(conn, user_id: int) -> list:
+    rows = conn.execute(
+        "SELECT c.id, c.name, c.is_default, c.position, COUNT(fc.fav_key) AS count"
+        " FROM collections c"
+        " LEFT JOIN favorite_collections fc ON fc.collection_id = c.id"
+        " WHERE c.user_id=?"
+        " GROUP BY c.id, c.name, c.is_default, c.position"
+        " ORDER BY c.is_default DESC, c.position, c.id",
+        (user_id,),
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "is_default": bool(row["is_default"]),
+            "position": row["position"],
+            "count": row["count"],
+        }
+        for row in rows
+    ]
+
+
+def _collection_memberships(conn, user_id: int) -> dict:
+    rows = conn.execute(
+        "SELECT fav_key, collection_id FROM favorite_collections WHERE user_id=?",
+        (user_id,),
+    ).fetchall()
+    memberships: dict = {}
+    for row in rows:
+        memberships.setdefault(row["fav_key"], []).append(row["collection_id"])
+    return memberships
+
+
+def _owned_collection_ids(conn, user_id: int, raw) -> list:
+    if not isinstance(raw, list):
+        raise _invalid_account_payload()
+    ids: list = []
+    for value in raw:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise _invalid_account_payload()
+        if value not in ids:
+            ids.append(value)
+    if not ids:
+        return []
+    placeholders = ",".join("?" for _ in ids)
+    owned = {
+        row["id"]
+        for row in conn.execute(
+            f"SELECT id FROM collections WHERE user_id=? AND id IN ({placeholders})",
+            (user_id, *ids),
+        ).fetchall()
+    }
+    if any(value not in owned for value in ids):
+        raise HTTPException(status_code=404, detail="Collection not found")
+    return ids
+
+
 def _favorites_payload(conn, user_id: int) -> dict:
     items = _favorites_list(conn, user_id)
     _refresh_favorite_ids(conn, user_id, items)
-    return {"favorites": items, "limit": FAVORITES_MAX}
+    memberships = _collection_memberships(conn, user_id)
+    for item in items:
+        item["collection_ids"] = memberships.get(item["fav_key"], [])
+    return {
+        "favorites": items,
+        "limit": FAVORITES_MAX,
+        "collections": _collections_list(conn, user_id),
+        "collections_limit": COLLECTIONS_MAX,
+    }
 
 
 @app.get("/api/account")
@@ -2297,6 +2447,7 @@ def register_account(request: Request, payload: dict = Body(...)):
             raise HTTPException(status_code=409, detail="Username already taken")
         user_id = cursor.lastrowid
         _store_questions(conn, user_id, questions)
+        _ensure_default_collection(conn, user_id, now)
         token = _new_session(conn, user_id, now)
         _purge_expired(conn, now)
         conn.commit()
@@ -2542,6 +2693,12 @@ def add_favorite(request: Request, payload: dict = Body(...)):
                 snapshot["credits"], snapshot["schedule"], snapshot["department"], now,
             ),
         )
+        default_id = _ensure_default_collection(conn, user_id, now)
+        conn.execute(
+            "INSERT OR IGNORE INTO favorite_collections (user_id, fav_key, collection_id, added_at)"
+            " VALUES (?, ?, ?, ?)",
+            (user_id, snapshot["fav_key"], default_id, now),
+        )
         conn.commit()
         payload = _favorites_payload(conn, user_id)
     return _no_store(payload, status_code=200 if existing else 201)
@@ -2564,6 +2721,161 @@ def remove_favorite(request: Request, payload: dict = Body(...)):
         conn.commit()
         payload = _favorites_payload(conn, session["user_id"])
     return _no_store(payload)
+
+
+@app.post("/api/favorites/set-collections")
+def set_favorite_collections(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    fav_key = data.get("fav_key")
+    if not isinstance(fav_key, str) or not 1 <= len(fav_key) <= 300:
+        raise _invalid_account_payload()
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, "favorite_write_ip", ip_hash, now)
+        _record_event(conn, "favorite_write_ip", ip_hash, now)
+        conn.commit()
+        user_id = session["user_id"]
+        collection_ids = _owned_collection_ids(conn, user_id, data.get("collection_ids"))
+        conn.execute("BEGIN IMMEDIATE")
+        exists = conn.execute(
+            "SELECT 1 FROM favorites WHERE user_id=? AND fav_key=?", (user_id, fav_key)
+        ).fetchone()
+        if exists is None:
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="Favorite not found")
+        conn.execute(
+            "DELETE FROM favorite_collections WHERE user_id=? AND fav_key=?",
+            (user_id, fav_key),
+        )
+        if collection_ids:
+            conn.executemany(
+                "INSERT OR IGNORE INTO favorite_collections"
+                " (user_id, fav_key, collection_id, added_at) VALUES (?, ?, ?, ?)",
+                [(user_id, fav_key, cid, now) for cid in collection_ids],
+            )
+        else:
+            # 不属于任何收藏夹即取消收藏，复合外键会顺带清掉残留映射。
+            conn.execute(
+                "DELETE FROM favorites WHERE user_id=? AND fav_key=?", (user_id, fav_key)
+            )
+        conn.commit()
+        result = _favorites_payload(conn, user_id)
+    return _no_store(result)
+
+
+@app.post("/api/collections", status_code=201)
+def create_collection(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    name = _validate_collection_name(data.get("name"))
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, "favorite_write_ip", ip_hash, now)
+        _record_event(conn, "favorite_write_ip", ip_hash, now)
+        conn.commit()
+        user_id = session["user_id"]
+        conn.execute("BEGIN IMMEDIATE")
+        count = conn.execute(
+            "SELECT COUNT(*) FROM collections WHERE user_id=? AND is_default=0", (user_id,)
+        ).fetchone()[0]
+        if count >= COLLECTIONS_MAX:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Collections limit reached")
+        position = conn.execute(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM collections WHERE user_id=?", (user_id,)
+        ).fetchone()[0]
+        try:
+            conn.execute(
+                "INSERT INTO collections (user_id, name, is_default, position, created_at)"
+                " VALUES (?, ?, 0, ?, ?)",
+                (user_id, name, position, now),
+            )
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Collection name already exists")
+        conn.commit()
+        result = _favorites_payload(conn, user_id)
+    return _no_store(result, status_code=201)
+
+
+@app.post("/api/collections/rename")
+def rename_collection(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    collection_id = data.get("collection_id")
+    if not isinstance(collection_id, int) or isinstance(collection_id, bool):
+        raise _invalid_account_payload()
+    name = _validate_collection_name(data.get("name"))
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, "favorite_write_ip", ip_hash, now)
+        _record_event(conn, "favorite_write_ip", ip_hash, now)
+        conn.commit()
+        user_id = session["user_id"]
+        conn.execute("BEGIN IMMEDIATE")
+        owned = conn.execute(
+            "SELECT 1 FROM collections WHERE id=? AND user_id=?", (collection_id, user_id)
+        ).fetchone()
+        if owned is None:
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="Collection not found")
+        try:
+            conn.execute(
+                "UPDATE collections SET name=? WHERE id=? AND user_id=?",
+                (name, collection_id, user_id),
+            )
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Collection name already exists")
+        conn.commit()
+        result = _favorites_payload(conn, user_id)
+    return _no_store(result)
+
+
+@app.post("/api/collections/remove")
+def remove_collection(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    collection_id = data.get("collection_id")
+    if not isinstance(collection_id, int) or isinstance(collection_id, bool):
+        raise _invalid_account_payload()
+    now = int(time.time())
+    ip_hash = _client_ip_hash(request)
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, "favorite_write_ip", ip_hash, now)
+        _record_event(conn, "favorite_write_ip", ip_hash, now)
+        conn.commit()
+        user_id = session["user_id"]
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT is_default FROM collections WHERE id=? AND user_id=?", (collection_id, user_id)
+        ).fetchone()
+        if row is None:
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="Collection not found")
+        if row["is_default"]:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Cannot delete default collection")
+        conn.execute(
+            "DELETE FROM collections WHERE id=? AND user_id=?", (collection_id, user_id)
+        )
+        # 删夹级联清该夹映射；仅存在于该夹的课程随之取消收藏。
+        conn.execute(
+            "DELETE FROM favorites WHERE user_id=? AND fav_key NOT IN"
+            " (SELECT fav_key FROM favorite_collections WHERE user_id=?)",
+            (user_id, user_id),
+        )
+        conn.commit()
+        result = _favorites_payload(conn, user_id)
+    return _no_store(result)
 
 
 # Static files ------------------------------------------------------------------

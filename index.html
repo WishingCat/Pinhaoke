@@ -1571,6 +1571,75 @@ html[data-theme="dark"] .fav-submit { color: #0E1013; }
 }
 .fav-toast.show { opacity: 1; }
 
+/* 顶栏登录 / 个人按钮 */
+.fav-nav-btn { width: auto; gap: 6px; padding: 0 10px; }
+.fav-nav-btn span { font-size: 0.8rem; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.fav-nav-btn.is-on { color: var(--accent); border-color: var(--accent); background: var(--accent-mist); }
+.fav-nav-btn.is-on span { color: var(--accent); }
+#favBtn.is-on svg { fill: none; }
+
+/* 个人中心全屏视图 */
+.account-view { display: none; position: fixed; inset: 0; z-index: 1100; background: var(--bg); flex-direction: column; }
+.account-view.open { display: flex; }
+.account-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  background: var(--surface); position: sticky; top: 0; z-index: 1;
+}
+.account-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px 6px 8px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink-2); cursor: pointer; font-size: 0.82rem;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.account-back:hover { border-color: var(--accent); color: var(--accent); }
+.account-back svg { width: 16px; height: 16px; }
+.account-scroll { flex: 1; min-height: 0; overflow-y: auto; width: 100%; max-width: 1120px; margin: 0 auto; padding: 8px 0 40px; }
+
+/* 收藏夹导航 */
+.collection-rail { display: flex; flex-direction: column; gap: 10px; padding: 10px 18px 6px; }
+.collection-rail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
+.collection-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.collection-card { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-2); transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease; }
+.collection-card:hover { border-color: var(--accent); }
+.collection-card.is-active { border-color: var(--accent); color: var(--accent); background: var(--accent-mist); }
+.collection-card-select { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; cursor: pointer; color: inherit; font-size: 0.82rem; padding: 0; }
+.collection-card-select svg { width: 15px; height: 15px; }
+.collection-card-name { overflow-wrap: anywhere; }
+.collection-card-count { font-family: var(--f-mono); font-size: 0.7rem; color: var(--ink-3); }
+.collection-card.is-active .collection-card-count { color: var(--accent); }
+.collection-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; }
+.collection-mini { border: none; background: none; cursor: pointer; padding: 2px 6px; font-size: 0.72rem; color: var(--ink-3); border-radius: 6px; }
+.collection-mini:hover { color: var(--accent); background: var(--accent-mist); }
+.collection-mini.is-danger:hover { color: var(--c-grad); background: var(--c-grad-soft); }
+.collection-new { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.collection-new input { flex: 1 1 160px; min-width: 120px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 0.82rem; }
+.collection-new input:focus { outline: none; border-color: var(--accent); }
+.collection-new button { display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-mist); color: var(--accent); cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+.collection-new button svg { width: 14px; height: 14px; }
+
+/* 详情弹窗内的收藏夹勾选 */
+.fav-chooser { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 14px; }
+.fav-chooser[hidden] { display: none; }
+.fav-chooser-title { font-size: 0.74rem; font-weight: 700; color: var(--ink-3); margin-right: 2px; }
+.collection-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); cursor: pointer; font-size: 0.8rem; transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease; }
+.collection-chip:hover { border-color: var(--accent); color: var(--accent); }
+.collection-chip.is-on { border-color: var(--accent); color: var(--accent); background: var(--accent-mist); }
+.collection-chip svg { width: 14px; height: 14px; }
+.collection-chip-cb { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.collection-chip:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fav-ico { display: inline-flex; }
+.fav-ico svg { width: 14px; height: 14px; }
+
+@media (max-width: 520px) {
+  .fav-nav-btn span { display: none; }
+  .fav-nav-btn { width: 31px; padding: 0; }
+}
+@media (max-width: 390px) {
+  .account-header { padding: 12px 14px; }
+  .collection-rail { padding-left: 14px; padding-right: 14px; }
+}
+
 /* ===== Sponsor panel ===== */
 .sponsor-panel { display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(760px, 92vh); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-xl); }
 .sponsor-sec { margin: 0 18px 8px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
@@ -2120,8 +2189,9 @@ window._hmt.push(['_trackPageview', location.pathname]);
           <button class="font-option" data-lang="ru" onclick="setLang('ru')">Русский</button>
         </div>
       </div>
-      <button class="icon-btn" id="favBtn" onclick="openFavorites()" aria-label="我的收藏" title="我的收藏">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <button class="icon-btn fav-nav-btn" id="favBtn" onclick="openPersonal()" aria-label="登录" title="登录">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="favBtnLabel">登录</span>
       </button>
       <button class="icon-btn" id="statsBtn" onclick="openStats()" aria-label="访问统计" title="访问统计">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -2398,6 +2468,17 @@ window._hmt.push(['_trackPageview', location.pathname]);
 </div>
 <div class="fav-toast" id="favToast" role="status" aria-live="polite"></div>
 
+<div class="account-view" id="accountView" role="dialog" aria-modal="true" aria-labelledby="accountViewTitle">
+  <div class="account-header">
+    <button class="account-back" id="accountBack" type="button" onclick="closeAccountView()" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>返回</span>
+    </button>
+    <span class="modal-title" id="accountViewTitle">个人中心</span>
+  </div>
+  <div class="account-scroll" id="accountBody"></div>
+</div>
+
 <script>
 /* ===== i18n ===== */
 const i18n = {
@@ -2417,7 +2498,7 @@ const i18n = {
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
     filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制', closeModal: '关闭课程详情',
-    favAdd: '加入收藏', favRemove: '取消收藏', myFavorites: '我的收藏',
+    favAdd: '加入收藏', favRemove: '取消收藏', myFavorites: '我的收藏', favLogin: '登录', favAccount: '个人',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
     resultsCount: (s, t) => `显示 ${s} / ${t} 门课程`,
@@ -2458,7 +2539,7 @@ const i18n = {
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
     filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied', closeModal: 'Close course details',
-    favAdd: 'Add to favorites', favRemove: 'Remove from favorites', myFavorites: 'My favorites',
+    favAdd: 'Add to favorites', favRemove: 'Remove from favorites', myFavorites: 'My favorites', favLogin: 'Sign in', favAccount: 'Account',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
     resultsCount: (s, t) => `Showing ${s} / ${t} courses`,
@@ -2499,7 +2580,7 @@ const i18n = {
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
     filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました', closeModal: '授業詳細を閉じる',
-    favAdd: 'お気に入りに追加', favRemove: 'お気に入りから削除', myFavorites: 'お気に入り',
+    favAdd: 'お気に入りに追加', favRemove: 'お気に入りから削除', myFavorites: 'お気に入り', favLogin: 'ログイン', favAccount: 'アカウント',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
     resultsCount: (s, t) => `${t} 件中 ${s} 件表示`,
@@ -2540,7 +2621,7 @@ const i18n = {
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
     filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨', closeModal: '강좌 상세 닫기',
-    favAdd: '즐겨찾기에 추가', favRemove: '즐겨찾기에서 제거', myFavorites: '내 즐겨찾기',
+    favAdd: '즐겨찾기에 추가', favRemove: '즐겨찾기에서 제거', myFavorites: '내 즐겨찾기', favLogin: '로그인', favAccount: '계정',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
     resultsCount: (s, t) => `${t}개 중 ${s}개 표시`,
@@ -2581,7 +2662,7 @@ const i18n = {
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
     filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9', closeModal: 'Fermer les d\u00e9tails du cours',
-    favAdd: 'Ajouter aux favoris', favRemove: 'Retirer des favoris', myFavorites: 'Mes favoris',
+    favAdd: 'Ajouter aux favoris', favRemove: 'Retirer des favoris', myFavorites: 'Mes favoris', favLogin: 'Connexion', favAccount: 'Compte',
     loadingText: 'Chargement des donn\u00e9es...',
     emptyText: 'Aucun cours trouv\u00e9',
     resultsCount: (s, t) => `${s} / ${t} cours affich\u00e9s`,
@@ -2622,7 +2703,7 @@ const i18n = {
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
     filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert', closeModal: 'Kursdetails schlie\u00dfen',
-    favAdd: 'Zu Favoriten hinzuf\u00fcgen', favRemove: 'Aus Favoriten entfernen', myFavorites: 'Meine Favoriten',
+    favAdd: 'Zu Favoriten hinzuf\u00fcgen', favRemove: 'Aus Favoriten entfernen', myFavorites: 'Meine Favoriten', favLogin: 'Anmelden', favAccount: 'Konto',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
     resultsCount: (s, t) => `${s} von ${t} Kursen angezeigt`,
@@ -2663,7 +2744,7 @@ const i18n = {
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
     filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado', closeModal: 'Cerrar detalles del curso',
-    favAdd: 'A\u00f1adir a favoritos', favRemove: 'Quitar de favoritos', myFavorites: 'Mis favoritos',
+    favAdd: 'A\u00f1adir a favoritos', favRemove: 'Quitar de favoritos', myFavorites: 'Mis favoritos', favLogin: 'Iniciar sesi\u00f3n', favAccount: 'Cuenta',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
     resultsCount: (s, t) => `Mostrando ${s} de ${t} cursos`,
@@ -2704,7 +2785,7 @@ const i18n = {
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
     filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано', closeModal: 'Закрыть сведения о курсе',
-    favAdd: 'В избранное', favRemove: 'Убрать из избранного', myFavorites: 'Моё избранное',
+    favAdd: 'В избранное', favRemove: 'Убрать из избранного', myFavorites: 'Моё избранное', favLogin: 'Войти', favAccount: 'Аккаунт',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
     resultsCount: (s, t) => `Показано ${s} из ${t} курсов`,
@@ -3010,6 +3091,9 @@ const ICONS = {
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   empty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
 };
 
 /* ===== Theme (data-theme set pre-paint by the inline <head> script) ===== */
@@ -3965,7 +4049,8 @@ async function showDetail(courseId) {
         ${courseTypeBadgesHTML(c.course_type)}
         ${categoryBadgesHTML(c.category)}
         <span class="badge badge-credits">${fmtCredits(c.credits)} ${esc(lang.fieldCredits)}</span>
-      </div>`;
+      </div>
+      <div id="favCollections" class="fav-chooser" hidden></div>`;
 
     // Basic info section
     html += `<div class="modal-section">
@@ -4066,6 +4151,7 @@ async function showDetail(courseId) {
     const favToggle = document.getElementById('favToggleBtn');
     favToggle.addEventListener('click', () => toggleFavorite(c, favToggle));
     syncFavButton(favToggle, lang);
+    refreshDetailChooser();
     if (!overlay.contains(document.activeElement)) focusModalClose();
   } catch (e) {
     if (e.name === 'AbortError') return;
@@ -4446,6 +4532,15 @@ let favInitStarted = false;
 let favBusy = false;
 let favToastTimer = null;
 
+/* 收藏夹与个人中心视图状态 */
+let favCollections = [];         // [{id, name, is_default, position, count}]
+let favCollectionsLimit = 50;
+let accountViewOpen = false;
+let accountReturnFocus = null;
+let accountHistoryPushed = false;
+let activeCollectionId = null;   // null = 全部收藏
+const favCollTimers = new Map(); // fav_key -> set-collections 防抖计时器
+
 function favoriteKey(course) {
   const id = String(course.id || '');
   const prefix = id.charAt(0);
@@ -4516,15 +4611,21 @@ function replaceFavorites(list, limit) {
 function applyAccount(data) {
   favUser = { username: data.username, questions: data.questions || [] };
   favModeSet('user');
+  if (data.collections) favCollections = data.collections;
+  if (data.collections_limit) favCollectionsLimit = data.collections_limit;
   replaceFavorites(data.favorites, data.limit);
+  if (accountViewOpen) renderAccountView();
 }
 
 function setFavUser(user) {
   favUser = user;
   if (!user) {
     favItems.clear();
+    favCollections = [];
+    activeCollectionId = null;
     favModeSet(null);
     favResetState = null;
+    if (accountViewOpen) closeAccountView({ keepFocus: true });
   }
   refreshFavoriteButtons();
   if (document.getElementById('favOverlay').classList.contains('open')) renderFavoritesPanel();
@@ -4574,8 +4675,11 @@ function refreshFavoriteButtons() {
   const favBtn = document.getElementById('favBtn');
   if (favBtn) {
     favBtn.classList.toggle('is-on', !!favUser);
-    favBtn.setAttribute('aria-label', lang.myFavorites);
-    favBtn.title = lang.myFavorites;
+    const favLabel = favUser ? lang.favAccount : lang.favLogin;
+    favBtn.setAttribute('aria-label', favLabel);
+    favBtn.title = favLabel;
+    const favLabelEl = document.getElementById('favBtnLabel');
+    if (favLabelEl) favLabelEl.textContent = favLabel;
   }
 }
 
@@ -4617,9 +4721,9 @@ async function toggleFavorite(course, sourceBtn) {
     ? await favApi('POST', '/api/favorites/remove', { fav_key: key })
     : await favApi('POST', '/api/favorites', { id: course.id });
   if (res.ok && res.data) {
-    replaceFavorites(res.data.favorites, res.data.limit);
+    applyFavData(res.data);
     favToast(wasOn ? `已取消收藏「${name}」` : `已收藏「${name}」`);
-    if (document.getElementById('favOverlay').classList.contains('open')) renderFavList();
+    refreshDetailChooser();
     return;
   }
   // 失败回滚
@@ -4637,12 +4741,11 @@ async function toggleFavorite(course, sourceBtn) {
 async function addPendingFavorite(courseId) {
   const res = await favApi('POST', '/api/favorites', { id: courseId });
   if (res.ok && res.data) {
-    replaceFavorites(res.data.favorites, res.data.limit);
+    applyFavData(res.data);
     const item = [...favItems.values()].find(entry => entry.id === courseId);
-    setFavStatus(item ? `已收藏「${item.course_name}」` : '已收藏');
-    renderFavList();
+    favToast(item ? `已收藏「${item.course_name}」` : '已收藏');
   } else if (res.status !== 401) {
-    setFavStatus(favErrorText(res, { 404: '课程不存在或已下架', 409: `收藏已达上限（${favLimit} 门）` }), true);
+    favToast(favErrorText(res, { 404: '课程不存在或已下架', 409: `收藏已达上限（${favLimit} 门）` }));
   }
 }
 
@@ -5093,14 +5196,12 @@ async function afterFavAuth(message) {
     renderFavoritesPanel();
     return;
   }
-  renderFavoritesPanel();
-  setFavStatus(message);
-  requestAnimationFrame(() => document.querySelector('#favOverlay .modal-close').focus());
-  if (pendingFavoriteId) {
-    const courseId = pendingFavoriteId;
-    pendingFavoriteId = null;
-    await addPendingFavorite(courseId);
-  }
+  const courseId = pendingFavoriteId;
+  pendingFavoriteId = null;
+  closeFavorites({ returnFocus: false });
+  openAccountView();
+  favToast(message);
+  if (courseId) await addPendingFavorite(courseId);
 }
 
 function renderFavAccount(body) {
@@ -5159,6 +5260,8 @@ function renderFavAccount(body) {
   body.appendChild(manage);
   body.appendChild(manageForm);
 
+  renderCollections(body);
+
   const list = favEl('div', 'fav-list');
   list.id = 'favList';
   list.setAttribute('aria-label', '收藏的课程');
@@ -5179,9 +5282,14 @@ function renderFavList() {
   if (!list) return;
   list.textContent = '';
   document.getElementById('favCount').textContent = favUser ? `${favItems.size} / ${favLimit}` : '';
-  const items = [...favItems.values()].filter(item => !item.pending);
+  const items = [...favItems.values()]
+    .filter(item => !item.pending)
+    .filter(item => activeCollectionId === null || (item.collection_ids || []).includes(activeCollectionId));
   if (!items.length) {
-    list.appendChild(favEl('p', 'fav-empty', '还没有收藏。点课程卡片右上角的星标即可收藏，多端同步。'));
+    const empty = activeCollectionId === null
+      ? '还没有收藏。点课程卡片右上角的星标即可收藏，多端同步。'
+      : '这个收藏夹还没有课程。在课程详情里勾选这个收藏夹即可加入。';
+    list.appendChild(favEl('p', 'fav-empty', empty));
     return;
   }
   const groups = new Map();
@@ -5232,30 +5340,43 @@ function buildFavItem(item) {
     open.addEventListener('click', () => openFavoriteItem(item));
   }
   row.appendChild(open);
+  const inCollection = activeCollectionId !== null;
   const remove = favButton('', 'fav-item-remove', async event => {
     const button = event.currentTarget;
     button.disabled = true;
-    const res = await favApi('POST', '/api/favorites/remove', { fav_key: item.fav_key });
+    const res = inCollection
+      ? await favApi('POST', '/api/favorites/set-collections', {
+          fav_key: item.fav_key,
+          collection_ids: (item.collection_ids || []).filter(id => id !== activeCollectionId),
+        })
+      : await favApi('POST', '/api/favorites/remove', { fav_key: item.fav_key });
     if (res.ok && res.data) {
-      replaceFavorites(res.data.favorites, res.data.limit);
-      setFavStatus(`已移除「${item.course_name}」`);
-      renderFavList();
-      const closeButton = document.querySelector('#favOverlay .modal-close');
+      favToast(inCollection ? `已从收藏夹移出「${item.course_name}」` : `已移除「${item.course_name}」`);
+      applyFavData(res.data);
       const next = document.querySelector('#favList .fav-item-remove');
-      requestAnimationFrame(() => (next || closeButton).focus());
+      const fallback = document.getElementById('accountBack')
+        || document.querySelector('#favOverlay .modal-close')
+        || document.getElementById('favBtn');
+      requestAnimationFrame(() => (next || fallback || document.body).focus());
     } else if (res.status !== 401) {
       button.disabled = false;
-      setFavStatus(favErrorText(res), true);
+      favToast(favErrorText(res));
     }
   });
   remove.innerHTML = ICONS.close;
-  remove.setAttribute('aria-label', `移除收藏：${item.course_name || item.id}`);
-  remove.title = '移除收藏';
+  const removeLabel = inCollection ? '从收藏夹移出' : '移除收藏';
+  remove.setAttribute('aria-label', `${removeLabel}：${item.course_name || item.id}`);
+  remove.title = removeLabel;
   row.appendChild(remove);
   return row;
 }
 
 function openFavoriteItem(item) {
+  if (accountViewOpen) {
+    closeAccountView({ viaPopstate: true, keepFocus: true });
+    showDetail(item.id);
+    return;
+  }
   const stacked = favStackedOnModal;
   closeFavorites({ returnFocus: false });
   if (!stacked) {
@@ -5263,6 +5384,289 @@ function openFavoriteItem(item) {
     if (favBtn) favBtn.focus();
   }
   showDetail(item.id);
+}
+
+/* ---- 个人中心视图与收藏夹（DOM API only；唯一 innerHTML 在 favIcon） ---- */
+function favIcon(key) {
+  const span = favEl('span', 'fav-ico');
+  span.innerHTML = ICONS[key] || '';
+  return span;
+}
+
+function applyFavData(data) {
+  if (data.collections) favCollections = data.collections;
+  if (data.collections_limit) favCollectionsLimit = data.collections_limit;
+  replaceFavorites(data.favorites, data.limit);
+  renderFavViews();
+}
+
+function renderFavViews() {
+  if (accountViewOpen) renderAccountView();
+  else if (document.getElementById('favOverlay').classList.contains('open')) renderFavList();
+}
+
+function openPersonal() {
+  if (favUser) openAccountView();
+  else { favTab = 'login'; openFavorites(); }
+}
+
+function openAccountView() {
+  if (accountViewOpen) return;
+  if (!favUser) { favTab = 'login'; openFavorites(); return; }
+  accountReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  accountViewOpen = true;
+  activeCollectionId = null;
+  setModalBackgroundInert(true);
+  document.body.style.overflow = 'hidden';
+  document.getElementById('accountView').classList.add('open');
+  renderAccountView();
+  try { history.pushState({ phk: 'account' }, ''); accountHistoryPushed = true; } catch (e) { accountHistoryPushed = false; }
+  requestAnimationFrame(() => { const back = document.getElementById('accountBack'); if (back) back.focus(); });
+  refreshAccount().then(ok => { if (ok && accountViewOpen) renderAccountView(); });
+}
+
+function closeAccountView({ viaPopstate = false, keepFocus = false } = {}) {
+  if (!accountViewOpen) return;
+  accountViewOpen = false;
+  document.getElementById('accountView').classList.remove('open');
+  const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
+  document.body.style.overflow = modalOpen ? 'hidden' : '';
+  if (!modalOpen) setModalBackgroundInert(false);
+  const owned = accountHistoryPushed;
+  accountHistoryPushed = false;
+  if (!viaPopstate && owned) { try { history.back(); } catch (e) {} }
+  const target = accountReturnFocus;
+  accountReturnFocus = null;
+  if (!keepFocus) {
+    const favBtn = document.getElementById('favBtn');
+    const focusTarget = (target && target.isConnected) ? target : favBtn;
+    if (focusTarget) requestAnimationFrame(() => focusTarget.focus());
+  }
+}
+
+window.addEventListener('popstate', () => {
+  if (accountViewOpen) closeAccountView({ viaPopstate: true });
+});
+
+function trapAccountFocus(event) {
+  if (event.key !== 'Tab') return;
+  const view = document.getElementById('accountView');
+  const focusable = [...view.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(element => !element.disabled && element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !view.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !view.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function renderAccountView() {
+  const body = document.getElementById('accountBody');
+  if (!body || !favUser) return;
+  body.textContent = '';
+  favBusy = false;
+  renderFavAccount(body);
+}
+
+function renderCollections(container) {
+  const rail = favEl('div', 'collection-rail');
+  const head = favEl('div', 'collection-rail-head');
+  head.appendChild(favEl('span', null, '收藏夹'));
+  head.appendChild(favEl('span', null, `${favCollections.length} / ${favCollectionsLimit + 1}`));
+  rail.appendChild(head);
+
+  const cards = favEl('div', 'collection-cards');
+  cards.appendChild(buildCollectionCard(null));
+  favCollections.forEach(collection => cards.appendChild(buildCollectionCard(collection)));
+  rail.appendChild(cards);
+
+  const custom = favCollections.filter(collection => !collection.is_default).length;
+  if (custom < favCollectionsLimit) {
+    const form = favEl('form', 'collection-new');
+    const input = favInput({ maxlength: '30', placeholder: '新建收藏夹', 'aria-label': '新建收藏夹名称', autocomplete: 'off' });
+    const submit = favEl('button', null);
+    submit.type = 'submit';
+    submit.appendChild(favIcon('plus'));
+    submit.appendChild(favEl('span', null, '新建'));
+    form.appendChild(input);
+    form.appendChild(submit);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const ok = await createCollection(input.value);
+      if (ok) input.value = '';
+    });
+    rail.appendChild(form);
+  }
+  container.appendChild(rail);
+}
+
+function buildCollectionCard(collection) {
+  const isAll = collection === null;
+  const id = isAll ? null : collection.id;
+  const active = activeCollectionId === id;
+  const card = favEl('div', 'collection-card' + (active ? ' is-active' : ''));
+  const select = favEl('button', 'collection-card-select');
+  select.type = 'button';
+  select.setAttribute('aria-pressed', active ? 'true' : 'false');
+  if (isAll) {
+    select.appendChild(favIcon('star'));
+    select.appendChild(favEl('span', 'collection-card-name', '全部'));
+    select.appendChild(favEl('span', 'collection-card-count', String(favItems.size)));
+    select.setAttribute('aria-label', `全部收藏，共 ${favItems.size} 门`);
+  } else {
+    select.appendChild(favIcon('folder'));
+    select.appendChild(favEl('span', 'collection-card-name', collection.name));
+    select.appendChild(favEl('span', 'collection-card-count', String(collection.count || 0)));
+    select.setAttribute('aria-label', `收藏夹 ${collection.name}，共 ${collection.count || 0} 门`);
+  }
+  select.addEventListener('click', () => { activeCollectionId = id; renderAccountView(); });
+  card.appendChild(select);
+  if (!isAll) {
+    const tools = favEl('div', 'collection-tools');
+    tools.appendChild(favButton('改名', 'collection-mini', () => startRenameCollection(card, collection)));
+    if (!collection.is_default) {
+      tools.appendChild(favButton('删除', 'collection-mini is-danger', event => confirmRemoveCollection(event.currentTarget, collection)));
+    }
+    card.appendChild(tools);
+  }
+  return card;
+}
+
+function startRenameCollection(card, collection) {
+  card.textContent = '';
+  const form = favEl('form', 'collection-new');
+  const input = favInput({ maxlength: '30', value: collection.name, 'aria-label': '收藏夹新名称', autocomplete: 'off' });
+  const save = favEl('button', null);
+  save.type = 'submit';
+  save.appendChild(favEl('span', null, '保存'));
+  const cancel = favButton('取消', 'collection-mini', () => renderAccountView());
+  form.appendChild(input);
+  form.appendChild(save);
+  form.appendChild(cancel);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    await renameCollection(collection.id, input.value);
+  });
+  card.appendChild(form);
+  requestAnimationFrame(() => { input.focus(); input.select(); });
+}
+
+function confirmRemoveCollection(button, collection) {
+  if (button.dataset.confirm === '1') {
+    removeCollection(collection.id);
+    return;
+  }
+  button.dataset.confirm = '1';
+  button.textContent = '确认删除';
+  button.classList.add('is-armed');
+  const cancel = favButton('取消', 'collection-mini', () => renderAccountView());
+  button.parentNode.appendChild(cancel);
+  favToast('删除后，仅在该收藏夹里的课程会一并取消收藏');
+}
+
+function renderCollectionChooser(container, item) {
+  container.appendChild(favEl('span', 'fav-chooser-title', '收藏夹'));
+  favCollections.forEach(collection => container.appendChild(buildCollectionChip(collection, item)));
+  const form = favEl('form', 'collection-new');
+  const input = favInput({ maxlength: '30', placeholder: '新建收藏夹', 'aria-label': '新建收藏夹名称', autocomplete: 'off' });
+  const submit = favEl('button', null);
+  submit.type = 'submit';
+  submit.appendChild(favIcon('plus'));
+  submit.appendChild(favEl('span', null, '新建'));
+  form.appendChild(input);
+  form.appendChild(submit);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const ok = await createCollection(input.value);
+    if (ok) { input.value = ''; refreshDetailChooser(); }
+  });
+  container.appendChild(form);
+}
+
+function buildCollectionChip(collection, item) {
+  const on = (item.collection_ids || []).includes(collection.id);
+  const label = favEl('label', 'collection-chip' + (on ? ' is-on' : ''));
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'collection-chip-cb';
+  checkbox.value = String(collection.id);
+  checkbox.checked = on;
+  checkbox.setAttribute('aria-label', collection.name);
+  label.appendChild(checkbox);
+  label.appendChild(favIcon('folder'));
+  label.appendChild(favEl('span', 'collection-chip-name', collection.name));
+  checkbox.addEventListener('change', () => {
+    label.classList.toggle('is-on', checkbox.checked);
+    scheduleSetCollections(item.fav_key);
+  });
+  return label;
+}
+
+function refreshDetailChooser() {
+  const container = document.getElementById('favCollections');
+  if (!container) return;
+  container.textContent = '';
+  const toggle = document.getElementById('favToggleBtn');
+  const key = toggle ? toggle.dataset.key : '';
+  const item = key ? favItems.get(key) : null;
+  if (!favUser || !item || item.pending) { container.hidden = true; return; }
+  container.hidden = false;
+  renderCollectionChooser(container, item);
+}
+
+function scheduleSetCollections(favKey) {
+  const existing = favCollTimers.get(favKey);
+  if (existing) clearTimeout(existing);
+  favCollTimers.set(favKey, setTimeout(async () => {
+    favCollTimers.delete(favKey);
+    const container = document.getElementById('favCollections');
+    if (!container) return;
+    const ids = [...container.querySelectorAll('.collection-chip-cb:checked')].map(cb => Number(cb.value));
+    const res = await favApi('POST', '/api/favorites/set-collections', { fav_key: favKey, collection_ids: ids });
+    if (res.ok && res.data) {
+      applyFavData(res.data);
+      if (!favItems.has(favKey)) { refreshDetailChooser(); favToast('已取消收藏'); }
+    } else if (res.status !== 401) {
+      favToast(favErrorText(res, { 404: '收藏已失效，请刷新页面', 409: '收藏夹数量超出上限' }));
+      refreshDetailChooser();
+    }
+  }, 350));
+}
+
+async function createCollection(name) {
+  const clean = (name || '').trim();
+  if (!clean) { favToast('请输入收藏夹名'); return false; }
+  const res = await favApi('POST', '/api/collections', { name: clean });
+  if (res.ok && res.data) { applyFavData(res.data); favToast(`已创建收藏夹「${clean}」`); return true; }
+  if (res.status !== 401) favToast(favErrorText(res, { 409: `收藏夹名重复，或已达上限（${favCollectionsLimit} 个）`, 422: '收藏夹名需 1 到 30 个字' }));
+  return false;
+}
+
+async function renameCollection(id, name) {
+  const clean = (name || '').trim();
+  if (!clean) { favToast('请输入收藏夹名'); return false; }
+  const res = await favApi('POST', '/api/collections/rename', { collection_id: id, name: clean });
+  if (res.ok && res.data) { applyFavData(res.data); favToast('已重命名收藏夹'); return true; }
+  if (res.status !== 401) favToast(favErrorText(res, { 409: '收藏夹名重复', 422: '收藏夹名需 1 到 30 个字', 404: '收藏夹不存在' }));
+  return false;
+}
+
+async function removeCollection(id) {
+  const res = await favApi('POST', '/api/collections/remove', { collection_id: id });
+  if (res.ok && res.data) {
+    if (activeCollectionId === id) activeCollectionId = null;
+    applyFavData(res.data);
+    favToast('已删除收藏夹');
+    return true;
+  }
+  if (res.status !== 401) favToast(favErrorText(res, { 409: '默认收藏夹不能删除', 404: '收藏夹不存在' }));
+  return false;
 }
 
 function buildChangePasswordForm(done) {
@@ -5410,6 +5814,15 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (accountViewOpen) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAccountView();
+    } else {
+      trapAccountFocus(e);
+    }
+    return;
+  }
   const favOpen = document.getElementById('favOverlay').classList.contains('open');
   const sponsorOpen = document.getElementById('sponsorOverlay').classList.contains('open');
   const statsOpen = document.getElementById('statsOverlay').classList.contains('open');

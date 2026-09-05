@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `app.py`：FastAPI 后端，只读查询五个课程 SQLite 数据库和一个树洞评测数据库，另以三个独立可写 SQLite 库提供公开留言板、访问统计以及账号与课程收藏。
 - 课程页与评测页顶栏都有访问统计与留言板两个按钮（课程页位于语言切换旁，评测页位于主题切换前）。统计按钮打开悬浮面板，展示今日/近 7 天/累计的访问量与访客数及近 7 天柱状趋势，每 20 秒刷新。留言板按钮打开简洁的悬浮面板：顶部一句话提示欢迎写问题反馈、功能建议和想对开发者说的话，下方是发布输入框和可滚动的公开留言列表。
-- 课程页顶栏在语言切换与访问统计之间另有“我的收藏”星形按钮，打开悬浮收藏面板：未登录时提供登录、注册与找回密码三个表单，已登录时显示用户名、退出登录、账号管理折叠区和按春季、暑期、秋季分组的收藏列表。课程卡片右上角与课程详情弹窗各有一个星标切换按钮；必须登录才能收藏，收藏保存在服务器端的账户库并随账号在多端同步。评测页没有收藏入口。
+- 课程页顶栏在语言切换与访问统计之间另有账号按钮：未登录显示“登录”，点击打开登录、注册与找回密码三个表单的悬浮面板；登录后按钮变为“个人”，点击进入页面内全屏“个人中心”视图。个人中心显示用户名、退出登录、账号管理折叠区，以及收藏夹：每账号有一个不可删除、可改名的默认收藏夹和若干自定义收藏夹，一门课可同时属于多个收藏夹。课程卡片右上角与课程详情弹窗各有一个星标切换按钮，点一下即把课程收进默认收藏夹；选择加入哪些收藏夹在课程详情弹窗与个人中心里就地勾选完成。必须登录才能收藏，收藏与收藏夹保存在服务器端的账户库并随账号在多端同步。评测页没有收藏入口。
 - `index.html`：无构建步骤的课程搜索页；`reviews.html`：无构建步骤的树洞课程评测页。
 - 生产站点：`https://www.pinhaoke.love`，Nginx 终止 TLS，systemd 运行 Uvicorn。
 - 页面学期顺序为春季、暑期、秋季；API 与页面默认学期均为 `fall`。
@@ -58,13 +58,14 @@ tests/                          标准库 unittest 回归测试
 - 项目开发人员悬浮卡在触发按钮或卡片上 hover/focus 时保持显示，文本允许选择和复制；联系方式 `tuzengji` 及欢迎联系文案同时保留在页脚。
 - 两页顶栏的留言板按钮打开悬浮留言面板：面板包含一句话提示、`500` 字上限的输入框、可滚动的公开留言列表和“加载更多”按钮。面板遵循与课程详情弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；留言正文和时间只能通过 `textContent` 渲染。
 - 两页顶栏的访问统计按钮打开悬浮统计面板：面板展示今日/近 7 天/累计的访问量与访客数、近 7 天柱状趋势和隐私说明，打开时拉取 `/api/stats` 并每 20 秒轮询，关闭时清除定时器。数字用 `textContent`、柱状高度用数值渲染，遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求。
-- 课程页顶栏的“我的收藏”按钮打开 `#favOverlay` 收藏面板，内容全部由 `renderFavoritesPanel()` 用 DOM API 生成，用户名、问题文本、状态提示与课程快照只通过 `textContent` 写入，唯一的 `innerHTML` 是移除按钮的图标常量。登录、注册、找回、修改密码、修改密保和删除账号表单使用 `autocomplete` 的 `username`、`current-password`、`new-password` 语义，用户名输入带 `pattern`，密码输入带 `minlength` 与 `maxlength`。面板遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；从课程详情弹窗打开时叠在详情之上，此时把详情弹窗设为 `inert`，关闭后恢复并把焦点还给详情内的收藏按钮。课程卡片右上角的星标是卡片内的独立按钮，click 与 Enter/Space 都必须 `stopPropagation()`，只切换 `aria-pressed` 与 `is-on`，不得打开详情；未登录时点击星标记录待收藏课程并打开登录表单，登录或注册成功后自动补做该次收藏。从面板打开某条收藏时先关闭面板并把焦点放到顶栏收藏按钮，再调用 `showDetail()`。
+- 课程页顶栏的账号按钮 `#favBtn` 双态：未登录显示“登录”、`onclick` 派发到打开 `#favOverlay`，登录后显示“个人”、派发到打开 `#accountView`。`#favOverlay` 只承载登录、注册、找回三个表单，由 `renderFavoritesPanel()` 用 DOM API 生成，`autocomplete` 的 `username`、`current-password`、`new-password` 语义、用户名 `pattern`、密码 `minlength` 与 `maxlength` 保持；面板遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求，从课程详情弹窗打开时叠在详情之上并把详情设为 `inert`。课程卡片右上角与详情弹窗的星标是独立按钮，click 与 Enter/Space 都 `stopPropagation()`，只把课程收进默认收藏夹，不打开详情；未登录时点星标记录待收藏课程并打开登录表单，登录或注册成功后进入个人中心并自动补做该次收藏。
+- 登录后的个人中心是页面内全屏视图 `#accountView`，由 `renderAccountView()` 组装账号信息、账号管理折叠区（修改密码、修改密保、删除账号）与收藏夹导航；用户名、收藏快照、收藏夹名与状态只用 `textContent`，新代码唯一的 `innerHTML` 是 `favIcon()` 的图标常量，移除按钮仍用 `ICONS.close`。视图用 `history.pushState` 支持返回键、`setModalBackgroundInert` 冻结背景，keydown 分支排在 `#favOverlay` 之前处理 Escape 与焦点循环，关闭后把焦点还给 `#favBtn`。收藏夹导航含“全部”与各收藏夹卡片及计数、自定义夹的改名与两步确认删除、内联新建收藏夹，默认夹只能改名。课程详情弹窗与个人中心用可勾选的收藏夹 chip 就地选择归属，chip 勾选经 `350ms` 防抖调用 `set-collections`，取消勾选全部即取消收藏。从个人中心打开某条收藏时先关闭视图并调用 `showDetail()`。
 - 关于悬浮卡中的赞助按钮不跳转 GitHub，而是打开站内赞助面板：面板依次展示微信赞助码、支付宝赞助码、开发者微信二维码和鸣谢赞助名单，图片直接引用 `/Images/` 下的 `wechat_sponsor.jpg`、`alipay_sponsor.jpg` 与 `MyWeChat.jpg`；Nginx 对 `/Images/` 设置 30 天 immutable 缓存，替换过内容的图片必须像两个赞助码一样带 `?v=N` 版本参数并在更换时递增，鸣谢名单必须与 README“鸣谢赞助”表一致并由前端契约测试校验。面板遵循与其它弹窗相同的焦点锁定、Escape、背景 `inert` 与关闭后焦点恢复要求；赞助按钮位于默认隐藏的悬浮卡内，因此恢复焦点前先给 `.tip-wrap` 加 `tip-pinned` 临时显示悬浮卡，聚焦后立即移除。
 
 ### 状态、安全与无障碍
 
 - `pinhaoke_theme` 保存共享主题；课程页另用 `pinhaoke_lang` 保存语言。课程页 URL 保存学期、搜索、筛选、排序、语言和课程详情；评测页 URL 保存 `q`。使用 `history.replaceState`，不要让每次输入污染浏览历史。
-- 收藏与账号状态不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
+- 收藏、收藏夹与账号状态都不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏、收藏夹或账号参数；个人中心全屏视图 `#accountView` 用 `history.pushState` 支持系统返回键关闭并监听 `popstate`，不写查询参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
 - 搜索、筛选、热门课程和详情请求使用 `AbortController` 或请求序号拒绝过时响应。修改时不得重新引入快速切换导致旧请求覆盖新状态的竞态。
 - 卡片、筛选组合框、弹窗和图标按钮必须有语义角色、`aria-*` 标签及可见焦点。弹窗打开时使背景 `inert`，锁定焦点，支持 Escape/背景关闭，并在关闭后把焦点还给原触发元素。
 - 课程页所有插入模板的数据先经过 `esc()`；评测正文与高亮必须通过 `textContent` 或文本节点分段，禁止把树洞正文拼入 `innerHTML`。原树洞链接只允许 PKU 树洞主机。
@@ -124,7 +125,7 @@ git diff --check
 
 `get_stats_db()` 以同样方式打开可写的访问统计数据库：路径来自 `PINHAOKE_STATS_DB`，本地默认仓库根目录 `访问统计.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/访问统计.db`，首次使用时自建 `visit_days(day, ip_hash, views, last_at)` 表。`record_visit()` 在 `/` 和 `/reviews` 页面路由中记录访问，按北京时间分日、以 IP 哈希对当日访客去重、`views` 累加，并过滤明显的 bot User-Agent；任何异常都被吞掉，绝不影响页面返回。`GET /api/health` 不检查统计库。
 
-`get_accounts_db()` 打开可写的账户数据库：路径来自 `PINHAOKE_ACCOUNTS_DB`，本地默认仓库根目录 `账户.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/账户.db`。连接启用 WAL、`busy_timeout` 与 `PRAGMA foreign_keys = ON`，由 `_migrate_accounts_db()` 按 `PRAGMA user_version` 迁移，版本 1 建 `users`、`security_questions`、`sessions`、`favorites`、`auth_events` 五张表，删除用户时级联删除密保、会话与收藏。密码与密保答案用标准库 `hashlib.scrypt` 加盐哈希，参数 `SCRYPT_PARAMS` 为 n=2^14、r=8、p=1，序列化为 `scrypt$n$r$p$salt$hash` 并随记录保存，登录成功时低于当前参数的哈希会重算；所有 scrypt 调用经过 `_SCRYPT_GATE`，每个进程最多两个并发。会话令牌由 `secrets.token_urlsafe(32)` 生成，库内只存 SHA-256；cookie `pinhaoke_session` 为 HttpOnly、SameSite=Lax、Path=/，只在 `X-Forwarded-Proto` 或请求 scheme 为 https 时带 Secure，有效期 180 天，`GET /api/account` 每天最多顺延一次。`auth_events(kind, subject, at)` 只保存 IP 哈希、`username_key` 或 `*` 作为限流主体，两天后清除。`GET /api/health` 不检查账户库。
+`get_accounts_db()` 打开可写的账户数据库：路径来自 `PINHAOKE_ACCOUNTS_DB`，本地默认仓库根目录 `账户.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/账户.db`。连接启用 WAL、`busy_timeout` 与 `PRAGMA foreign_keys = ON`，由 `_migrate_accounts_db()` 按 `PRAGMA user_version` 迁移：版本 1 建 `users`、`security_questions`、`sessions`、`favorites`、`auth_events` 五张表；版本 2 增建 `collections` 与 `favorite_collections`，并为已有收藏回填默认收藏夹与成员映射，回填在显式 `BEGIN IMMEDIATE` 事务内锁后重查版本以对齐 `--workers 2` 首连竞争。`collections` 以 `UNIQUE(user_id, name)` 和 `is_default = 1` 的唯一部分索引约束每账号恰一个默认夹；`favorite_collections` 复合外键指向 `favorites(user_id, fav_key)`，删收藏行级联清成员映射，删收藏夹级联清该夹映射且不动 `favorites`。删除用户时经两条 `ON DELETE CASCADE` 一并清除密保、会话、收藏、收藏夹与成员映射。默认收藏夹不可删除（409）但可改名，删除自定义收藏夹后清理不再属于任何夹的孤儿收藏行。收藏夹上限 `COLLECTIONS_MAX = 50`（不含默认夹），夹名 `strip()` 后 1 到 `COLLECTION_NAME_MAX = 30` 字，默认夹名为 `DEFAULT_COLLECTION_NAME`。密码与密保答案用标准库 `hashlib.scrypt` 加盐哈希，参数 `SCRYPT_PARAMS` 为 n=2^14、r=8、p=1，序列化为 `scrypt$n$r$p$salt$hash` 并随记录保存，登录成功时低于当前参数的哈希会重算；所有 scrypt 调用经过 `_SCRYPT_GATE`，每个进程最多两个并发。会话令牌由 `secrets.token_urlsafe(32)` 生成，库内只存 SHA-256；cookie `pinhaoke_session` 为 HttpOnly、SameSite=Lax、Path=/，只在 `X-Forwarded-Proto` 或请求 scheme 为 https 时带 Secure，有效期 180 天，`GET /api/account` 每天最多顺延一次。`auth_events(kind, subject, at)` 只保存 IP 哈希、`username_key` 或 `*` 作为限流主体，两天后清除。`GET /api/health` 不检查账户库。
 
 ## API 契约
 
@@ -140,7 +141,7 @@ git diff --check
 | `GET /api/messages` | 返回 `{total, page, page_size, messages}`，公开留言按发布时间倒序分页。 |
 | `POST /api/messages` | 发布一条公开留言，body 为 `{content}`；成功返回 201 和新留言。 |
 | `GET /api/stats` | 返回今日/近 7 天/累计的访问量与访客数及近 7 天每日趋势；`no-store`。 |
-| `GET /api/account` | 返回 `{authenticated}`；已登录时另含 `username`、`questions`（只含 `position` 与 `question`）、`favorites` 与 `limit`。 |
+| `GET /api/account` | 返回 `{authenticated}`；已登录时另含 `username`、`questions`（只含 `position` 与 `question`）、`favorites`、`limit`、`collections` 与 `collections_limit`，每条收藏含 `collection_ids`。 |
 | `POST /api/auth/register` | body `{username, password, questions}`；成功 201 返回 `{username}` 并签发会话 cookie，用户名已占用 409。 |
 | `POST /api/auth/login` | body `{username, password}`；成功 200 返回 `{username}` 并签发新会话，失败统一 401。 |
 | `POST /api/auth/logout` | 删除当前会话并清除 cookie，204，幂等。 |
@@ -149,9 +150,13 @@ git diff --check
 | `POST /api/auth/reset/questions` | body `{username}`；返回 `{questions}`，用户名不存在 404。 |
 | `POST /api/auth/reset` | body `{username, position, answer, new_password}`；答对任意一个问题即 204 并吊销该用户全部会话，答错 401。 |
 | `POST /api/auth/delete` | body `{password}`；204，级联删除密保、会话与收藏并清除 cookie。 |
-| `GET /api/favorites` | 返回 `{favorites, limit}`，需登录。 |
-| `POST /api/favorites` | body `{id}`；服务器从课程库生成快照，新增 201、已存在 200，都返回全量 `{favorites, limit}`，课程不存在 404，超过上限 409。 |
-| `POST /api/favorites/remove` | body `{fav_key}`；200 返回全量 `{favorites, limit}`，幂等。 |
+| `GET /api/favorites` | 返回 `{favorites, limit, collections, collections_limit}`，每条收藏含 `collection_ids`，需登录。 |
+| `POST /api/favorites` | body `{id}`；服务器从课程库生成快照并映射进默认收藏夹，新增 201、已存在 200，都返回全量 `{favorites, limit, collections, collections_limit}`，课程不存在 404，超过上限 409。 |
+| `POST /api/favorites/remove` | body `{fav_key}`；200 返回全量收藏与收藏夹 payload，删收藏行并级联清成员映射，幂等。 |
+| `POST /api/favorites/set-collections` | body `{fav_key, collection_ids}`；整集替换该收藏的收藏夹成员，收藏行不存在或含他人夹 id 返回 404，勾选清空即删收藏行取消收藏，200 返回全量 payload。 |
+| `POST /api/collections` | body `{name}`；新建自定义收藏夹，201 返回全量 payload，撞名或超过 `COLLECTIONS_MAX` 409，名称非法 422。 |
+| `POST /api/collections/rename` | body `{collection_id, name}`；默认夹与自定义夹都可改名，200 返回全量 payload，撞名 409，不存在 404，名称非法 422。 |
+| `POST /api/collections/remove` | body `{collection_id}`；删自定义收藏夹并取消仅属于该夹的收藏，默认夹 409，不存在 404，200 返回全量 payload。 |
 | `GET /api/health` | 返回五个课程库及一个评测库的健康状态；异常时为 503。 |
 
 `GET /api/courses` 参数：
@@ -201,6 +206,9 @@ git diff --check
 - 账号与收藏响应一律 `Cache-Control: no-store`，不得包含用户主键、IP、任何哈希、令牌明文或密保答案。
 - 收藏稳定键为 `term|level|course_code|class_no|teacher`，各段 `strip()`，前端 `favoriteKey()` 与后端 `_favorite_key()` 必须保持同一规范化。客户端只提交课程 ID，快照字段由服务器通过 `get_course_detail()` 读取，`term_label` 取自学期主库文件名前缀；重复收藏只刷新快照并保留原 `added_at`；每账号上限 `FAVORITES_MAX = 300`，超限 409。
 - 收藏条目字段为 `fav_key`、`id`、`available`、`term`、`term_label`、`level`、`course_code`、`class_no`、`teacher`、`course_name`、`credits`、`schedule`、`department`、`added_at`，按 `added_at` 倒序、`fav_key` 收尾。`_refresh_favorite_ids()` 在返回前确认课程 ID 仍存在，漂移的条目按 `(course_code, class_no, teacher)` 在同一学期库重新解析并回写新 ID，只有 `term_label` 与快照相同时才回写，否则标记 `available: false` 且不落库。
+- 收藏夹数据模型的不变式：一条 `favorites` 行存在当且仅当该课程至少属于一个收藏夹。收藏一门课即建快照行并映射进默认收藏夹；取消收藏删 `favorites` 行并由复合外键级联清所有成员映射；`set-collections` 整集替换成员，勾选清空即删 `favorites` 行取消收藏；删自定义收藏夹级联清该夹映射后清理不再属于任何夹的孤儿收藏行。默认收藏夹每账号恰一个，`is_default = 1`，不可删除，可改名。
+- 收藏夹名 `strip()` 后为 1 到 `COLLECTION_NAME_MAX = 30` 字，按 `UNIQUE(user_id, name)` 判重，撞名 409；每账号自定义收藏夹上限 `COLLECTIONS_MAX = 50`（不含默认夹），超限 409；`collection_ids` 只接受该用户拥有的收藏夹 id，含他人夹 id 返回 404。收藏夹写入与收藏写入共用 `favorite_write_ip` 限流窗口。
+- `GET /api/account` 与四个 favorites、三个 collections 端点都经唯一装配出口返回全量 `{favorites, limit, collections, collections_limit}`，`collections` 每项为 `{id, name, is_default, position, count}` 且默认夹在前，`favorites` 每项带 `collection_ids`；成员映射以稳定 `fav_key` 为锚，课程库 ID 漂移不影响夹归属。
 
 ## 课程 ID
 

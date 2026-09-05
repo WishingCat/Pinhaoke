@@ -1048,6 +1048,62 @@ class FrontendContractTests(unittest.TestCase):
         # 星标为实体表面，不使用渐变；主按钮实色
         self.assertNotIn("gradient", HTML[HTML.index(".fav-btn {"):HTML.index(".fav-toast {")])
 
+        # ---- 登录 / 个人双态与个人中心全屏视图 ----
+        for key in ("favLogin:", "favAccount:"):
+            self.assertEqual(HTML.count(key), 8, key)
+        self.assertIn('onclick="openPersonal()"', HTML)
+        self.assertIn('id="favBtnLabel"', HTML)
+        personal = function_body("openPersonal")
+        self.assertIn("openAccountView()", personal)
+        self.assertIn("openFavorites()", personal)
+        rfb = function_body("refreshFavoriteButtons")
+        self.assertIn("favUser ? lang.favAccount : lang.favLogin", rfb)
+        # 个人中心视图语义
+        self.assertIn('id="accountView" role="dialog" aria-modal="true" aria-labelledby="accountViewTitle"', HTML)
+        self.assertIn('id="accountBody"', HTML)
+        self.assertIn('id="accountBack"', HTML)
+        self.assertIn(".account-view { display: none; position: fixed; inset: 0; z-index: 1100;", HTML)
+        opener = function_body("openAccountView")
+        self.assertIn("setModalBackgroundInert(true)", opener)
+        self.assertIn("history.pushState({ phk: 'account' }", opener)
+        self.assertIn("window.addEventListener('popstate'", HTML)
+        self.assertIn("function trapAccountFocus", HTML)
+        # keydown：个人视图分支在 favOverlay 之前
+        keydown_new = HTML[HTML.index("document.addEventListener('keydown'"):]
+        self.assertIn("if (accountViewOpen) {", keydown_new)
+        self.assertLess(keydown_new.index("accountViewOpen"), keydown_new.index("favOverlay"))
+        # 新渲染函数只用 DOM API，唯一 innerHTML 在 favIcon
+        for name in (
+            "applyFavData", "renderFavViews", "openPersonal", "openAccountView",
+            "closeAccountView", "trapAccountFocus", "renderAccountView", "renderCollections",
+            "buildCollectionCard", "startRenameCollection", "confirmRemoveCollection",
+            "renderCollectionChooser", "buildCollectionChip", "refreshDetailChooser",
+            "scheduleSetCollections", "createCollection", "renameCollection", "removeCollection",
+        ):
+            self.assertNotIn("innerHTML", function_body(name), name)
+        icon = function_body("favIcon")
+        self.assertEqual(icon.count("innerHTML"), 1)
+        self.assertIn("span.innerHTML = ICONS[key]", icon)
+        # 详情弹窗就地选夹
+        detail2 = function_body("showDetail")
+        self.assertIn('id="favCollections"', detail2)
+        self.assertIn("refreshDetailChooser();", detail2)
+        chip = function_body("buildCollectionChip")
+        self.assertIn("scheduleSetCollections(item.fav_key)", chip)
+        sched = function_body("scheduleSetCollections")
+        self.assertIn("/api/favorites/set-collections", sched)
+        self.assertIn("}, 350)", sched)
+        # 收藏夹 CRUD 走对应端点
+        self.assertIn("/api/collections", function_body("createCollection"))
+        self.assertIn("/api/collections/rename", function_body("renameCollection"))
+        self.assertIn("/api/collections/remove", function_body("removeCollection"))
+        # 收藏与账号状态不进入 URL
+        for token in ("account", "collection"):
+            self.assertNotIn(token, function_body("syncURL").lower())
+            self.assertNotIn(token, function_body("readURLState").lower())
+        # 从个人视图打开某条收藏
+        self.assertIn("if (accountViewOpen) {", function_body("openFavoriteItem"))
+
     def test_favorite_key_matches_server_normalization(self):
         term_map = re.search(r"const TERM_BY_PREFIX = \{[^}]*\};", HTML).group(0)
         level_map = re.search(r"const LEVEL_BY_PREFIX = \{[^}]*\};", HTML).group(0)
