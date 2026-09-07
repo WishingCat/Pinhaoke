@@ -472,6 +472,7 @@ html[data-theme="dark"] .about-title { background-image: linear-gradient(118deg,
 
 /* lang dropdown */
 .font-selector { position: relative; }
+#langSelector[hidden] { display: none; }
 
 .font-dropdown {
   display: none;
@@ -2201,7 +2202,7 @@ window._hmt.push(['_trackPageview', location.pathname]);
       <span class="brand-name" id="brandName">拼好课</span>
     </a>
     <div class="topbar-actions">
-      <div class="font-selector" id="langSelector">
+      <div class="font-selector" id="langSelector" hidden>
         <button class="top-btn" onclick="toggleLangDropdown()" aria-haspopup="listbox" aria-label="Language">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <span id="langLabel">中文</span>
@@ -3021,86 +3022,29 @@ const dataI18n = {
   },
 };
 
-// i18n note: short/closed-set values (categories, departments, course_type,
-// weekdays, titles, etc.) are translated client-side via dataI18n. Free-text
-// per-row fields (course_name, classroom, notes, intro_cn, …) come from the
-// backend's translations table and are already in the requested language by
-// the time they reach the frontend — do NOT pass those through tr().
-const _missingTrLogged = new Set();
+// Translation is disabled. Display scraped fields without localization or rewriting.
 function tr(cat, key) {
-  if (!key) return key || '';
-  if (currentLang === 'zh') return key;
-  const i = TR_IDX[currentLang];
-  if (i === undefined) return key;
-  const entry = dataI18n[cat] && dataI18n[cat][key];
-  if (!entry || !entry[i]) {
-    // Surface dictionary gaps once per (cat,key,lang) so we notice when PKU
-    // ships a new department / category that nobody added to dataI18n.
-    const tag = cat + '|' + key + '|' + currentLang;
-    if (!_missingTrLogged.has(tag)) {
-      _missingTrLogged.add(tag);
-      console.warn('[i18n] missing translation:', cat, key, '→', currentLang);
-    }
-    return key;
-  }
-  return entry[i];
+  return key || '';
 }
 
-// Translate parenthetical titles inside "教师姓名(职称),..."
 function trTeacher(s) {
-  if (!s || currentLang === 'zh') return s;
-  return s.replace(/[（(]([^)）]+)[)）]/g, (m, t) => {
-    const trans = tr('titles', t.trim());
-    return ' (' + trans + ')';
-  });
+  return s;
 }
 
-// Localize schedule: "1~15周 每周周二3~5节"
 function trSchedule(s) {
-  if (!s) return s;
-  // The source occasionally joins a three-digit room number directly to the
-  // next week range. Add boundaries around known schedule tokens only; leave
-  // every unknown character untouched.
-  let translated = String(s)
-    .replace(/([^\s\d~]+\d{3})(?=\d{1,2}~\d{1,2}周)/g, '$1 ')
-    .replace(/周(?=每周|单周|双周|周[一二三四五六日])/g, '周 ')
-    .replace(/(每周|单周|双周)(?=周[一二三四五六日])/g, '$1 ')
-    .replace(/(周[一二三四五六日])(?=\d{1,2}(?:~\d{1,2})?节)/g, '$1 ')
-    .replace(/节(?=\S)/g, '节 ');
-  if (currentLang === 'zh') return translated;
-  const t = dataI18n.scheduleTerms;
-  const wd = dataI18n.weekdayShort;
-  const i = TR_IDX[currentLang];
-  if (i === undefined) return translated;
-  translated = translated
-    .replace(/(^|\s)(\d{1,2})~(\d{1,2})周/g, (_, lead, a, b) => lead + t.weeks[i] + ' ' + a + '-' + b)
-    .replace(/每周/g, t.every[i] + ' ')
-    .replace(/单周/g, t.odd[i] + ' ')
-    .replace(/双周/g, t.even[i] + ' ')
-    .replace(/周([一二三四五六日])/g, (_, d) => wd[d] ? wd[d][i] : '周' + d)
-    .replace(/(\d{1,2})~(\d{1,2})节/g, (_, a, b) => t.period[i] + ' ' + a + '-' + b)
-    .replace(/(\d{1,2})节/g, (_, a) => t.period[i] + ' ' + a);
-  return translated;
+  return s;
 }
 
-// Use an available source English name; otherwise keep the API display name.
 function trCourseName(course) {
-  if (!course) return '';
-  if (currentLang === 'en' && (course.english_name || '').trim()) return course.english_name;
-  return course.course_name || '';
+  return course ? course.course_name || '' : '';
 }
 
 function displayLanguageForTerm(language, term) {
-  return language === 'zh' || TR_IDX[language] !== undefined ? language : 'zh';
+  return 'zh';
 }
 
 /* ===== Global state ===== */
-let currentLang = (function () {
-  try {
-    const stored = localStorage.getItem('pinhaoke_lang');
-    return stored === 'zh' || TR_IDX[stored] !== undefined ? stored : 'zh';
-  } catch (e) { return 'zh'; }
-})();
+let currentLang = 'zh';
 // Always open a fresh tab on the newest term. Shared links with ?term=spring
 // or ?term=summer override this in readURLState(); the previous session's term
 // is never restored.
@@ -3160,8 +3104,6 @@ function toggleTheme() {
    keystroke; a copied URL reproduces the exact view (and open modal). */
 function readURLState() {
   const p = new URLSearchParams(location.search);
-  const lang = p.get('lang');
-  if (lang && (lang === 'zh' || TR_IDX[lang] !== undefined)) currentLang = lang;
   if (TERMS.has(p.get('term'))) currentTerm = p.get('term');
   currentLang = displayLanguageForTerm(currentLang, currentTerm);
   document.getElementById('searchInput').value = p.get('q') || '';
@@ -3216,7 +3158,6 @@ function refreshLangSelectorUI() {
 
 function setLang(key) {
   currentLang = displayLanguageForTerm(key, currentTerm);
-  try { localStorage.setItem('pinhaoke_lang', currentLang); } catch (e) {}
   refreshLangSelectorUI();
   closeLangDropdown();
   applyI18n();

@@ -70,27 +70,29 @@ def function_source(name):
 
 
 class FrontendContractTests(unittest.TestCase):
-    def test_all_terms_keep_language_choices_and_missing_course_names_fall_back(self):
+    def test_translation_is_disabled_for_all_terms_and_course_fields(self):
         self.run_node(f"""
             const assert = require('node:assert/strict');
             const TR_IDX = {{ en: 0, ja: 1 }};
             let currentLang = 'en';
             {function_source('displayLanguageForTerm')}
             {function_source('trCourseName')}
-            assert.equal(displayLanguageForTerm('en', 'fall'), 'en');
-            assert.equal(displayLanguageForTerm('ja', 'fall'), 'ja');
-            assert.equal(displayLanguageForTerm('en', 'spring'), 'en');
+            assert.equal(displayLanguageForTerm('en', 'fall'), 'zh');
+            assert.equal(displayLanguageForTerm('ja', 'fall'), 'zh');
+            assert.equal(displayLanguageForTerm('en', 'spring'), 'zh');
             assert.equal(displayLanguageForTerm('bad', 'summer'), 'zh');
-            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: 'English' }}), 'English');
-            assert.equal(trCourseName({{ id: 'r1', course_name: '研究生课', english_name: 'English' }}), 'English');
+            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: 'English' }}), '中文课名');
+            assert.equal(trCourseName({{ id: 'r1', course_name: '研究生课', english_name: 'English' }}), '研究生课');
             assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: '  ' }}), '中文课名');
             assert.equal(trCourseName({{ id: 'r1', course_name: 'Translated course' }}), 'Translated course');
-            assert.equal(trCourseName({{ id: 'u1', course_name: '春季课', english_name: 'English' }}), 'English');
+            assert.equal(trCourseName({{ id: 'u1', course_name: '春季课', english_name: 'English' }}), '春季课');
         """)
         self.assertIn('displayLanguageForTerm(currentLang, currentTerm)', function_body('readURLState'))
         self.assertIn('displayLanguageForTerm(key, currentTerm)', function_body('setLang'))
         self.assertIn('refreshLangSelectorUI()', function_body('setTerm'))
-        self.assertNotIn("el.hidden", function_body('refreshLangSelectorUI'))
+        self.assertIn('id="langSelector" hidden', HTML)
+        self.assertNotIn("p.get('lang')", function_body('readURLState'))
+        self.assertNotIn("localStorage.getItem('pinhaoke_lang')", HTML)
         self.assertIn('.font-option[hidden] { display: none; }', HTML)
 
     def run_node(self, script):
@@ -905,12 +907,18 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("modalReferenceBook", HTML)
         self.assertIn("modalIntroTranslated", HTML)
 
-    def test_schedule_translation_preserves_source_and_adds_safe_boundaries(self):
-        body = function_body("trSchedule")
-        self.assertIn("let translated = String(s)", body)
-        self.assertIn("return translated", body)
-        self.assertRegex(body, r"replace\([^\n]+周")
-        self.assertNotIn("split(", body)
+    def test_course_field_helpers_preserve_exact_source_text(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            let currentLang = 'en';
+            {function_source('tr')}
+            {function_source('trTeacher')}
+            {function_source('trSchedule')}
+            const schedule = '1~16周每周周二3~4节理教3189~16周单周周三5~6节';
+            assert.equal(trSchedule(schedule), schedule);
+            assert.equal(trTeacher('教师（教授）'), '教师（教授）');
+            assert.equal(tr('departments', '数学科学学院'), '数学科学学院');
+        """)
 
     def test_custom_select_exposes_keyboard_and_aria_contract(self):
         builder = function_body("buildCustomSelect")

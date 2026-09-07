@@ -1267,6 +1267,8 @@ def list_courses(
     page_size: int = Query(50, ge=1, le=200),
 ):
     credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
+    # Translation is disabled site-wide; accept old lang links but use source fields.
+    lang = "zh"
     period_bounds = _period_bounds(period)
 
     filters = {
@@ -1414,6 +1416,8 @@ def get_course_detail(
 ):
     if lang not in VALID_LANGS:
         raise HTTPException(status_code=422, detail="Invalid course query parameter")
+    # Preserve source text even for previously shared non-Chinese URLs.
+    lang = "zh"
     term, level, local_id = _parse_id(course_id)
     if level is None:
         raise HTTPException(status_code=404, detail="Course not found")

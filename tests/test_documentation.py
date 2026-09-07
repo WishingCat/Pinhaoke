@@ -88,7 +88,7 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("独立入口", text)
         self.assertIn("手机端", text)
         self.assertIn("四个入口每行两个", text)
-        self.assertIn("所有学期均支持界面语言切换", text)
+        self.assertIn("所有学期均关闭翻译", text)
         self.assertIn("课程名、教师名", text)
         self.assertIn("教师姓名拼音首字母都会加粗彩色高亮", text)
         self.assertIn("热度最高的 `24` 门课程", text)

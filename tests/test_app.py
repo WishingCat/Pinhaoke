@@ -1590,27 +1590,16 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(len(courses), first["total"])
         return courses
 
-    def test_fall_missing_translations_preserve_source_and_existing_translations_display(self):
-        chinese = self.call(term="fall", q="30301172")
-        self.assertTrue(chinese["courses"])
-        for lang in sorted(app.VALID_LANGS - {"zh"}):
-            with self.subTest(lang=lang):
-                self.assertEqual(self.call(term="fall", lang=lang, q="30301172"), chinese)
-                course_id = chinese["courses"][0]["id"]
-                self.assertEqual(app.get_course_detail(course_id, lang), app.get_course_detail(course_id, "zh"))
-                with app.get_db("fall") as conn:
-                    row = conn.execute(
-                        "SELECT b.id, b.course_code, b.course_name, t.text FROM gr.basic_info b "
-                        "JOIN gr.translations t ON t.course_id=b.id "
-                        "WHERE t.lang=? AND t.field='course_name' AND TRIM(t.text) != '' "
-                        "AND t.text != b.course_name LIMIT 1", (lang,),
-                    ).fetchone()
-                self.assertIsNotNone(row)
-                detail = app.get_course_detail(f"r{row[0]}", lang)
-                self.assertEqual(detail["course_name"], row[3])
-                self.assertEqual(app.get_course_detail(f"r{row[0]}", "zh")["course_name"], row[2])
-                cards = self.call(term="fall", lang=lang, q=row[1])["courses"]
-                self.assertTrue(any(c["course_name"] == row[3].strip() for c in cards))
+    def test_all_terms_and_levels_ignore_translation_requests(self):
+        for term in app.VALID_TERMS:
+            chinese = self.call(term=term, page_size=10)
+            with app.get_db(term) as conn:
+                ids = [f"{prefix}1" for _, _, prefix in app.TERM_DBS[term]]
+            for lang in sorted(app.VALID_LANGS - {"zh"}):
+                with self.subTest(term=term, lang=lang):
+                    self.assertEqual(self.call(term=term, lang=lang, page_size=10), chinese)
+                    for course_id in ids:
+                        self.assertEqual(app.get_course_detail(course_id, lang), app.get_course_detail(course_id, "zh"))
 
     def test_fall_refresh_keeps_old_courses_and_applies_reclassification(self):
         retained = self.call(term="fall", q="00131421", type="专业课")
@@ -1875,7 +1864,7 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(card["course_type"], sorted(card["course_type"]))
         self.assertEqual(card["category"], sorted(card["category"]))
 
-    def test_translated_course_name_is_searchable(self):
+    def test_translated_course_name_does_not_replace_source_search(self):
         with app.get_db("spring") as conn:
             row = conn.execute(
                 """
@@ -1902,10 +1891,9 @@ class CourseListTests(unittest.TestCase):
         sample_id, translated_name = row
         result = self.all_courses(term="spring", lang="ja", q=translated_name, sort="name_asc")
         card = next((course for course in result if course["id"] == f"u{sample_id}"), None)
-        self.assertIsNotNone(card)
-        self.assertEqual(card["course_name"], translated_name)
+        self.assertIsNone(card)
 
-    def test_translated_classroom_is_searchable(self):
+    def test_translated_classroom_does_not_replace_source_search(self):
         with app.get_db("spring") as conn:
             row = conn.execute(
                 """
@@ -1922,10 +1910,9 @@ class CourseListTests(unittest.TestCase):
         sample_id, translated_classroom = row
         result = self.all_courses(term="spring", lang="en", q=translated_classroom)
         card = next((course for course in result if course["id"] == f"u{sample_id}"), None)
-        self.assertIsNotNone(card)
-        self.assertEqual(card["classroom"], translated_classroom)
+        self.assertIsNone(card)
 
-    def test_translated_graduate_course_name_is_searchable(self):
+    def test_translated_graduate_course_name_does_not_replace_source_search(self):
         with app.get_db("spring") as conn:
             row = conn.execute(
                 """
@@ -1944,8 +1931,7 @@ class CourseListTests(unittest.TestCase):
         sample_id, translated_name = row
         result = self.all_courses(term="spring", lang="ja", q=translated_name)
         card = next((course for course in result if course["id"] == f"g{sample_id}"), None)
-        self.assertIsNotNone(card)
-        self.assertEqual(card["course_name"], translated_name)
+        self.assertIsNone(card)
 
     def test_cross_level_same_key_collision_returns_two_cards(self):
         with app.get_db("fall") as conn:
@@ -2166,7 +2152,7 @@ class ValidationAndDetailTests(unittest.TestCase):
         self.assertEqual(detail["textbook"], "")
         self.assertEqual(detail["reference_book"], row["reference_book"])
 
-    def assert_translated_book_field_replaces_source_text(self, field):
+    def assert_translated_book_field_preserves_source_text(self, field):
         schema = importlib.import_module("北京大学选课网数据抓取.build_undergrad_2627_fall_db").SCHEMA
         with tempfile.TemporaryDirectory() as tmp:
             database = Path(tmp) / "books.db"
@@ -2178,13 +2164,13 @@ class ValidationAndDetailTests(unittest.TestCase):
                 conn.commit()
             with patch.dict(app.TERM_DBS, {"spring": [("main", database, "u")]}):
                 detail = app.get_course_detail("u1", lang="en")
-            self.assertEqual(detail[field], "Translated book")
+            self.assertEqual(detail[field], {"textbook": "中文教材", "reference_book": "中文参考书"}[field])
 
-    def test_translated_textbook_replaces_source_text(self):
-        self.assert_translated_book_field_replaces_source_text("textbook")
+    def test_translated_textbook_preserves_source_text(self):
+        self.assert_translated_book_field_preserves_source_text("textbook")
 
-    def test_translated_reference_book_replaces_source_text(self):
-        self.assert_translated_book_field_replaces_source_text("reference_book")
+    def test_translated_reference_book_preserves_source_text(self):
+        self.assert_translated_book_field_preserves_source_text("reference_book")
 
     def test_blank_translation_does_not_replace_original(self):
         out = {"course_name": "Original name"}
