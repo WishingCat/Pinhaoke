@@ -1394,6 +1394,7 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 .msg-changelog-entry h3 { font-size: 0.95rem; color: var(--ink); margin: 5px 0 8px; }
 .msg-changelog-entry ul { list-style: disc; padding-left: 20px; margin: 0; color: var(--ink-2); font-size: 0.83rem; line-height: 1.8; }
 .msg-changelog-entry time { color: var(--ink-3); font-size: 0.74rem; }
+.msg-changelog-entry-major h3, .msg-changelog-entry-major ul, .msg-changelog-entry-major time { font-weight: 700; color: var(--ink); }
 .msg-changelog-note { margin: 4px 0; color: var(--ink-3); font-size: 0.78rem; }
 .fav-nickname { display: block; overflow-wrap: anywhere; }
 
@@ -4687,6 +4688,7 @@ async function loadChangelog() {
     page.appendChild(msgElement('p', 'msg-changelog-note', '记录拼好课的主要功能与数据更新。'));
     data.entries.forEach(entry => {
       const article = msgElement('article', 'msg-changelog-entry');
+      if (entry.major === true) article.classList.add('msg-changelog-entry-major');
       const date = msgElement('time', null, entry.date);
       date.dateTime = entry.date;
       const title = msgElement('h3', null, entry.title);

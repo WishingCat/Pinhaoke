@@ -193,7 +193,7 @@ git diff --check
 - 来源 IP 以 SHA-256 哈希形式仅用于发布频率限制，同一 IP 哈希的留言和回复共用每小时最多 `5` 条、每天最多 `20` 条，超限返回 429；限流检查与插入在 `BEGIN IMMEDIATE` 内执行。公开响应仅包含 `id`、`posted_at`、`content`、`nickname`、`reply_count`，不包含 IP、登录用户名或账号主键。
 - 留言库 schema 版本 1 增加 `nickname`、`parent_id` 和 `(parent_id, id)` 索引；锁内重查版本后迁移，保留旧 ID、正文、时间与 IP 哈希。账户库版本 4 同样在锁内新增 `nickname`，为旧账号补默认昵称，保留会话、密保与收藏。
 - 前端渲染留言、回复、昵称和更新日志必须使用 `textContent` 或 DOM API，禁止拼入 `innerHTML`。两页的留言板 UI 与行为保持一致。
-- `GET /api/changelog` 从 `BASE_DIR / "changelog.json"` 读取唯一的中文更新记录并返回 `no-store`；留言板顶部按钮在留言与更新日志子页面间切换，隐藏子页退出键盘焦点顺序，沿用弹窗焦点约束。
+- `GET /api/changelog` 从 `BASE_DIR / "changelog.json"` 读取唯一的中文更新记录并返回 `no-store`；日志只收录主要功能与数据更新，不记录功能回退、修复和细微调整，重大记录设 `major: true`，两页均加粗日期、标题与内容；留言板顶部按钮在留言与更新日志子页面间切换，隐藏子页退出键盘焦点顺序，沿用弹窗焦点约束。
 
 访问统计契约：
 
