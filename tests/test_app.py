@@ -1590,17 +1590,27 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(len(courses), first["total"])
         return courses
 
-    def test_fall_language_requests_return_chinese_for_both_levels(self):
+    def test_fall_missing_translations_preserve_source_and_existing_translations_display(self):
         chinese = self.call(term="fall", q="30301172")
         self.assertTrue(chinese["courses"])
-        with app.get_db("fall") as conn:
-            graduate_id = conn.execute("SELECT course_id FROM gr.translations WHERE lang='en' LIMIT 1").fetchone()[0]
-        ids = [chinese["courses"][0]["id"], f"r{graduate_id}"]
         for lang in sorted(app.VALID_LANGS - {"zh"}):
             with self.subTest(lang=lang):
                 self.assertEqual(self.call(term="fall", lang=lang, q="30301172"), chinese)
-                for course_id in ids:
-                    self.assertEqual(app.get_course_detail(course_id, lang), app.get_course_detail(course_id, "zh"))
+                course_id = chinese["courses"][0]["id"]
+                self.assertEqual(app.get_course_detail(course_id, lang), app.get_course_detail(course_id, "zh"))
+                with app.get_db("fall") as conn:
+                    row = conn.execute(
+                        "SELECT b.id, b.course_code, b.course_name, t.text FROM gr.basic_info b "
+                        "JOIN gr.translations t ON t.course_id=b.id "
+                        "WHERE t.lang=? AND t.field='course_name' AND TRIM(t.text) != '' "
+                        "AND t.text != b.course_name LIMIT 1", (lang,),
+                    ).fetchone()
+                self.assertIsNotNone(row)
+                detail = app.get_course_detail(f"r{row[0]}", lang)
+                self.assertEqual(detail["course_name"], row[3])
+                self.assertEqual(app.get_course_detail(f"r{row[0]}", "zh")["course_name"], row[2])
+                cards = self.call(term="fall", lang=lang, q=row[1])["courses"]
+                self.assertTrue(any(c["course_name"] == row[3].strip() for c in cards))
 
     def test_fall_refresh_keeps_old_courses_and_applies_reclassification(self):
         retained = self.call(term="fall", q="00131421", type="专业课")

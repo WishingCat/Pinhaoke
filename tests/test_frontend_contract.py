@@ -70,25 +70,27 @@ def function_source(name):
 
 
 class FrontendContractTests(unittest.TestCase):
-    def test_fall_language_links_and_choices_fall_back_to_chinese(self):
+    def test_all_terms_keep_language_choices_and_missing_course_names_fall_back(self):
         self.run_node(f"""
             const assert = require('node:assert/strict');
             const TR_IDX = {{ en: 0, ja: 1 }};
             let currentLang = 'en';
             {function_source('displayLanguageForTerm')}
             {function_source('trCourseName')}
-            assert.equal(displayLanguageForTerm('en', 'fall'), 'zh');
-            assert.equal(displayLanguageForTerm('ja', 'fall'), 'zh');
+            assert.equal(displayLanguageForTerm('en', 'fall'), 'en');
+            assert.equal(displayLanguageForTerm('ja', 'fall'), 'ja');
             assert.equal(displayLanguageForTerm('en', 'spring'), 'en');
             assert.equal(displayLanguageForTerm('bad', 'summer'), 'zh');
-            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: 'English' }}), '中文课名');
-            assert.equal(trCourseName({{ id: 'r1', course_name: '研究生课', english_name: 'English' }}), '研究生课');
+            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: 'English' }}), 'English');
+            assert.equal(trCourseName({{ id: 'r1', course_name: '研究生课', english_name: 'English' }}), 'English');
+            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: '  ' }}), '中文课名');
+            assert.equal(trCourseName({{ id: 'r1', course_name: 'Translated course' }}), 'Translated course');
             assert.equal(trCourseName({{ id: 'u1', course_name: '春季课', english_name: 'English' }}), 'English');
         """)
         self.assertIn('displayLanguageForTerm(currentLang, currentTerm)', function_body('readURLState'))
         self.assertIn('displayLanguageForTerm(key, currentTerm)', function_body('setLang'))
         self.assertIn('refreshLangSelectorUI()', function_body('setTerm'))
-        self.assertIn("el.hidden = currentTerm === 'fall'", function_body('refreshLangSelectorUI'))
+        self.assertNotIn("el.hidden", function_body('refreshLangSelectorUI'))
         self.assertIn('.font-option[hidden] { display: none; }', HTML)
 
     def run_node(self, script):
@@ -300,10 +302,11 @@ class FrontendContractTests(unittest.TestCase):
         self.assertLess(review_shell, review_link)
         self.assertIn('.term-nav, .review-nav-shell {', REVIEWS_HTML)
         self.assertIn('.term-nav a { padding: 7px 18px; border-radius: 999px; }', REVIEWS_HTML)
-        self.assertIn('.term-nav a, .review-nav-link { padding: 6px 14px; font-size: 0.82rem; }', REVIEWS_HTML)
-        self.assertIn('.review-nav-shell { width: 100%;', REVIEWS_HTML)
-        self.assertIn('.review-nav-link { width: 100%;', REVIEWS_HTML)
-        self.assertIn('.term-nav a { flex-basis: 100%;', REVIEWS_HTML)
+        for page in (HTML, REVIEWS_HTML):
+            self.assertIn('grid-template-columns: repeat(2, minmax(0, 1fr))', page)
+            self.assertNotIn('flex-basis: 100%;', page)
+        self.assertIn('.term-toggle { display: contents; }', HTML)
+        self.assertIn('.term-nav, .review-nav-shell { display: contents; }', REVIEWS_HTML)
 
     def test_review_page_matches_index_visual_language(self):
         # 与课程页共享的视觉记号：标题字号、学期控件尺寸、暗色底色、

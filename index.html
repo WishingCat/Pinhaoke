@@ -1669,6 +1669,7 @@ html[data-theme="dark"] .fav-submit { color: #0E1013; }
 }
 
 /* ===== Sponsor panel ===== */
+.sponsor-notice { margin: 0 14px 14px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--ink); font-size: 0.88rem; line-height: 1.8; }
 .sponsor-panel { display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(760px, 92vh); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-xl); }
 .sponsor-sec { margin: 0 18px 8px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
 .sponsor-qr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 18px 14px; }
@@ -2103,8 +2104,10 @@ html[data-theme="dark"] .site-footer::after {
   .hero { padding: 36px 8px 4px; }
   .hero h1 { font-size: 2.1rem; }
   .hero .subtitle { font-size: 0.86rem; margin-top: 10px; }
-  .view-switcher { margin-top: 14px; }
-  .term-toggle button { padding: 6px 14px; font-size: 0.82rem; }
+  .view-switcher { display: grid; align-items: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin-top: 14px; }
+  .term-toggle { display: contents; }
+  .term-toggle button, .review-hub-link { min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 0.82rem; white-space: normal; overflow-wrap: anywhere; }
+  .review-hub-link svg { flex-shrink: 0; }
   .search-section { margin: 20px 0 14px; }
   .search-box { padding: 12px 16px; }
   .filters { padding: 16px 14px; }
@@ -2144,9 +2147,6 @@ html[data-theme="dark"] .site-footer::after {
 @media (max-width: 390px) {
   .container { padding-left: 12px; padding-right: 12px; }
   .topbar-inner { padding-left: 12px; padding-right: 12px; gap: 8px; }
-  .term-toggle { width: 100%; border-radius: var(--r); }
-  .term-toggle button { flex: 1 1 30%; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: normal; overflow-wrap: anywhere; }
-  .review-hub-link { width: 100%; border-radius: var(--r); }
   .toolbar-right { width: 100%; margin-left: 0; }
   .cs-compact { flex: 1 1 150px; }
   .clear-btn { flex: 0 1 auto; }
@@ -2163,7 +2163,6 @@ html[data-theme="dark"] .site-footer::after {
   .icon-btn { width: 29px; height: 29px; }
   .top-btn { padding-left: 7px; padding-right: 7px; }
   .hero { padding-left: 0; padding-right: 0; }
-  .term-toggle button { flex-basis: 100%; }
   .search-box { padding-left: 12px; padding-right: 12px; }
   .course-card { padding: 14px; }
   .modal-overlay { padding: 6px; }
@@ -2459,6 +2458,7 @@ window._hmt.push(['_trackPageview', location.pathname]);
       <span class="modal-title" id="sponsorTitle">赞助与联系</span>
       <button class="modal-close" onclick="closeSponsor()" aria-label="关闭赞助面板">&times;</button>
     </div>
+    <p class="sponsor-notice"><strong>如果你赞助了可以加我的微信告诉我，或者转账备注上你希望留下的名字，我会给你加入到赞助列表。真的非常感谢您的支持！</strong></p>
     <p class="msg-hint">拼好课是纯公益项目，承诺永久免费服务。如果有能力的话，欢迎扫码赞助，支持网站运行。</p>
     <div class="sponsor-sec">赞助二维码</div>
     <div class="sponsor-qr-grid">
@@ -3082,16 +3082,14 @@ function trSchedule(s) {
   return translated;
 }
 
-// Fall course names remain Chinese even when opened from another term's favorites.
+// Use an available source English name; otherwise keep the API display name.
 function trCourseName(course) {
   if (!course) return '';
-  const chineseOnly = /^[ar][1-9][0-9]*$/.test(String(course.id || ''));
-  if (!chineseOnly && currentLang === 'en' && course.english_name) return course.english_name;
+  if (currentLang === 'en' && (course.english_name || '').trim()) return course.english_name;
   return course.course_name || '';
 }
 
 function displayLanguageForTerm(language, term) {
-  if (term === 'fall') return 'zh';
   return language === 'zh' || TR_IDX[language] !== undefined ? language : 'zh';
 }
 
@@ -3212,7 +3210,6 @@ function refreshLangSelectorUI() {
   document.getElementById('langLabel').textContent = i18n[currentLang].name;
   document.querySelectorAll('#langDropdown .font-option').forEach(el => {
     el.classList.toggle('active', el.dataset.lang === currentLang);
-    el.hidden = currentTerm === 'fall' && el.dataset.lang !== 'zh';
   });
 }
 
