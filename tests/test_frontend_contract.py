@@ -336,9 +336,12 @@ class FrontendContractTests(unittest.TestCase):
             self.assertIn('class="about-links"', page)
             self.assertIn('class="about-link-btn about-sponsor"', page)
             self.assertIn('aria-label="GitHub"', page)
-            self.assertIn("纯公益项目，承诺永久免费服务", page)
+            self.assertNotIn('class="about-links-note">纯公益项目，承诺永久免费服务', page)
+            self.assertIn("Zengji Tu", page)
+            self.assertIn("Ningjing Wang", page)
+            self.assertIn("Tingyi Huang", page)
             self.assertLess(
-                page.index("纯公益项目 · 每学期更新"),
+                page.index("纯公益项目 · 实时更新"),
                 page.index('class="about-links"'),
             )
             # 赞助与 GitHub 已移出顶栏，赞助不再有悬浮文字
