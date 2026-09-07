@@ -397,6 +397,19 @@ def _migrate_accounts_db(conn) -> None:
             )
             conn.execute("PRAGMA user_version = 4")
         conn.commit()
+        version = 4
+    if version < 5:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 5:
+            conn.execute("""CREATE TABLE IF NOT EXISTS timetable_courses (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                course_key TEXT NOT NULL,
+                snapshot TEXT NOT NULL,
+                added_at INTEGER NOT NULL,
+                PRIMARY KEY(user_id, course_key)
+            )""")
+            conn.execute("PRAGMA user_version = 5")
+        conn.commit()
 
 
 @contextmanager
@@ -2338,6 +2351,40 @@ def _favorites_list(conn, user_id: int) -> list:
     return items
 
 
+def _enrich_saved_courses(items: list) -> None:
+    by_term = {}
+    for item in items:
+        by_term.setdefault(item.get("term"), []).append(item)
+    for term, group in by_term.items():
+        if term not in TERM_DBS:
+            continue
+        aliases = {prefix: alias for alias, _, prefix in TERM_DBS[term]}
+        try:
+            with get_db(term) as course_conn:
+                for item in group:
+                    _, prefix, _ = _parse_id(item.get("id", ""))
+                    alias = aliases.get(prefix)
+                    if alias is None or item.get("term_label") != _term_label(term):
+                        item["available"] = False
+                        continue
+                    row = course_conn.execute(
+                        f"SELECT * FROM {alias}.basic_info WHERE course_code=? "
+                        "AND CAST(class_no AS TEXT)=? AND TRIM(COALESCE(teacher,''))=? ORDER BY id LIMIT 1",
+                        (item["course_code"], item["class_no"], item["teacher"]),
+                    ).fetchone()
+                    if row is None:
+                        item["available"] = False
+                        continue
+                    source = dict(row)
+                    item["id"] = f"{prefix}{row['id']}"
+                    item["available"] = True
+                    for field in ("course_name", "teacher", "credits", "schedule", "classroom", "department", "course_type", "category"):
+                        item[field] = source.get(field, "研究生课" if field == "course_type" and prefix in ("g", "r") else "")
+        except (sqlite3.Error, OSError, HTTPException):
+            for item in group:
+                item["available"] = False
+
+
 def _refresh_favorite_ids(conn, user_id: int, items: list) -> None:
     """课程库重建后 ID 会漂移；按稳定键回写新 ID，学期字面变化时标记不可用。"""
     by_term = {}
@@ -2474,6 +2521,7 @@ def _owned_collection_ids(conn, user_id: int, raw) -> list:
 def _favorites_payload(conn, user_id: int) -> dict:
     items = _favorites_list(conn, user_id)
     _refresh_favorite_ids(conn, user_id, items)
+    _enrich_saved_courses(items)
     memberships = _collection_memberships(conn, user_id)
     for item in items:
         item["collection_ids"] = memberships.get(item["fav_key"], [])
@@ -2483,6 +2531,105 @@ def _favorites_payload(conn, user_id: int) -> dict:
         "collections": _collections_list(conn, user_id),
         "collections_limit": COLLECTIONS_MAX,
     }
+
+
+TIMETABLE_LIMIT = 100
+_TIMETABLE_SLOT_RE = re.compile(
+    r"(?:(?P<weeks>\d{1,2}(?:[~～-]\d{1,2})?(?:[,，、]\d{1,2}(?:[~～-]\d{1,2})?)*)周\s*)?"
+    r"(?P<parity>每周|单周|双周)?\s*周(?P<day>[一二三四五六日天])\s*"
+    r"(?P<start>\d{1,2})(?:[~～-](?P<end>\d{1,2}))?节"
+)
+
+
+def _timetable_sessions(schedule: str) -> dict:
+    sessions = []
+    for match in _TIMETABLE_SLOT_RE.finditer(schedule or ""):
+        start, end = int(match['start']), int(match['end'] or match['start'])
+        if not 1 <= start <= end <= 14:
+            continue
+        weeks = None
+        if match['weeks']:
+            weeks = set()
+            for part in re.split(r'[,，、]', match['weeks']):
+                bounds = re.split(r'[~～-]', part)
+                a, b = int(bounds[0]), int(bounds[-1])
+                if not 0 <= a <= b <= 30:
+                    weeks = None
+                    break
+                weeks.update(range(a, b + 1))
+            if weeks is None:
+                continue
+        parity = match['parity'] or '每周'
+        if weeks is not None:
+            weeks = sorted(w for w in weeks if parity == '每周' or w % 2 == (1 if parity == '单周' else 0))
+        sessions.append({"day": "一二三四五六日".index(match['day'].replace('天', '日')) + 1,
+                         "start": start, "end": end, "weeks": weeks, "parity": parity,
+                         "label": match.group(0).strip()})
+    expected = len(re.findall(r'周[一二三四五六日天]', schedule or ''))
+    return {"sessions": sessions, "unparsed": not sessions or len(sessions) != expected}
+
+
+def _timetable_payload(conn, user_id):
+    items = []
+    for row in conn.execute("SELECT course_key, snapshot, added_at FROM timetable_courses WHERE user_id=? ORDER BY added_at, course_key", (user_id,)):
+        item = json.loads(row['snapshot'])
+        item.update(course_key=row['course_key'], added_at=row['added_at'])
+        items.append(item)
+    _enrich_saved_courses(items)
+    for item in items:
+        item.update(_timetable_sessions(item.get('schedule', '')))
+    return {"courses": items, "limit": TIMETABLE_LIMIT}
+
+
+@app.get("/api/timetable")
+def get_timetable(request: Request):
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, int(time.time()))
+        return _no_store(_timetable_payload(conn, session['user_id']))
+
+
+@app.post("/api/timetable")
+def add_timetable_course(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    course_id = _payload_dict(payload).get('id')
+    if not isinstance(course_id, str) or not COURSE_ID_RE.fullmatch(course_id):
+        raise HTTPException(status_code=422, detail="Invalid course id")
+    now = int(time.time())
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, now)
+        user_id = session['user_id']
+        _enforce_rate_limit(conn, 'favorite_write_ip', _client_ip_hash(request), now)
+        _record_event(conn, 'favorite_write_ip', _client_ip_hash(request), now)
+        conn.commit()
+        snapshot = _favorite_snapshot(course_id)
+        snapshot['id'] = snapshot.pop('course_id')
+        _enrich_saved_courses([snapshot])
+        key = snapshot['fav_key']
+        conn.execute('BEGIN IMMEDIATE')
+        exists = conn.execute('SELECT 1 FROM timetable_courses WHERE user_id=? AND course_key=?', (user_id, key)).fetchone()
+        if not exists and conn.execute('SELECT COUNT(*) FROM timetable_courses WHERE user_id=?', (user_id,)).fetchone()[0] >= TIMETABLE_LIMIT:
+            raise HTTPException(status_code=409, detail='课表课程已达上限（100 门）')
+        conn.execute("INSERT INTO timetable_courses(user_id,course_key,snapshot,added_at) VALUES(?,?,?,?) "
+                     "ON CONFLICT(user_id,course_key) DO UPDATE SET snapshot=excluded.snapshot",
+                     (user_id, key, json.dumps(snapshot, ensure_ascii=False), now))
+        conn.commit()
+        return _no_store(_timetable_payload(conn, user_id))
+
+
+@app.post("/api/timetable/remove")
+def remove_timetable_course(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    key = _payload_dict(payload).get('course_key')
+    if not isinstance(key, str) or not 1 <= len(key) <= 2000:
+        raise HTTPException(status_code=422, detail="Invalid course key")
+    with get_accounts_db() as conn:
+        now = int(time.time())
+        session = _require_user(conn, request, now)
+        _enforce_rate_limit(conn, 'favorite_write_ip', _client_ip_hash(request), now)
+        _record_event(conn, 'favorite_write_ip', _client_ip_hash(request), now)
+        conn.execute('DELETE FROM timetable_courses WHERE user_id=? AND course_key=?', (session['user_id'], key))
+        conn.commit()
+        return _no_store(_timetable_payload(conn, session['user_id']))
 
 
 @app.get("/api/account")

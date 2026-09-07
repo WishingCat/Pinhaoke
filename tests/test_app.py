@@ -944,7 +944,7 @@ class AccountApiTests(unittest.TestCase):
                 row[0]
                 for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 5)
             user_cols = {
                 row[1] for row in conn.execute("PRAGMA table_info(users)")
             }
@@ -990,7 +990,7 @@ class AccountApiTests(unittest.TestCase):
             conn.commit()
         # 打开一次即触发迁移
         with app.get_accounts_db() as conn:
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 5)
             self.assertEqual(conn.execute("SELECT nickname FROM users WHERE id=1").fetchone()[0], "路过的 PKUer")
             cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
             self.assertIn("last_collection_id", cols)
@@ -1075,7 +1075,7 @@ class FavoritesApiTests(unittest.TestCase):
             {
                 "fav_key", "id", "available", "term", "term_label", "level", "course_code",
                 "class_no", "teacher", "course_name", "credits", "schedule", "department",
-                "added_at", "collection_ids",
+                "added_at", "collection_ids", "classroom", "course_type", "category",
             },
         )
         self.assertEqual(item["collection_ids"], [payload["collections"][0]["id"]])

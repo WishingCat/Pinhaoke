@@ -179,7 +179,7 @@ class MessageRepliesAndNicknameTests(unittest.TestCase):
             with app.get_accounts_db() as conn:
                 return conn.execute("PRAGMA user_version").fetchone()[0]
         with ThreadPoolExecutor(max_workers=2) as pool:
-            self.assertEqual(list(pool.map(migrate, range(2))), [4, 4])
+            self.assertEqual(list(pool.map(migrate, range(2))), [5, 5])
         with app.get_accounts_db() as conn:
             columns = [row[1] for row in conn.execute("PRAGMA table_info(users)")]
             self.assertEqual(columns.count("nickname"), 1)
@@ -214,7 +214,7 @@ class MessageRepliesAndNicknameTests(unittest.TestCase):
         self.assertIn("3152", json.dumps(entries, ensure_ascii=False))
         self.assertNotIn("语言切换与手机导航优化", {e["title"] for e in entries})
         self.assertEqual({e["title"] for e in entries if e.get("major")},
-                         {"2026 秋季课程数据更新", "账号、收藏夹与个人中心"})
+                         {"2026 秋季课程数据更新", "账号、收藏夹与个人中心", "我的课表与收藏课程卡片"})
 
 
 if __name__ == "__main__":

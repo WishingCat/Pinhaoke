@@ -95,6 +95,23 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn("localStorage.getItem('pinhaoke_lang')", HTML)
         self.assertIn('.font-option[hidden] { display: none; }', HTML)
 
+    def test_timetable_week_matching_and_safe_personal_rendering(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            {function_source('sessionInWeek')}
+            {function_source('sessionsOverlap')}
+            const odd = {{weeks:[1,3,5], parity:'单周'}};
+            const even = {{weeks:[2,4,6], parity:'双周'}};
+            assert.equal(sessionsOverlap(odd, even), false);
+            assert.equal(sessionInWeek(odd, 3), true);
+            assert.equal(sessionInWeek(odd, 2), false);
+            assert.equal(sessionInWeek({{weeks:[0,1], parity:'每周'}}, 0), true);
+            assert.equal(sessionInWeek(odd, -1), true);
+        """)
+        self.assertNotIn('innerHTML', function_body('renderTimetable'))
+        self.assertIn("createTimetableButton(c)", function_body('showDetail'))
+        self.assertIn("createCard(item", function_body('buildFavItem'))
+
     def run_node(self, script):
         if not NODE:
             self.skipTest("node is unavailable; JavaScript behavior contract skipped")
@@ -1069,7 +1086,7 @@ class FrontendContractTests(unittest.TestCase):
         item = function_body("buildFavItem")
         self.assertEqual(item.count("innerHTML"), 1)
         self.assertIn("remove.innerHTML = ICONS.close", item)
-        self.assertIn("favEl('span', 'fav-item-name', item.course_name || item.id)", item)
+        self.assertIn("createCard(item", item)
         # 卡片星标与详情弹窗按钮
         card = function_body("createCard")
         self.assertIn('<button class="fav-btn" type="button" aria-pressed="false"></button>', card)

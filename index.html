@@ -2080,6 +2080,37 @@ html[data-theme="dark"] .site-footer::after {
   .hero .subtitle { font-size: 0.78rem; }
 }
 
+
+/* Favorites share homepage cards; timetable uses the same account surface. */
+.fav-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.fav-group-title, .fav-list > .fav-empty { grid-column: 1 / -1; }
+.fav-course-card { animation: none; }
+.fav-course-card .fav-item-remove { position: static; width: 30px; height: 30px; }
+.account-sections { display: flex; gap: 10px; margin: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.account-section-button, .timetable-add { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--surface); font-size: 0.85rem; }
+.account-section-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+.timetable-add { display: block; width: 100%; margin-bottom: 18px; color: var(--accent); font-weight: 600; }
+.timetable-add:disabled { opacity: 0.6; cursor: wait; }
+.timetable { margin: 18px; }
+.timetable-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.timetable-controls label { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+.timetable-controls select { max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.timetable-scroll { overflow: auto; max-height: 65vh; border: 1px solid var(--border); border-radius: 10px; }
+.timetable-grid { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: 900px; font-size: 0.78rem; }
+.timetable-grid th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); padding: 10px; font-weight: 600; }
+.timetable-grid th:first-child { width: 52px; }
+.timetable-grid td, .timetable-grid tbody th { border: 1px solid var(--border); padding: 4px; vertical-align: top; height: 52px; }
+.timetable-grid tbody th { position: static; font-size: 0.72rem; padding-top: 12px; }
+.timetable-course { display: block; width: 100%; padding: 8px; margin: 2px 0; background: var(--accent-soft); color: var(--ink); border-radius: 6px; text-align: left; overflow-wrap: anywhere; font-size: 0.75rem; }
+.timetable-course span { display: block; margin-top: 4px; font-size: 0.68rem; }
+.timetable-conflict { background: color-mix(in srgb, #F59E0B 14%, var(--surface)); }
+.timetable-note { font-size: 0.8rem; line-height: 1.8; color: var(--ink-3); margin: 10px 0 16px; }
+.timetable-items { display: grid; gap: 10px; margin-top: 16px; }
+.timetable-item { border-bottom: 1px solid var(--border); padding: 10px 0; display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; }
+.timetable-item > div { min-width: 0; overflow-wrap: anywhere; }
+.timetable-item p { margin: 4px 0; font-size: 0.78rem; color: var(--ink-3); }
+@media(max-width:640px) { .fav-list { grid-template-columns: 1fr; } .timetable { margin: 14px; } .timetable-grid { min-width: 850px; } }
+
 </style>
 <script>
 window._hmt = window._hmt || [];
@@ -3759,7 +3790,7 @@ function stripKey(types) {
   return getTypeBadgeClass(first).replace('badge-', '');
 }
 
-function createCard(course) {
+function createCard(course, onOpen = null) {
   const lang = i18n[currentLang];
   const card = document.createElement('article');
   card.className = 'course-card';
@@ -3819,10 +3850,11 @@ function createCard(course) {
   });
   card.addEventListener('click', () => {
     card.focus();
-    showDetail(course.id);
+    if (onOpen) onOpen(); else showDetail(course.id);
   });
   card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDetail(course.id); }
+    if (e.target !== card) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onOpen) onOpen(); else showDetail(course.id); }
   });
   return card;
 }
@@ -4027,6 +4059,9 @@ async function showDetail(courseId) {
     const favToggle = document.getElementById('favToggleBtn');
     favToggle.addEventListener('click', () => toggleFavorite(c, favToggle));
     syncFavButton(favToggle, lang);
+    const timetableAction = createTimetableButton(c);
+    content.querySelector('.modal-body').prepend(timetableAction);
+    if (favUser && !timetableLoaded) loadTimetable();
     refreshDetailChooser();
     if (!overlay.contains(document.activeElement)) focusModalClose();
   } catch (e) {
@@ -4703,6 +4738,10 @@ function setFavUser(user) {
   favUser = user;
   if (!user) {
     favItems.clear();
+    timetableCourses = [];
+    timetableLoaded = false;
+    timetableRequest++;
+    accountSection = 'favorites';
     favCollections = [];
     activeCollectionId = null;
     favModeSet(null);
@@ -4869,6 +4908,7 @@ function closeFavorites({ returnFocus = true } = {}) {
   }
   favStackedOnModal = false;
   pendingFavoriteId = null;
+  pendingTimetableId = null;
   const returnTarget = favReturnFocus;
   favReturnFocus = null;
   if (returnFocus && returnTarget && returnTarget.isConnected) {
@@ -5278,11 +5318,15 @@ async function afterFavAuth(message) {
     renderFavoritesPanel();
     return;
   }
+  const timetableId = pendingTimetableId;
+  pendingTimetableId = null;
   const courseId = pendingFavoriteId;
   pendingFavoriteId = null;
   closeFavorites({ returnFocus: false });
+  if (timetableId) closeModal();
   openAccountView();
   favToast(message);
+  if (timetableId) { accountSection = 'timetable'; await addToTimetable(timetableId); }
   if (courseId) await addPendingFavorite(courseId);
 }
 
@@ -5344,6 +5388,21 @@ function renderFavAccount(body) {
   body.appendChild(manage);
   body.appendChild(manageForm);
 
+  const sections = favEl('div', 'account-sections');
+  sections.setAttribute('aria-label', '个人中心功能');
+  [['favorites', '我的收藏'], ['timetable', '我的课表']].forEach(([key, label]) => {
+    const button = favButton(label, 'account-section-button', () => {
+      accountSection = key;
+      renderAccountView();
+      document.querySelector(`.account-section-button[data-section="${key}"]`)?.focus();
+      if (key === 'timetable') loadTimetable();
+    });
+    button.dataset.section = key;
+    button.setAttribute('aria-pressed', String(accountSection === key));
+    sections.appendChild(button);
+  });
+  body.appendChild(sections);
+  if (accountSection === 'timetable') { renderTimetable(body); return; }
   renderCollections(body);
 
   const list = favEl('div', 'fav-list');
@@ -5399,33 +5458,16 @@ function renderFavList() {
 }
 
 function buildFavItem(item) {
-  const lang = i18n[currentLang];
-  const row = favEl('div', 'fav-item');
-  const open = favEl('button', 'fav-item-open');
-  open.type = 'button';
-  const name = favEl('span', 'fav-item-name', item.course_name || item.id);
-  name.appendChild(favEl('span', 'fav-level', item.level === 'gr' ? '研究生' : '本科'));
-  open.appendChild(name);
-  const metaBits = [];
-  if (item.course_code) metaBits.push(item.course_code);
-  if (item.class_no) metaBits.push(`${lang.modalClassNo} ${item.class_no}`);
-  if (item.teacher) metaBits.push(item.teacher);
-  if (item.schedule) metaBits.push(item.schedule);
-  if (item.credits !== null && item.credits !== undefined && item.credits !== '') {
-    metaBits.push(`${fmtCredits(item.credits)} ${lang.fieldCredits}`);
-  }
-  open.appendChild(favEl('span', 'fav-item-meta', metaBits.join(' · ')));
+  const row = createCard(item, () => { if (item.available !== false) openFavoriteItem(item); });
+  row.classList.add('fav-course-card');
   if (item.available === false) {
-    open.appendChild(favEl('span', 'fav-item-note', `${item.term_label || ''} 课程库已更新，仅保留记录`));
-    open.disabled = true;
-    open.setAttribute('aria-disabled', 'true');
-  } else {
-    open.setAttribute('aria-label', `打开课程详情：${item.course_name || item.id}`);
-    open.addEventListener('click', () => openFavoriteItem(item));
+    row.removeAttribute('role');
+    row.tabIndex = -1;
+    row.appendChild(favEl('p', 'fav-item-note', '课程已不在当前课程库中，仅保留收藏记录'));
   }
-  row.appendChild(open);
   const inCollection = activeCollectionId !== null;
   const remove = favButton('', 'fav-item-remove', async event => {
+    event.stopPropagation();
     const button = event.currentTarget;
     button.disabled = true;
     const res = inCollection
@@ -5451,7 +5493,8 @@ function buildFavItem(item) {
   const removeLabel = inCollection ? '从收藏夹移出' : '移除收藏';
   remove.setAttribute('aria-label', `${removeLabel}：${item.course_name || item.id}`);
   remove.title = removeLabel;
-  row.appendChild(remove);
+  remove.addEventListener('keydown', event => event.stopPropagation());
+  row.querySelector('.fav-btn').replaceWith(remove);
   return row;
 }
 
@@ -5487,6 +5530,163 @@ function applyFavData(data) {
 function renderFavViews() {
   if (accountViewOpen) renderAccountView();
   else if (document.getElementById('favOverlay').classList.contains('open')) renderFavList();
+}
+
+let accountSection = 'favorites';
+let timetableCourses = [];
+let timetableLoaded = false;
+let timetableLoading = false;
+let timetableRequest = 0;
+let timetableTerm = 'fall';
+let timetableWeek = -1;
+let pendingTimetableId = null;
+
+function timetableHas(course) {
+  return timetableCourses.some(item => item.id === course.id || item.course_key === favoriteKey(course));
+}
+
+function updateTimetableButtons() {
+  document.querySelectorAll('.timetable-add').forEach(button => {
+    const added = timetableCourses.some(item => item.id === button.dataset.courseId || item.course_key === button.dataset.courseKey);
+    button.textContent = added ? '已加入我的课表' : '加入到我的课表';
+    button.setAttribute('aria-pressed', String(added));
+  });
+}
+
+function createTimetableButton(course) {
+  const button = favButton(timetableHas(course) ? '已加入我的课表' : '加入到我的课表', 'timetable-add', async () => {
+    if (!favUser) { pendingTimetableId = course.id; favTab = 'login'; openFavorites(); return; }
+    if (timetableHas(course)) { favToast('课程已在个人中心的“我的课表”中'); return; }
+    button.disabled = true;
+    await addToTimetable(course.id);
+    button.disabled = false;
+  });
+  button.dataset.courseId = course.id;
+  button.dataset.courseKey = favoriteKey(course);
+  button.setAttribute('aria-pressed', String(timetableHas(course)));
+  return button;
+}
+
+async function loadTimetable() {
+  if (!favUser) return;
+  const username = favUser.username;
+  const request = ++timetableRequest;
+  timetableLoading = true;
+  const res = await favApi('GET', '/api/timetable');
+  if (request !== timetableRequest || favUser?.username !== username) return;
+  timetableLoading = false;
+  if (res.ok) { timetableCourses = res.data.courses; timetableLoaded = true; updateTimetableButtons(); }
+  else { favToast(favErrorText(res)); }
+  if (accountViewOpen && accountSection === 'timetable') renderAccountView();
+}
+
+async function addToTimetable(id) {
+  const username = favUser?.username;
+  ++timetableRequest;
+  const res = await favApi('POST', '/api/timetable', { id });
+  if (!favUser || favUser.username !== username) return;
+  timetableLoading = false;
+  if (res.ok) {
+    timetableCourses = res.data.courses;
+    timetableLoaded = true;
+    const course = timetableCourses.find(item => item.id === id);
+    if (course) timetableTerm = course.term;
+    updateTimetableButtons();
+    if (accountViewOpen && accountSection === 'timetable') renderAccountView();
+    favToast('已加入我的课表，可在个人中心查看');
+  } else favToast(favErrorText(res, { 404: '课程已不在当前课程库中' }));
+}
+
+function sessionInWeek(session, week) {
+  if (week < 0) return !session.weeks || session.weeks.length > 0;
+  if (session.weeks) return session.weeks.includes(week);
+  return session.parity === '单周' ? week % 2 === 1 : session.parity === '双周' ? week % 2 === 0 : true;
+}
+
+function sessionsOverlap(a, b) {
+  return Array.from({ length: 31 }, (_, i) => i).some(week => sessionInWeek(a, week) && sessionInWeek(b, week));
+}
+
+function renderTimetable(body) {
+  const area = favEl('section', 'timetable');
+  area.setAttribute('aria-label', '我的课表');
+  body.appendChild(area);
+  if (!timetableLoaded) {
+    area.appendChild(favEl('p', 'timetable-note', timetableLoading ? '正在加载课表…' : '课表尚未加载'));
+    area.appendChild(favButton('重新加载课表', 'fav-ghost', loadTimetable));
+    return;
+  }
+  const controls = favEl('div', 'timetable-controls');
+  function selectControl(label, choices, value, onChange) {
+    const wrapper = favEl('label', null, label);
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', label);
+    choices.forEach(([key, text]) => { const option = favEl('option', null, text); option.value = key; select.appendChild(option); });
+    select.value = String(value);
+    select.addEventListener('change', () => { onChange(select.value); renderAccountView(); document.querySelector(`.timetable-controls select[aria-label="${label}"]`)?.focus(); });
+    wrapper.appendChild(select); controls.appendChild(wrapper);
+  }
+  selectControl('学期', [['spring', '2026春季学期'], ['summer', '2026暑期学期'], ['fall', '2026秋季学期']], timetableTerm, value => timetableTerm = value);
+  selectControl('周次', [[-1, '全部周次'], ...Array.from({length:31}, (_, i) => [i, `第 ${i} 周`])], timetableWeek, value => timetableWeek = Number(value));
+  area.appendChild(controls);
+  const items = timetableCourses.filter(item => item.term === timetableTerm);
+  area.appendChild(favEl('p', 'timetable-note', '课表按选课网的周次、星期和节次展示。横向滑动可查看整周；点击课程查看详情。'));
+  if (!items.length) { area.appendChild(favEl('p', 'fav-empty', '这个学期还没有课表课程。在课程详情中点击“加入到我的课表”即可添加。')); return; }
+  const scroll = favEl('div', 'timetable-scroll');
+  scroll.tabIndex = 0;
+  scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', '每周课表，可横向滚动');
+  const table = favEl('table', 'timetable-grid');
+  const caption = favEl('caption', 'timetable-note', `${favTermLabel(timetableTerm)} · ${timetableWeek >= 0 ? `第 ${timetableWeek} 周` : '全部周次'}`);
+  table.appendChild(caption);
+  const head = document.createElement('thead'); const header = document.createElement('tr');
+  ['节次', ...WEEKDAYS_CN].forEach(text => { const th = favEl('th', null, text); th.scope = 'col'; header.appendChild(th); }); head.appendChild(header); table.appendChild(head);
+  const tbody = document.createElement('tbody');
+  let conflicts = false;
+  for (let period = 1; period <= 14; period++) {
+    const tr = document.createElement('tr'); const label = favEl('th', null, `${period}节`); label.scope = 'row'; tr.appendChild(label);
+    for (let day = 1; day <= 7; day++) {
+      const td = document.createElement('td'); const matches = [];
+      items.filter(item => item.available !== false).forEach(item => item.sessions.forEach(session => {
+        if (session.day === day && session.start <= period && session.end >= period && sessionInWeek(session, timetableWeek)) matches.push({item, session});
+      }));
+      const overlap = matches.some((a, index) => matches.slice(index + 1).some(b => a.item.course_key !== b.item.course_key && sessionsOverlap(a.session, b.session)));
+      if (overlap) { conflicts = true; td.className = 'timetable-conflict'; }
+      const seen = new Set();
+      matches.forEach(({item, session}) => {
+        if (seen.has(item.course_key)) return; seen.add(item.course_key);
+        const button = favButton(item.course_name, 'timetable-course', () => openFavoriteItem(item));
+        button.appendChild(favEl('span', null, item.classroom || '地点待定'));
+        button.title = `${item.teacher || ''} · ${session.label}`;
+        button.setAttribute('aria-label', `${item.course_name}，${item.classroom || '地点待定'}，${session.label}${overlap ? '，时间可能重叠' : ''}`);
+        td.appendChild(button);
+      });
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody); scroll.appendChild(table); area.appendChild(scroll);
+  if (conflicts) area.appendChild(favEl('p', 'timetable-note', '浅橙色格子中的课程时间可能重叠，请核对周次和选课安排。'));
+  area.appendChild(favEl('h3', null, `课表课程（${items.length}）`));
+  const list = favEl('div', 'timetable-items');
+  items.forEach(item => {
+    const row = favEl('div', 'timetable-item'); const info = favEl('div');
+    const open = favButton(item.course_name, 'fav-ghost', () => openFavoriteItem(item)); open.disabled = item.available === false;
+    info.appendChild(open);
+    info.appendChild(favEl('p', null, `${item.teacher || ''} · ${item.classroom || '地点待定'}`));
+    info.appendChild(favEl('p', null, item.schedule || '上课时间待定'));
+    if (item.unparsed) info.appendChild(favEl('p', null, '部分时间待确认，请以原始上课信息为准。'));
+    if (item.available === false) info.appendChild(favEl('p', null, '课程已不在当前课程库中，仅保留记录，未排入课表。'));
+    row.appendChild(info);
+    row.appendChild(favButton('移除', 'fav-ghost', async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      const username = favUser?.username; ++timetableRequest;
+      const res = await favApi('POST', '/api/timetable/remove', {course_key:item.course_key});
+      if (favUser?.username !== username) return;
+      if (res.ok) { timetableCourses = res.data.courses; updateTimetableButtons(); renderAccountView(); document.querySelector('.account-section-button[data-section="timetable"]')?.focus(); }
+      else { button.disabled = false; favToast(favErrorText(res)); }
+    })); list.appendChild(row);
+  }); area.appendChild(list);
 }
 
 function openPersonal() {
