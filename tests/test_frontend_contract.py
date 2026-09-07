@@ -70,6 +70,27 @@ def function_source(name):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_fall_language_links_and_choices_fall_back_to_chinese(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            const TR_IDX = {{ en: 0, ja: 1 }};
+            let currentLang = 'en';
+            {function_source('displayLanguageForTerm')}
+            {function_source('trCourseName')}
+            assert.equal(displayLanguageForTerm('en', 'fall'), 'zh');
+            assert.equal(displayLanguageForTerm('ja', 'fall'), 'zh');
+            assert.equal(displayLanguageForTerm('en', 'spring'), 'en');
+            assert.equal(displayLanguageForTerm('bad', 'summer'), 'zh');
+            assert.equal(trCourseName({{ id: 'a1', course_name: '中文课名', english_name: 'English' }}), '中文课名');
+            assert.equal(trCourseName({{ id: 'r1', course_name: '研究生课', english_name: 'English' }}), '研究生课');
+            assert.equal(trCourseName({{ id: 'u1', course_name: '春季课', english_name: 'English' }}), 'English');
+        """)
+        self.assertIn('displayLanguageForTerm(currentLang, currentTerm)', function_body('readURLState'))
+        self.assertIn('displayLanguageForTerm(key, currentTerm)', function_body('setLang'))
+        self.assertIn('refreshLangSelectorUI()', function_body('setTerm'))
+        self.assertIn("el.hidden = currentTerm === 'fall'", function_body('refreshLangSelectorUI'))
+        self.assertIn('.font-option[hidden] { display: none; }', HTML)
+
     def run_node(self, script):
         if not NODE:
             self.skipTest("node is unavailable; JavaScript behavior contract skipped")

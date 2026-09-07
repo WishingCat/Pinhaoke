@@ -122,6 +122,9 @@ TERM_DBS = {
 
 VALID_TERMS = frozenset(TERM_DBS)
 VALID_LANGS = frozenset({"zh", "en", "ja", "ko", "fr", "de", "es", "ru"})
+# Fall 2026 was refreshed from the September snapshot; older translations are
+# not authoritative for the new course data. Keep requests compatible in Chinese.
+CHINESE_ONLY_TERMS = frozenset({"fall"})
 VALID_WEEKDAYS = frozenset({"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"})
 # Class-period filter values look like "3-4": a session occupying periods 3 through 4.
 # PKU numbers periods 1-13; 14 is accepted as headroom, matching parse_first_period().
@@ -1228,6 +1231,8 @@ def list_courses(
     page_size: int = Query(50, ge=1, le=200),
 ):
     credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
+    if term in CHINESE_ONLY_TERMS:
+        lang = "zh"
     period_bounds = _period_bounds(period)
 
     filters = {
@@ -1378,6 +1383,8 @@ def get_course_detail(
     term, level, local_id = _parse_id(course_id)
     if level is None:
         raise HTTPException(status_code=404, detail="Course not found")
+    if term in CHINESE_ONLY_TERMS:
+        lang = "zh"
 
     with get_db(term) as conn:
         cur = conn.cursor()

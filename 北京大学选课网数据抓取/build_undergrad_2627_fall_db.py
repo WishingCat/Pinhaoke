@@ -18,7 +18,7 @@ from build_atomic import (  # noqa: E402
 from build_common import parse_first_period, parse_schedule  # noqa: E402
 
 DB_PATH = PROJECT_ROOT / "数据库" / "2026秋季学期本科生课程.db"
-SOURCE = PROJECT_ROOT / "课程数据" / "北大本科课程_26-27第1学期.json"
+SOURCE = PROJECT_ROOT / "课程数据" / "北大本科课程_26-27第1学期_20260907合并.json"
 
 SCHEMA = """
 CREATE TABLE basic_info (

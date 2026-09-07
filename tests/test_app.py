@@ -1,5 +1,6 @@
 from contextlib import closing
 import hashlib
+import importlib
 import json
 import re
 import sqlite3
@@ -1535,6 +1536,27 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(len(courses), first["total"])
         return courses
 
+    def test_fall_language_requests_return_chinese_for_both_levels(self):
+        chinese = self.call(term="fall", q="30301172")
+        self.assertTrue(chinese["courses"])
+        with app.get_db("fall") as conn:
+            graduate_id = conn.execute("SELECT course_id FROM gr.translations WHERE lang='en' LIMIT 1").fetchone()[0]
+        ids = [chinese["courses"][0]["id"], f"r{graduate_id}"]
+        for lang in sorted(app.VALID_LANGS - {"zh"}):
+            with self.subTest(lang=lang):
+                self.assertEqual(self.call(term="fall", lang=lang, q="30301172"), chinese)
+                for course_id in ids:
+                    self.assertEqual(app.get_course_detail(course_id, lang), app.get_course_detail(course_id, "zh"))
+
+    def test_fall_refresh_keeps_old_courses_and_applies_reclassification(self):
+        retained = self.call(term="fall", q="00131421", type="专业课")
+        self.assertEqual(len([c for c in retained["courses"] if c["course_code"] == "00131421"]), 8)
+        moved = self.call(term="fall", q="00100514")
+        card = next(c for c in moved["courses"] if c["id"].startswith("a"))
+        self.assertEqual(card["course_type"], ["公选课"])
+        renamed = self.call(term="fall", q="02432477")
+        self.assertEqual(renamed["courses"][0]["course_name"], "国家安全理论与实践")
+
     def all_ids(self, term, sort="", random_seed=0, lang="zh", q="", page_size=200):
         courses = self.all_courses(
             term=term,
@@ -1639,7 +1661,7 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(params, ["%周三%", "%周三3~4节%"])
 
     def test_card_totals_keep_undergrad_and_graduate_separate(self):
-        self.assertEqual(self.call(term="fall", page_size=1)["total"], 4421)
+        self.assertEqual(self.call(term="fall", page_size=1)["total"], 4529)
         self.assertEqual(self.call(term="spring", page_size=1)["total"], 3701)
         self.assertEqual(self.call(term="summer", page_size=1)["total"], 160)
 
@@ -1790,7 +1812,7 @@ class CourseListTests(unittest.TestCase):
         self.assertEqual(card["category"], sorted(card["category"]))
 
     def test_translated_course_name_is_searchable(self):
-        with app.get_db("fall") as conn:
+        with app.get_db("spring") as conn:
             row = conn.execute(
                 """
                 WITH singleton AS (
@@ -1814,13 +1836,13 @@ class CourseListTests(unittest.TestCase):
             ).fetchone()
 
         sample_id, translated_name = row
-        result = self.all_courses(term="fall", lang="ja", q=translated_name, sort="name_asc")
-        card = next((course for course in result if course["id"] == f"a{sample_id}"), None)
+        result = self.all_courses(term="spring", lang="ja", q=translated_name, sort="name_asc")
+        card = next((course for course in result if course["id"] == f"u{sample_id}"), None)
         self.assertIsNotNone(card)
         self.assertEqual(card["course_name"], translated_name)
 
     def test_translated_classroom_is_searchable(self):
-        with app.get_db("fall") as conn:
+        with app.get_db("spring") as conn:
             row = conn.execute(
                 """
                 SELECT b.id, t.text
@@ -1834,8 +1856,8 @@ class CourseListTests(unittest.TestCase):
             ).fetchone()
 
         sample_id, translated_classroom = row
-        result = self.all_courses(term="fall", lang="en", q=translated_classroom)
-        card = next((course for course in result if course["id"] == f"a{sample_id}"), None)
+        result = self.all_courses(term="spring", lang="en", q=translated_classroom)
+        card = next((course for course in result if course["id"] == f"u{sample_id}"), None)
         self.assertIsNotNone(card)
         self.assertEqual(card["classroom"], translated_classroom)
 
@@ -1980,7 +2002,7 @@ class CourseListTests(unittest.TestCase):
         with app.get_db("fall") as conn:
             total = conn.execute(count_sql, params).fetchone()[0]
             plan = conn.execute(f"EXPLAIN QUERY PLAN {count_sql}", params).fetchall()
-        self.assertEqual(total, 4421)
+        self.assertEqual(total, 4529)
         plan_details = [step["detail"] for step in plan]
         self.assertFalse(any("ranked" in detail or "badges" in detail for detail in plan_details))
 
@@ -2081,29 +2103,18 @@ class ValidationAndDetailTests(unittest.TestCase):
         self.assertEqual(detail["reference_book"], row["reference_book"])
 
     def assert_translated_book_field_replaces_source_text(self, field):
-        with app.get_db("fall") as conn:
-            row = conn.execute(
-                """
-                SELECT b.id, t.text
-                FROM translations t
-                JOIN basic_info b ON b.id = t.course_id
-                JOIN detail_info d ON d.course_id = b.id
-                WHERE t.lang = 'en'
-                  AND t.field = ?
-                  AND TRIM(t.text) != ''
-                  AND t.text != CASE t.field
-                      WHEN 'textbook' THEN COALESCE(d.textbook, '')
-                      ELSE COALESCE(d.reference_book, '')
-                  END
-                ORDER BY b.id, t.field
-                LIMIT 1
-                """,
-                (field,),
-            ).fetchone()
-
-        self.assertIsNotNone(row)
-        detail = app.get_course_detail(f"a{row['id']}", lang="en")
-        self.assertEqual(detail[field], row["text"])
+        schema = importlib.import_module("北京大学选课网数据抓取.build_undergrad_2627_fall_db").SCHEMA
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / "books.db"
+            with closing(sqlite3.connect(database)) as conn:
+                conn.executescript(schema)
+                conn.execute("INSERT INTO basic_info(id,course_type,course_code,class_no) VALUES(1,'专业课','TEST','1')")
+                conn.execute("INSERT INTO detail_info(course_id,textbook,reference_book) VALUES(1,'中文教材','中文参考书')")
+                conn.execute("INSERT INTO translations VALUES(1,?,'en','Translated book')", (field,))
+                conn.commit()
+            with patch.dict(app.TERM_DBS, {"spring": [("main", database, "u")]}):
+                detail = app.get_course_detail("u1", lang="en")
+            self.assertEqual(detail[field], "Translated book")
 
     def test_translated_textbook_replaces_source_text(self):
         self.assert_translated_book_field_replaces_source_text("textbook")

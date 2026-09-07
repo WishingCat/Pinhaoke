@@ -507,6 +507,7 @@ html[data-theme="dark"] .about-title { background-image: linear-gradient(118deg,
 }
 
 .font-option:hover { background: var(--bg); color: var(--ink); }
+.font-option[hidden] { display: none; }
 
 .font-option.active {
   color: var(--accent);
@@ -3046,11 +3047,17 @@ function trSchedule(s) {
   return translated;
 }
 
-// Course name: prefer english_name for EN
+// Fall course names remain Chinese even when opened from another term's favorites.
 function trCourseName(course) {
   if (!course) return '';
-  if (currentLang === 'en' && course.english_name) return course.english_name;
+  const chineseOnly = /^[ar][1-9][0-9]*$/.test(String(course.id || ''));
+  if (!chineseOnly && currentLang === 'en' && course.english_name) return course.english_name;
   return course.course_name || '';
+}
+
+function displayLanguageForTerm(language, term) {
+  if (term === 'fall') return 'zh';
+  return language === 'zh' || TR_IDX[language] !== undefined ? language : 'zh';
 }
 
 /* ===== Global state ===== */
@@ -3122,6 +3129,7 @@ function readURLState() {
   const lang = p.get('lang');
   if (lang && (lang === 'zh' || TR_IDX[lang] !== undefined)) currentLang = lang;
   if (TERMS.has(p.get('term'))) currentTerm = p.get('term');
+  currentLang = displayLanguageForTerm(currentLang, currentTerm);
   document.getElementById('searchInput').value = p.get('q') || '';
   document.getElementById('filterClassroom').value = p.get('room') || '';
   csValues.filterCourseType = p.get('type') || '';
@@ -3165,15 +3173,17 @@ function syncURL() {
 
 /* ===== Language selector ===== */
 function refreshLangSelectorUI() {
+  currentLang = displayLanguageForTerm(currentLang, currentTerm);
   document.getElementById('langLabel').textContent = i18n[currentLang].name;
   document.querySelectorAll('#langDropdown .font-option').forEach(el => {
     el.classList.toggle('active', el.dataset.lang === currentLang);
+    el.hidden = currentTerm === 'fall' && el.dataset.lang !== 'zh';
   });
 }
 
 function setLang(key) {
-  currentLang = key;
-  try { localStorage.setItem('pinhaoke_lang', key); } catch (e) {}
+  currentLang = displayLanguageForTerm(key, currentTerm);
+  try { localStorage.setItem('pinhaoke_lang', currentLang); } catch (e) {}
   refreshLangSelectorUI();
   closeLangDropdown();
   applyI18n();
@@ -3336,6 +3346,7 @@ async function setTerm(term) {
   if (fetchController) fetchController.abort();
   const requestedTerm = term;
   currentTerm = requestedTerm;
+  refreshLangSelectorUI();
   hasMore = false;
   refreshTermToggleUI();
 
