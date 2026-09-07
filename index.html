@@ -4160,7 +4160,9 @@ function closeModal({ viaPopstate = false } = {}) {
     if (!viaPopstate && owned) { try { history.back(); } catch (e) {} }
     const backTarget = modalReturnFocus;
     modalReturnFocus = null;
-    if (backTarget && backTarget.isConnected) requestAnimationFrame(() => backTarget.focus());
+    const courseTarget = Array.from(view?.querySelectorAll('[data-saved-course-id]') || []).find(element => element.dataset.savedCourseId === backTarget?.dataset.savedCourseId);
+    const focusTarget = backTarget?.isConnected ? backTarget : (courseTarget || view?.querySelector('.account-section-button[aria-pressed="true"]') || document.getElementById('accountBack'));
+    if (focusTarget) requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
     return;
   }
   document.body.style.overflow = '';
@@ -5498,6 +5500,7 @@ function renderFavList() {
 function buildFavItem(item) {
   const row = createCard(item, () => { if (item.available !== false) openFavoriteItem(item); });
   row.classList.add('fav-course-card');
+  row.dataset.savedCourseId = item.id;
   if (item.available === false) {
     row.removeAttribute('role');
     row.tabIndex = -1;
@@ -5598,10 +5601,14 @@ function createTimetableButton(course) {
   const label = timetableHas(course) ? '已加入课表' : '加入课表';
   const button = favButton('', 'modal-action timetable-add', async () => {
     if (!favUser) { pendingTimetableId = course.id; favTab = 'login'; openFavorites(); return; }
-    if (timetableHas(course)) { favToast('课程已在个人中心的“我的课表”中'); return; }
     button.disabled = true;
-    await addToTimetable(course.id);
-    button.disabled = false;
+    try {
+      if (!timetableLoaded) await loadTimetable();
+      if (!favUser || !timetableLoaded) return;
+      const saved = timetableCourses.find(item => item.id === course.id || item.course_key === favoriteKey(course));
+      if (saved) await removeFromTimetable(saved.course_key);
+      else await addToTimetable(course.id);
+    } finally { button.disabled = false; }
   });
   button.innerHTML = ICONS.calendar;
   button.appendChild(favEl('span', null, label));
@@ -5641,6 +5648,21 @@ async function addToTimetable(id) {
     if (accountViewOpen && accountSection === 'timetable') renderAccountView();
     favToast('已加入我的课表，可在个人中心查看');
   } else favToast(favErrorText(res, { 404: '课程已不在当前课程库中' }));
+}
+
+async function removeFromTimetable(courseKey) {
+  const username = favUser?.username;
+  const request = ++timetableRequest;
+  const res = await favApi('POST', '/api/timetable/remove', { course_key: courseKey });
+  if (!favUser || favUser.username !== username || request !== timetableRequest) return false;
+  if (!res.ok) { favToast(favErrorText(res)); return false; }
+  timetableCourses = res.data.courses;
+  timetableLoaded = true;
+  timetableLoading = false;
+  updateTimetableButtons();
+  if (accountViewOpen && accountSection === 'timetable') renderAccountView();
+  favToast('已从我的课表移除');
+  return true;
 }
 
 function sessionInWeek(session, week) {
@@ -5701,6 +5723,7 @@ function renderTimetable(body) {
       matches.forEach(({item, session}) => {
         if (seen.has(item.course_key)) return; seen.add(item.course_key);
         const button = favButton(item.course_name, 'timetable-course', () => openFavoriteItem(item));
+        button.dataset.savedCourseId = item.id;
         button.appendChild(favEl('span', null, item.classroom || '地点待定'));
         button.title = `${item.teacher || ''} · ${session.label}`;
         button.setAttribute('aria-label', `${item.course_name}，${item.classroom || '地点待定'}，${session.label}${overlap ? '，时间可能重叠' : ''}`);
@@ -5716,7 +5739,7 @@ function renderTimetable(body) {
   const list = favEl('div', 'timetable-items');
   items.forEach(item => {
     const row = favEl('div', 'timetable-item'); const info = favEl('div');
-    const open = favButton(item.course_name, 'fav-ghost', () => openFavoriteItem(item)); open.disabled = item.available === false;
+    const open = favButton(item.course_name, 'fav-ghost', () => openFavoriteItem(item)); open.dataset.savedCourseId = item.id; open.disabled = item.available === false;
     info.appendChild(open);
     info.appendChild(favEl('p', null, `${item.teacher || ''} · ${item.classroom || '地点待定'}`));
     info.appendChild(favEl('p', null, item.schedule || '上课时间待定'));
@@ -5726,11 +5749,8 @@ function renderTimetable(body) {
     row.appendChild(favButton('移除', 'fav-ghost', async event => {
       const button = event.currentTarget;
       button.disabled = true;
-      const username = favUser?.username; ++timetableRequest;
-      const res = await favApi('POST', '/api/timetable/remove', {course_key:item.course_key});
-      if (favUser?.username !== username) return;
-      if (res.ok) { timetableCourses = res.data.courses; updateTimetableButtons(); renderAccountView(); document.querySelector('.account-section-button[data-section="timetable"]')?.focus(); }
-      else { button.disabled = false; favToast(favErrorText(res)); }
+      if (await removeFromTimetable(item.course_key)) document.querySelector('.account-section-button[data-section="timetable"]')?.focus();
+      else button.disabled = false;
     })); list.appendChild(row);
   }); area.appendChild(list);
 }
@@ -5808,9 +5828,15 @@ function trapAccountFocus(event) {
 function renderAccountView() {
   const body = document.getElementById('accountBody');
   if (!body || !favUser) return;
+  const top = body.scrollTop;
+  const grid = body.querySelector('.timetable-scroll');
+  const gridPosition = grid ? { top: grid.scrollTop, left: grid.scrollLeft } : null;
   body.textContent = '';
   favBusy = false;
   renderFavAccount(body);
+  body.scrollTop = top;
+  const nextGrid = body.querySelector('.timetable-scroll');
+  if (gridPosition && nextGrid) { nextGrid.scrollTop = gridPosition.top; nextGrid.scrollLeft = gridPosition.left; }
 }
 
 function renderCollections(container) {

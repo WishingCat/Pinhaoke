@@ -113,6 +113,36 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("favToggle.before(timetableAction)", function_body('showDetail'))
         self.assertIn("createCard(item", function_body('buildFavItem'))
 
+    def test_timetable_button_toggles_and_preserves_state_on_failure(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            let favUser = {{username:'qa'}}, timetableCourses = [], timetableLoaded = false;
+            let timetableLoading = false, timetableRequest = 0, accountViewOpen = false;
+            let failRemove = false, callback, loaded = 0, added = 0;
+            const ICONS = {{calendar:'<svg></svg>'}};
+            const course = {{id:'a1'}}, favoriteKey = () => 'stable-key';
+            const favButton = (text, cls, cb) => {{ callback=cb; return {{dataset:{{}}, appendChild(){{}}, setAttribute(){{}}}}; }};
+            const favEl = () => ({{}}), favToast = () => {{}}, updateTimetableButtons = () => {{}};
+            const favErrorText = () => 'error';
+            const loadTimetable = async () => {{ loaded++; timetableLoaded=true; }};
+            const addToTimetable = async () => {{ added++; timetableCourses=[{{id:'a1',course_key:'stable-key'}}]; }};
+            const favApi = async (method,url,payload) => {{
+                assert.equal(url,'/api/timetable/remove');
+                assert.equal(payload.course_key,'stable-key');
+                return failRemove ? {{ok:false}} : {{ok:true,data:{{courses:[]}}}};
+            }};
+            {function_source('timetableHas')}
+            {function_source('removeFromTimetable')}
+            {function_source('createTimetableButton')}
+            (async () => {{
+                const button=createTimetableButton(course);
+                await callback(); assert.equal(added,1); assert.equal(loaded,1);
+                failRemove=true; await callback(); assert.equal(timetableCourses.length,1); assert.equal(button.disabled,false);
+                failRemove=false; await callback(); assert.equal(timetableCourses.length,0);
+                await callback(); assert.equal(added,2); assert.equal(button.disabled,false);
+            }})().catch(error => {{ console.error(error); process.exit(1); }});
+        """)
+
     def run_node(self, script):
         if not NODE:
             self.skipTest("node is unavailable; JavaScript behavior contract skipped")
