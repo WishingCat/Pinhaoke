@@ -1636,6 +1636,8 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   letter-spacing: 0;
 }
 
+.course-save-actions { display: flex; align-items: center; gap: 8px; }
+
 .modal-head-actions {
   display: flex;
   align-items: center;
@@ -2039,6 +2041,13 @@ html[data-theme="dark"] .site-footer::after {
   .modal-grid { grid-template-columns: 1fr; gap: 12px; }
   .modal-action span { display: none; }
   .modal-action { padding: 7px 9px; }
+  .course-detail-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .course-detail-head .modal-title { grid-column: 1; grid-row: 1; }
+  .course-detail-head .modal-head-actions { display: contents; }
+  .course-detail-head .modal-close { grid-column: 2; grid-row: 1; }
+  .course-save-actions { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .course-save-actions .modal-action { flex: 1; justify-content: center; min-height: 40px; }
+  .course-save-actions .modal-action span { display: inline; }
   .fav-btn { width: 30px; height: 30px; }
   .fav-status, .fav-seg, .fav-form, .fav-account, .fav-manage, .fav-list { padding-left: 14px; padding-right: 14px; }
   .back-top { right: 14px; bottom: 18px; }
@@ -2423,8 +2432,8 @@ window._hmt.push(['_trackPageview', location.pathname]);
 <div class="modal-overlay" id="favOverlay" role="dialog" aria-modal="true" aria-labelledby="favTitle" onclick="if(event.target===this)closeFavorites()">
   <div class="msg-panel fav-panel">
     <div class="msg-head">
-      <span class="modal-title" id="favTitle">我的收藏<span class="fav-count" id="favCount"></span></span>
-      <button class="modal-close" onclick="closeFavorites()" aria-label="关闭我的收藏">&times;</button>
+      <span class="modal-title" id="favTitle">个人中心<span class="fav-count" id="favCount"></span></span>
+      <button class="modal-close" onclick="closeFavorites()" aria-label="关闭账号面板">&times;</button>
     </div>
     <p class="fav-status" id="favStatus" role="status" aria-live="polite"></p>
     <div class="fav-body" id="favBody"></div>
@@ -2462,7 +2471,7 @@ const i18n = {
     labelWeekday: '星期几', labelPeriod: '上课节时', labelClassroom: '教室',
     classroomPlaceholder: '输入教室名称...',
     clearBtn: '清除筛选', loadMoreText: '加载更多',
-    filtersBtn: '筛选', selectSearch: '搜索…', copyLink: '复制链接', copied: '已复制', closeModal: '关闭课程详情',
+    filtersBtn: '筛选', selectSearch: '搜索…', closeModal: '关闭课程详情',
     favAdd: '加入收藏', favRemove: '取消收藏', myFavorites: '我的收藏', favLogin: '登录', favAccount: '个人',
     loadingText: '正在加载课程数据...',
     emptyText: '未找到匹配的课程',
@@ -2503,7 +2512,7 @@ const i18n = {
     labelWeekday: 'Weekday', labelPeriod: 'Periods', labelClassroom: 'Classroom',
     classroomPlaceholder: 'Enter classroom name...',
     clearBtn: 'Clear Filters', loadMoreText: 'Load More',
-    filtersBtn: 'Filters', selectSearch: 'Search…', copyLink: 'Copy Link', copied: 'Copied', closeModal: 'Close course details',
+    filtersBtn: 'Filters', selectSearch: 'Search…', closeModal: 'Close course details',
     favAdd: 'Add to favorites', favRemove: 'Remove from favorites', myFavorites: 'My favorites', favLogin: 'Sign in', favAccount: 'Account',
     loadingText: 'Loading course data...',
     emptyText: 'No matching courses found',
@@ -2544,7 +2553,7 @@ const i18n = {
     labelWeekday: '曜日', labelPeriod: '時限', labelClassroom: '教室',
     classroomPlaceholder: '教室名を入力...',
     clearBtn: 'クリア', loadMoreText: 'もっと見る',
-    filtersBtn: 'フィルター', selectSearch: '検索…', copyLink: 'リンクをコピー', copied: 'コピーしました', closeModal: '授業詳細を閉じる',
+    filtersBtn: 'フィルター', selectSearch: '検索…', closeModal: '授業詳細を閉じる',
     favAdd: 'お気に入りに追加', favRemove: 'お気に入りから削除', myFavorites: 'お気に入り', favLogin: 'ログイン', favAccount: 'アカウント',
     loadingText: 'データを読み込み中...',
     emptyText: '該当する授業が見つかりません',
@@ -2585,7 +2594,7 @@ const i18n = {
     labelWeekday: '요일', labelPeriod: '교시', labelClassroom: '강의실',
     classroomPlaceholder: '강의실명 입력...',
     clearBtn: '초기화', loadMoreText: '더 보기',
-    filtersBtn: '필터', selectSearch: '검색…', copyLink: '링크 복사', copied: '복사됨', closeModal: '강좌 상세 닫기',
+    filtersBtn: '필터', selectSearch: '검색…', closeModal: '강좌 상세 닫기',
     favAdd: '즐겨찾기에 추가', favRemove: '즐겨찾기에서 제거', myFavorites: '내 즐겨찾기', favLogin: '로그인', favAccount: '계정',
     loadingText: '데이터 로딩 중...',
     emptyText: '일치하는 강좌가 없습니다',
@@ -2626,7 +2635,7 @@ const i18n = {
     labelWeekday: 'Jour', labelPeriod: 'Cr\u00e9neau', labelClassroom: 'Salle',
     classroomPlaceholder: 'Nom de la salle...',
     clearBtn: 'R\u00e9initialiser', loadMoreText: 'Voir plus',
-    filtersBtn: 'Filtres', selectSearch: 'Rechercher…', copyLink: 'Copier le lien', copied: 'Copi\u00e9', closeModal: 'Fermer les d\u00e9tails du cours',
+    filtersBtn: 'Filtres', selectSearch: 'Rechercher…', closeModal: 'Fermer les d\u00e9tails du cours',
     favAdd: 'Ajouter aux favoris', favRemove: 'Retirer des favoris', myFavorites: 'Mes favoris', favLogin: 'Connexion', favAccount: 'Compte',
     loadingText: 'Chargement des donn\u00e9es...',
     emptyText: 'Aucun cours trouv\u00e9',
@@ -2667,7 +2676,7 @@ const i18n = {
     labelWeekday: 'Wochentag', labelPeriod: 'Stunde', labelClassroom: 'Raum',
     classroomPlaceholder: 'Raumname eingeben...',
     clearBtn: 'Zur\u00fccksetzen', loadMoreText: 'Mehr laden',
-    filtersBtn: 'Filter', selectSearch: 'Suchen…', copyLink: 'Link kopieren', copied: 'Kopiert', closeModal: 'Kursdetails schlie\u00dfen',
+    filtersBtn: 'Filter', selectSearch: 'Suchen…', closeModal: 'Kursdetails schlie\u00dfen',
     favAdd: 'Zu Favoriten hinzuf\u00fcgen', favRemove: 'Aus Favoriten entfernen', myFavorites: 'Meine Favoriten', favLogin: 'Anmelden', favAccount: 'Konto',
     loadingText: 'Daten werden geladen...',
     emptyText: 'Keine passenden Kurse gefunden',
@@ -2708,7 +2717,7 @@ const i18n = {
     labelWeekday: 'D\u00eda', labelPeriod: 'Sesi\u00f3n', labelClassroom: 'Aula',
     classroomPlaceholder: 'Nombre del aula...',
     clearBtn: 'Limpiar', loadMoreText: 'Cargar m\u00e1s',
-    filtersBtn: 'Filtros', selectSearch: 'Buscar…', copyLink: 'Copiar enlace', copied: 'Copiado', closeModal: 'Cerrar detalles del curso',
+    filtersBtn: 'Filtros', selectSearch: 'Buscar…', closeModal: 'Cerrar detalles del curso',
     favAdd: 'A\u00f1adir a favoritos', favRemove: 'Quitar de favoritos', myFavorites: 'Mis favoritos', favLogin: 'Iniciar sesi\u00f3n', favAccount: 'Cuenta',
     loadingText: 'Cargando datos...',
     emptyText: 'No se encontraron cursos',
@@ -2749,7 +2758,7 @@ const i18n = {
     labelWeekday: 'День', labelPeriod: 'Периоды', labelClassroom: 'Аудитория',
     classroomPlaceholder: 'Название аудитории...',
     clearBtn: 'Сбросить', loadMoreText: 'Загрузить ещё',
-    filtersBtn: 'Фильтры', selectSearch: 'Поиск…', copyLink: 'Копировать ссылку', copied: 'Скопировано', closeModal: 'Закрыть сведения о курсе',
+    filtersBtn: 'Фильтры', selectSearch: 'Поиск…', closeModal: 'Закрыть сведения о курсе',
     favAdd: 'В избранное', favRemove: 'Убрать из избранного', myFavorites: 'Моё избранное', favLogin: 'Войти', favAccount: 'Аккаунт',
     loadingText: 'Загрузка данных...',
     emptyText: 'Курсы не найдены',
@@ -3964,11 +3973,12 @@ async function showDetail(courseId, opts = {}) {
     content.dataset.strip = stripKey(c.course_type);
 
     let html = `
-      <div class="modal-head">
+      <div class="modal-head course-detail-head">
         <span class="modal-title" id="modalTitle">${esc(trCourseName(c))}</span>
         <div class="modal-head-actions">
+          <div class="course-save-actions">
           <button class="modal-action" id="favToggleBtn" type="button" aria-pressed="false" data-key="${esc(favoriteKey(c))}" aria-label="${esc(lang.favAdd)}">${ICONS.star}<span>${esc(lang.favAdd)}</span></button>
-          <button class="modal-action" id="copyLinkBtn" onclick="copyCourseLink()" aria-label="${esc(lang.copyLink)}">${ICONS.link}<span>${esc(lang.copyLink)}</span></button>
+          </div>
           <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
         </div>
       </div>
@@ -4092,52 +4102,6 @@ async function showDetail(courseId, opts = {}) {
         <button class="modal-close" onclick="closeModal()" aria-label="${esc(lang.closeModal)}">&times;</button>
       </div>`;
     focusModalClose();
-  }
-}
-
-async function copyCourseLink() {
-  if (!currentModalCourseId) return;
-  syncURL();
-  const url = location.href;
-  const modalOverlay = document.getElementById('modalOverlay');
-  const focusBeforeCopy = modalOverlay.contains(document.activeElement)
-    ? document.activeElement
-    : document.getElementById('copyLinkBtn');
-  let ok = false;
-  try {
-    await navigator.clipboard.writeText(url);
-    ok = true;
-  } catch (e) {
-    // http / older browsers: fall back to a hidden textarea + execCommand.
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      ta.setAttribute('aria-hidden', 'true');
-      const fallbackHost = modalOverlay.classList.contains('open')
-        ? document.getElementById('modalContent')
-        : document.body;
-      fallbackHost.appendChild(ta);
-      try {
-        ta.select();
-        ok = document.execCommand('copy');
-      } finally {
-        ta.remove();
-        if (focusBeforeCopy && focusBeforeCopy.isConnected) {
-          focusBeforeCopy.focus();
-        } else if (modalOverlay.classList.contains('open')) {
-          document.getElementById('copyLinkBtn')?.focus();
-        }
-      }
-    } catch (e2) { ok = false; }
-  }
-  const btn = document.getElementById('copyLinkBtn');
-  if (btn && ok) {
-    const span = btn.querySelector('span');
-    const original = span.textContent;
-    span.textContent = i18n[currentLang].copied;
-    setTimeout(() => { span.textContent = original; }, 1600);
   }
 }
 
@@ -5037,7 +5001,7 @@ function renderFavoritesPanel(options = {}) {
 
 function renderFavAuth(body) {
   body.appendChild(favEl('p', 'msg-hint',
-    '登录后收藏会同步到你的所有设备。用户名建议与真实身份无关，不收集邮箱或手机号；忘记密码只能靠密保问题找回。'));
+    '登录后收藏和课表会同步到你的所有设备。用户名建议与真实身份无关，不收集邮箱或手机号；忘记密码只能靠密保问题找回。'));
   const seg = favEl('div', 'fav-seg');
   seg.setAttribute('aria-label', '账号操作');
   [['login', '登录'], ['register', '注册'], ['reset', '找回密码']].forEach(([key, label]) => {

@@ -854,19 +854,15 @@ class FrontendContractTests(unittest.TestCase):
                 self.assertIn("const filtersLoaded = await loadFiltersForCurrentTerm()", body)
                 self.assertIn("if (!filtersLoaded", body)
 
-    def test_copy_syncs_and_uses_complete_location(self):
-        body = function_body("copyCourseLink")
-        self.assertIn("syncURL()", body)
-        self.assertIn("location.href", body)
-        self.assertNotIn("location.origin + location.pathname", body)
-
-    def test_clipboard_fallback_stays_in_modal_and_restores_modal_focus(self):
-        body = function_body("copyCourseLink")
-        self.assertIn("fallbackHost", body)
-        self.assertIn("modalOverlay", body)
-        self.assertIn("focusBeforeCopy", body)
-        self.assertIn("fallbackHost.appendChild(ta)", body)
-        self.assertIn("focusBeforeCopy.focus()", body)
+    def test_course_actions_and_personal_title_match_mobile_layout(self):
+        self.assertNotIn('copyCourseLink', HTML)
+        self.assertNotIn('copyLinkBtn', HTML)
+        detail = function_body('showDetail')
+        self.assertIn('class="modal-head course-detail-head"', detail)
+        self.assertIn('class="course-save-actions"', detail)
+        self.assertIn('.course-save-actions .modal-action span { display: inline; }', HTML)
+        self.assertIn('id="favTitle">个人中心', HTML)
+        self.assertIn('body.appendChild(seg)', function_body('renderFavAuth'))
 
     def test_sync_url_executes_complete_state_and_omits_default_fall(self):
         source = function_source("syncURL")
@@ -1098,7 +1094,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn("favOverlay", REVIEWS_HTML)
         # 面板语义、状态区与滚动容器
         self.assertIn('id="favOverlay" role="dialog" aria-modal="true" aria-labelledby="favTitle"', HTML)
-        self.assertIn('aria-label="关闭我的收藏"', HTML)
+        self.assertIn('aria-label="关闭账号面板"', HTML)
         self.assertIn('id="favStatus" role="status" aria-live="polite"', HTML)
         self.assertIn(".fav-body { flex: 1; min-height: 0; overflow-y: auto;", HTML)
         self.assertIn("function trapFavFocus", HTML)
