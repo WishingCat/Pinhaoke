@@ -132,12 +132,16 @@ html:not([data-theme="dark"]) .theme-sun { display: none; }
 .about-row { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 12px; align-items: baseline; }
 .about-row dt { margin: 0; font-size: 0.74rem; font-weight: 400; color: var(--ink-3); }
 .about-row dd { display: grid; gap: 4px; margin: 0; font-size: 0.82rem; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
-.about-contact-id { font-weight: 500; }
-.about-contact-note { margin: 16px 0 0; font-size: 0.72rem; line-height: 1.6; color: var(--ink-3); }
+.about-contact { margin-top: -8px; }
+.about-contact dt { font-weight: 600; color: var(--ink-2); }
+.about-contact-id { font-size: 0.94rem; font-weight: 700; color: var(--accent); }
+.about-contact-note { margin: 0; font-size: 0.72rem; line-height: 1.6; color: var(--ink-2); }
 .about-links-wrap { margin: 0 20px; padding: 16px 0 20px; border-top: 1px solid var(--border); }
 .about-links { display: flex; gap: 10px; }
 .about-link-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.8rem; font-weight: 500; line-height: 1.4; text-decoration: none; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
 .about-link-btn:hover { color: var(--ink); border-color: var(--ink-3); background: var(--surface-2); }
+.about-sponsor { background: #b42332; border-color: #b42332; color: #fff; font-weight: 600; }
+.about-sponsor:hover { background: #961c2a; border-color: #961c2a; color: #fff; }
 
 .page { width: min(1120px, 100%); margin: 0 auto; padding: 0 28px 80px; }
 .page-head { display: block; position: relative; text-align: center; padding: 56px 16px 8px; animation: enter 0.35s ease-out both; }
@@ -533,10 +537,9 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
           <div class="about-body">
             <dl class="about-details">
               <div class="about-row"><dt>项目开发</dt><dd>Zengji Tu</dd></div>
+              <div class="about-row about-contact"><dt>微信联系</dt><dd><strong class="about-contact-id">tuzengji</strong><p class="about-contact-note">如果有问题或需求 欢迎联系！</p></dd></div>
               <div class="about-row"><dt>鸣谢</dt><dd><span>Ningjing Wang</span><span>Tingyi Huang</span></dd></div>
-              <div class="about-row"><dt>微信联系</dt><dd><span class="about-contact-id">tuzengji</span></dd></div>
             </dl>
-            <p class="about-contact-note">如果有问题或需求 欢迎联系！</p>
           </div>
           <div class="about-links-wrap">
             <div class="about-links">

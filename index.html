@@ -365,12 +365,16 @@ html:not([data-theme="dark"]) .theme-icon-sun { display: none; }
 .about-row { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 12px; align-items: baseline; }
 .about-row dt { margin: 0; font-size: 0.74rem; font-weight: 400; color: var(--ink-3); }
 .about-row dd { display: grid; gap: 4px; margin: 0; font-size: 0.82rem; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
-.about-contact-id { font-weight: 500; }
-.about-contact-note { margin: 16px 0 0; font-size: 0.72rem; line-height: 1.6; color: var(--ink-3); }
+.about-contact { margin-top: -8px; }
+.about-contact dt { font-weight: 600; color: var(--ink-2); }
+.about-contact-id { font-size: 0.94rem; font-weight: 700; color: var(--accent); }
+.about-contact-note { margin: 0; font-size: 0.72rem; line-height: 1.6; color: var(--ink-2); }
 .about-links-wrap { margin: 0 20px; padding: 16px 0 20px; border-top: 1px solid var(--border); }
 .about-links { display: flex; gap: 10px; }
 .about-link-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.8rem; font-weight: 500; line-height: 1.4; text-decoration: none; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
 .about-link-btn:hover { color: var(--ink); border-color: var(--ink-3); background: var(--surface-2); }
+.about-sponsor { background: #b42332; border-color: #b42332; color: #fff; font-weight: 600; }
+.about-sponsor:hover { background: #961c2a; border-color: #961c2a; color: #fff; }
 
 /* lang dropdown */
 .font-selector { position: relative; }
@@ -2087,9 +2091,9 @@ html[data-theme="dark"] .site-footer::after {
 .fav-course-card { animation: none; }
 .fav-course-card .fav-item-remove { position: static; width: 30px; height: 30px; }
 .account-sections { display: flex; gap: 10px; margin: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-.account-section-button, .timetable-add { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--surface); font-size: 0.85rem; }
+.account-section-button { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--surface); font-size: 0.85rem; }
 .account-section-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
-.timetable-add { display: block; width: 100%; margin-bottom: 18px; color: var(--accent); font-weight: 600; }
+.timetable-add[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-mist); }
 .timetable-add:disabled { opacity: 0.6; cursor: wait; }
 .timetable { margin: 18px; }
 .timetable-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
@@ -2180,10 +2184,9 @@ window._hmt.push(['_trackPageview', location.pathname]);
           <div class="about-body">
             <dl class="about-details">
               <div class="about-row"><dt>项目开发</dt><dd>Zengji Tu</dd></div>
+              <div class="about-row about-contact"><dt>微信联系</dt><dd><strong class="about-contact-id">tuzengji</strong><p class="about-contact-note">如果有问题或需求 欢迎联系！</p></dd></div>
               <div class="about-row"><dt>鸣谢</dt><dd><span>Ningjing Wang</span><span>Tingyi Huang</span></dd></div>
-              <div class="about-row"><dt>微信联系</dt><dd><span class="about-contact-id">tuzengji</span></dd></div>
             </dl>
-            <p class="about-contact-note">如果有问题或需求 欢迎联系！</p>
           </div>
           <div class="about-links-wrap">
             <div class="about-links">
@@ -2990,6 +2993,7 @@ const HIDDEN_CATEGORIES = {
 
 /* ===== Inline SVG icons (stroke = currentColor) ===== */
 const ICONS = {
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2"/></svg>',
   teacher: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
   dept: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>',
   time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
@@ -4060,7 +4064,7 @@ async function showDetail(courseId) {
     favToggle.addEventListener('click', () => toggleFavorite(c, favToggle));
     syncFavButton(favToggle, lang);
     const timetableAction = createTimetableButton(c);
-    content.querySelector('.modal-body').prepend(timetableAction);
+    favToggle.before(timetableAction);
     if (favUser && !timetableLoaded) loadTimetable();
     refreshDetailChooser();
     if (!overlay.contains(document.activeElement)) focusModalClose();
@@ -5548,19 +5552,27 @@ function timetableHas(course) {
 function updateTimetableButtons() {
   document.querySelectorAll('.timetable-add').forEach(button => {
     const added = timetableCourses.some(item => item.id === button.dataset.courseId || item.course_key === button.dataset.courseKey);
-    button.textContent = added ? '已加入我的课表' : '加入到我的课表';
+    const label = added ? '已加入课表' : '加入课表';
+    button.querySelector('span').textContent = label;
+    button.setAttribute('aria-label', label);
+    button.title = label;
     button.setAttribute('aria-pressed', String(added));
   });
 }
 
 function createTimetableButton(course) {
-  const button = favButton(timetableHas(course) ? '已加入我的课表' : '加入到我的课表', 'timetable-add', async () => {
+  const label = timetableHas(course) ? '已加入课表' : '加入课表';
+  const button = favButton('', 'modal-action timetable-add', async () => {
     if (!favUser) { pendingTimetableId = course.id; favTab = 'login'; openFavorites(); return; }
     if (timetableHas(course)) { favToast('课程已在个人中心的“我的课表”中'); return; }
     button.disabled = true;
     await addToTimetable(course.id);
     button.disabled = false;
   });
+  button.innerHTML = ICONS.calendar;
+  button.appendChild(favEl('span', null, label));
+  button.setAttribute('aria-label', label);
+  button.title = label;
   button.dataset.courseId = course.id;
   button.dataset.courseKey = favoriteKey(course);
   button.setAttribute('aria-pressed', String(timetableHas(course)));
@@ -5631,7 +5643,7 @@ function renderTimetable(body) {
   area.appendChild(controls);
   const items = timetableCourses.filter(item => item.term === timetableTerm);
   area.appendChild(favEl('p', 'timetable-note', '课表按选课网的周次、星期和节次展示。横向滑动可查看整周；点击课程查看详情。'));
-  if (!items.length) { area.appendChild(favEl('p', 'fav-empty', '这个学期还没有课表课程。在课程详情中点击“加入到我的课表”即可添加。')); return; }
+  if (!items.length) { area.appendChild(favEl('p', 'fav-empty', '这个学期还没有课表课程。在课程详情中点击“加入课表”即可添加。')); return; }
   const scroll = favEl('div', 'timetable-scroll');
   scroll.tabIndex = 0;
   scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', '每周课表，可横向滚动');

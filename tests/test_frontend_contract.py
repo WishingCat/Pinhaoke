@@ -110,6 +110,7 @@ class FrontendContractTests(unittest.TestCase):
         """)
         self.assertNotIn('innerHTML', function_body('renderTimetable'))
         self.assertIn("createTimetableButton(c)", function_body('showDetail'))
+        self.assertIn("favToggle.before(timetableAction)", function_body('showDetail'))
         self.assertIn("createCard(item", function_body('buildFavItem'))
 
     def run_node(self, script):
