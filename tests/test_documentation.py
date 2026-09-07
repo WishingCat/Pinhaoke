@@ -64,6 +64,9 @@ class DocumentationTests(unittest.TestCase):
         text = read("README.md")
         self.assertIn("https://www.pinhaoke.love", text)
         self.assertIn("### 留言板", text)
+        for fact in ("POST /api/messages/{message_id}/replies", "GET /api/changelog",
+                     "POST /api/account/nickname", "路过的 PKUer", "历史发言", "changelog.json"):
+            self.assertIn(fact, text)
         self.assertIn("公开留言", text)
         self.assertIn("### 访问统计", text)
         self.assertIn("### 收藏与账号", text)
@@ -129,6 +132,12 @@ class DocumentationTests(unittest.TestCase):
             "GET /api/review-courses",
             "GET /api/messages",
             "POST /api/messages",
+            "GET /api/messages/{message_id}/replies",
+            "POST /api/messages/{message_id}/replies",
+            "GET /api/changelog",
+            "POST /api/account/nickname",
+            "NICKNAME_MAX_LENGTH",
+            "账户库版本 4",
             "GET /api/stats",
             "赞助面板",
             "tip-pinned",

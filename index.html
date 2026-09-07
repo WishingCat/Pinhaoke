@@ -1370,6 +1370,33 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 }
 .msg-more:hover { border-color: var(--ink-3); color: var(--ink); }
 
+/* Message threads and changelog; kept in sync with reviews.html. */
+.msg-head-actions { display: flex; align-items: center; gap: 10px; }
+.msg-nav, .msg-action { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: var(--surface); color: var(--accent); font-size: 0.78rem; cursor: pointer; }
+.msg-nav:hover, .msg-action:hover { background: var(--bg); }
+.msg-board-view { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.msg-board-view .msg-list { flex: none; overflow-y: visible; }
+.msg-board-view[hidden], .msg-changelog[hidden], .msg-replies[hidden], .msg-reply-form[hidden] { display: none; }
+.msg-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 4px; }
+.msg-author { font-size: 0.78rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.msg-meta .msg-time { margin: 0; }
+.msg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.msg-replies { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.msg-reply { padding: 8px 0 8px 10px; margin-bottom: 6px; border-left: 2px solid var(--border); }
+.msg-reply .msg-content { font-size: 0.82rem; }
+.msg-reply-form { padding: 10px 0 0; margin-top: 10px; border-top: 1px solid var(--border); border-bottom: 0; }
+.msg-reply-form .msg-submit { padding: 8px 12px; }
+.msg-reply-form textarea { resize: vertical; max-height: 180px; }
+.msg-replies .msg-more { width: 100%; margin: 6px 0 0; }
+.msg-changelog { overflow-y: auto; padding: 6px 18px 20px; }
+.msg-changelog-entry { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.msg-changelog-entry:last-child { border-bottom: 0; }
+.msg-changelog-entry h3 { font-size: 0.95rem; color: var(--ink); margin: 5px 0 8px; }
+.msg-changelog-entry ul { list-style: disc; padding-left: 20px; margin: 0; color: var(--ink-2); font-size: 0.83rem; line-height: 1.8; }
+.msg-changelog-entry time { color: var(--ink-3); font-size: 0.74rem; }
+.msg-changelog-note { margin: 4px 0; color: var(--ink-3); font-size: 0.78rem; }
+.fav-nickname { display: block; overflow-wrap: anywhere; }
+
 /* ===== Visit statistics ===== */
 .stats-panel {
   display: flex;
@@ -2370,9 +2397,14 @@ window._hmt.push(['_trackPageview', location.pathname]);
   <div class="msg-panel">
     <div class="msg-head">
       <span class="modal-title" id="msgTitle">留言板</span>
-      <button class="modal-close" onclick="closeMsgBoard()" aria-label="关闭留言板">&times;</button>
+      <div class="msg-head-actions">
+        <button type="button" class="msg-nav" id="msgChangelogButton" onclick="showMsgPage()" aria-controls="msgChangelog" aria-expanded="false">更新日志</button>
+        <button class="modal-close" onclick="closeMsgBoard()" aria-label="关闭留言板">&times;</button>
+      </div>
     </div>
+    <div class="msg-board-view" id="msgBoardView">
     <p class="msg-hint">欢迎公开留言：问题反馈、功能建议、想对开发者说的话都可以写在这里，所有人可见。</p>
+    <p class="msg-hint">登录后使用个人昵称，未登录显示“路过的 PKUer”。</p>
     <form class="msg-form" onsubmit="submitMessage(event)">
       <textarea id="msgInput" maxlength="500" rows="3" placeholder="写下你的留言…（最多 500 字）" aria-label="留言内容"></textarea>
       <div class="msg-form-foot">
@@ -2382,6 +2414,8 @@ window._hmt.push(['_trackPageview', location.pathname]);
     </form>
     <div class="msg-list" id="msgList" aria-label="全部留言"></div>
     <button type="button" class="msg-more hidden" id="msgMore" onclick="loadMessages(false)">加载更多</button>
+    </div>
+    <div class="msg-changelog" id="msgChangelog" role="region" aria-label="更新日志" hidden></div>
   </div>
 </div>
 
@@ -2477,6 +2511,7 @@ window._hmt.push(['_trackPageview', location.pathname]);
     </button>
     <span class="modal-title" id="accountViewTitle">个人中心</span>
   </div>
+  <p class="fav-status" id="accountStatus" role="status" aria-live="polite"></p>
   <div class="account-scroll" id="accountBody"></div>
 </div>
 
@@ -4385,7 +4420,26 @@ let msgReturnFocus = null;
 let msgPage = 0;
 let msgTotal = 0;
 let msgLoading = false;
+let msgController = null;
+let msgShowingChangelog = false;
+let changelogLoaded = false;
+let changelogLoading = false;
 const MSG_PAGE_SIZE = 20;
+const DEFAULT_NICKNAME = '路过的 PKUer';
+
+function msgElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function msgButton(label, className, action) {
+  const button = msgElement('button', className, label);
+  button.type = 'button';
+  button.addEventListener('click', action);
+  return button;
+}
 
 function formatMsgTime(ts) {
   const d = new Date(ts * 1000);
@@ -4393,21 +4447,157 @@ function formatMsgTime(ts) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function renderMessage(message) {
+function renderMessage(message, isReply = false) {
   const item = document.createElement('div');
-  item.className = 'msg-item';
+  item.className = isReply ? 'msg-reply' : 'msg-item';
+  item.dataset.messageId = message.id;
+  const meta = msgElement('div', 'msg-meta');
+  const author = msgElement('strong', 'msg-author', message.nickname || DEFAULT_NICKNAME);
   const time = document.createElement('div');
   time.className = 'msg-time';
   time.textContent = formatMsgTime(message.posted_at);
   const body = document.createElement('p');
   body.className = 'msg-content';
   body.textContent = message.content;
-  item.append(time, body);
+  meta.append(author, time);
+  item.append(meta, body);
+  if (!isReply) addMessageReplies(item, message);
   return item;
 }
 
+function messagePostError(resp) {
+  if (resp.status === 429) return '发布太频繁，请稍后再试';
+  if (resp.status === 422) return '请输入 1 到 500 字的内容';
+  if (resp.status === 404) return '原留言不存在，请刷新留言板';
+  return '发布失败，请稍后再试';
+}
+
+function addMessageReplies(item, message) {
+  let count = message.reply_count || 0;
+  let beforeId = 0;
+  let loaded = false;
+  let loading = false;
+  let posting = false;
+  const actions = msgElement('div', 'msg-actions');
+  const replies = msgElement('div', 'msg-replies');
+  replies.id = `msgReplies-${message.id}`;
+  replies.hidden = true;
+  const list = msgElement('div', 'msg-reply-list');
+  const replyStatus = msgElement('p', 'msg-status');
+  replyStatus.setAttribute('role', 'status');
+  const more = msgButton('加载更多回复', 'msg-more', () => loadReplies());
+  more.hidden = true;
+  replies.append(list, replyStatus, more);
+  const toggle = msgButton('', 'msg-action', () => {
+    replies.hidden = !replies.hidden;
+    updateToggle();
+    if (!replies.hidden && !loaded) loadReplies();
+  });
+  toggle.setAttribute('aria-controls', replies.id);
+  function updateToggle() {
+    toggle.textContent = `${replies.hidden ? '查看回复' : '收起回复'}（${count}）`;
+    toggle.setAttribute('aria-expanded', String(!replies.hidden));
+  }
+  async function loadReplies() {
+    if (loading) return;
+    loading = true;
+    more.disabled = true;
+    replyStatus.textContent = '正在加载回复…';
+    try {
+      const resp = await fetch(`/api/messages/${message.id}/replies?before_id=${beforeId}&page_size=${MSG_PAGE_SIZE}`, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('bad status');
+      const data = await resp.json();
+      const existing = new Set([...list.children].map(child => child.dataset.messageId));
+      data.replies.forEach(reply => {
+        if (!existing.has(String(reply.id))) list.appendChild(renderMessage(reply, true));
+      });
+      if (data.replies.length) beforeId = data.replies[data.replies.length - 1].id;
+      loaded = true;
+      more.hidden = !data.has_more;
+      replyStatus.textContent = list.children.length ? '' : '还没有回复，来说两句吧。';
+    } catch (error) {
+      replyStatus.textContent = '回复加载失败，请重试';
+      more.hidden = false;
+    } finally {
+      loading = false;
+      more.disabled = false;
+    }
+  }
+  const form = msgElement('form', 'msg-form msg-reply-form');
+  form.id = `msgReplyForm-${message.id}`;
+  form.hidden = true;
+  const input = msgElement('textarea');
+  input.maxLength = 500;
+  input.rows = 2;
+  input.placeholder = '写下回复…（最多 500 字）';
+  input.setAttribute('aria-label', `回复留言：${message.content.slice(0, 30)}`);
+  const status = msgElement('span', 'msg-status');
+  status.setAttribute('role', 'status');
+  const submit = msgElement('button', 'msg-submit', '发布回复');
+  submit.type = 'submit';
+  const reply = msgButton('回复', 'msg-action', () => {
+    form.hidden = !form.hidden;
+    reply.setAttribute('aria-expanded', String(!form.hidden));
+    if (!form.hidden) input.focus();
+  });
+  reply.setAttribute('aria-expanded', 'false');
+  reply.setAttribute('aria-controls', form.id);
+  const cancel = msgButton('取消', 'msg-action', () => {
+    if (posting) return;
+    form.hidden = true;
+    reply.setAttribute('aria-expanded', 'false');
+    reply.focus();
+  });
+  const foot = msgElement('div', 'msg-form-foot');
+  const buttons = msgElement('div', 'msg-head-actions');
+  buttons.append(cancel, submit);
+  foot.append(status, buttons);
+  form.append(input, foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (posting) return;
+    const content = input.value.trim();
+    if (!content) { status.textContent = '回复不能为空'; return; }
+    posting = true;
+    submit.disabled = true;
+    cancel.disabled = true;
+    input.readOnly = true;
+    status.textContent = '发布中…';
+    try {
+      const resp = await fetch(`/api/messages/${message.id}/replies`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (!resp.ok) { status.textContent = messagePostError(resp); return; }
+      const created = await resp.json();
+      input.value = '';
+      status.textContent = '回复已发布';
+      count += 1;
+      replies.hidden = false;
+      updateToggle();
+      // 首次展开时仍从第一页拉取，不能因自己的新回复跳过先前的回复。
+      list.prepend(renderMessage(created, true));
+      if (!loaded) await loadReplies();
+      else if (!loading) replyStatus.textContent = '';
+    } catch (error) {
+      status.textContent = '发布失败，请稍后再试';
+    } finally {
+      posting = false;
+      submit.disabled = false;
+      cancel.disabled = false;
+      input.readOnly = false;
+    }
+  });
+  updateToggle();
+  actions.append(reply, toggle);
+  item.append(actions, replies, form);
+}
+
 async function loadMessages(reset) {
-  if (msgLoading) return;
+  if (msgLoading && !reset) return;
+  if (reset && msgController) msgController.abort();
+  const controller = new AbortController();
+  msgController = controller;
   msgLoading = true;
   const list = document.getElementById('msgList');
   const more = document.getElementById('msgMore');
@@ -4418,7 +4608,8 @@ async function loadMessages(reset) {
   }
   const page = msgPage + 1;
   try {
-    const resp = await fetch(`/api/messages?page=${page}&page_size=${MSG_PAGE_SIZE}`);
+    more.disabled = true;
+    const resp = await fetch(`/api/messages?page=${page}&page_size=${MSG_PAGE_SIZE}`, { signal: controller.signal, cache: 'no-store' });
     if (!resp.ok) throw new Error('bad status');
     const data = await resp.json();
     msgPage = page;
@@ -4429,15 +4620,24 @@ async function loadMessages(reset) {
       empty.textContent = '还没有留言，来写第一条吧！';
       list.appendChild(empty);
     }
-    data.messages.forEach(message => list.appendChild(renderMessage(message)));
+    list.querySelectorAll('.msg-error').forEach(error => error.remove());
+    const existing = new Set([...list.children].map(child => child.dataset.messageId));
+    data.messages.forEach(message => {
+      if (!existing.has(String(message.id))) list.appendChild(renderMessage(message));
+    });
     more.classList.toggle('hidden', msgPage * MSG_PAGE_SIZE >= msgTotal);
   } catch (err) {
+    if (err.name === 'AbortError') return;
     const error = document.createElement('p');
     error.className = 'msg-error';
     error.textContent = '留言加载失败，请稍后再试';
     list.appendChild(error);
+    more.classList.remove('hidden');
   } finally {
-    msgLoading = false;
+    if (msgController === controller) {
+      msgLoading = false;
+      more.disabled = false;
+    }
   }
 }
 
@@ -4446,12 +4646,14 @@ async function submitMessage(event) {
   const input = document.getElementById('msgInput');
   const status = document.getElementById('msgStatus');
   const submit = document.getElementById('msgSubmit');
+  if (submit.disabled) return;
   const content = input.value.trim();
   if (!content) {
     status.textContent = '留言不能为空';
     return;
   }
   submit.disabled = true;
+  input.readOnly = true;
   status.textContent = '发布中…';
   try {
     const resp = await fetch('/api/messages', {
@@ -4459,24 +4661,61 @@ async function submitMessage(event) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     });
-    if (resp.status === 429) {
-      status.textContent = '发布太频繁，请稍后再试';
+    if (!resp.ok) {
+      status.textContent = messagePostError(resp);
       return;
     }
-    if (!resp.ok) throw new Error('bad status');
-    const created = await resp.json();
+    await resp.json();
     input.value = '';
     status.textContent = '已发布';
-    const list = document.getElementById('msgList');
-    const empty = list.querySelector('.msg-empty');
-    if (empty) empty.remove();
-    list.prepend(renderMessage(created));
-    msgTotal += 1;
+    await loadMessages(true);
   } catch (err) {
     status.textContent = '发布失败，请稍后再试';
   } finally {
     submit.disabled = false;
+    input.readOnly = false;
   }
+}
+
+async function loadChangelog() {
+  if (changelogLoaded || changelogLoading) return;
+  changelogLoading = true;
+  const page = document.getElementById('msgChangelog');
+  page.textContent = '正在加载更新日志…';
+  try {
+    const resp = await fetch('/api/changelog', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('bad status');
+    const data = await resp.json();
+    page.textContent = '';
+    page.appendChild(msgElement('p', 'msg-changelog-note', '记录拼好课的主要功能与数据更新。'));
+    data.entries.forEach(entry => {
+      const article = msgElement('article', 'msg-changelog-entry');
+      const date = msgElement('time', null, entry.date);
+      date.dateTime = entry.date;
+      const title = msgElement('h3', null, entry.title);
+      const changes = msgElement('ul');
+      entry.changes.forEach(change => changes.appendChild(msgElement('li', null, change)));
+      article.append(date, title, changes);
+      page.appendChild(article);
+    });
+    changelogLoaded = true;
+  } catch (error) {
+    page.textContent = '更新日志加载失败。';
+    page.appendChild(msgButton('重试', 'msg-action', () => loadChangelog()));
+  } finally {
+    changelogLoading = false;
+  }
+}
+
+function showMsgPage(changelog = !msgShowingChangelog) {
+  msgShowingChangelog = changelog;
+  document.getElementById('msgBoardView').hidden = changelog;
+  document.getElementById('msgChangelog').hidden = !changelog;
+  document.getElementById('msgTitle').textContent = changelog ? '更新日志' : '留言板';
+  const button = document.getElementById('msgChangelogButton');
+  button.textContent = changelog ? '返回留言板' : '更新日志';
+  button.setAttribute('aria-expanded', String(changelog));
+  if (changelog) loadChangelog();
 }
 
 function openMsgBoard() {
@@ -4487,6 +4726,7 @@ function openMsgBoard() {
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('msgStatus').textContent = '';
+  showMsgPage(false);
   requestAnimationFrame(() => document.getElementById('msgInput').focus());
   loadMessages(true);
 }
@@ -4530,7 +4770,7 @@ const FAV_MODE_KEY = 'pinhaoke_fav_mode';
 const FAV_TERM_ORDER = ['spring', 'summer', 'fall'];
 const FAV_USERNAME_PATTERN = '[A-Za-z0-9_]{3,20}';
 
-let favUser = null;              // { username, questions } | null
+let favUser = null;              // { username, nickname, questions } | null
 const favItems = new Map();      // fav_key -> favorite snapshot
 let favLimit = 300;
 let pendingFavoriteId = null;    // 未登录时点的那门课，登录成功后自动补收藏
@@ -4620,7 +4860,7 @@ function replaceFavorites(list, limit) {
 }
 
 function applyAccount(data) {
-  favUser = { username: data.username, questions: data.questions || [] };
+  favUser = { username: data.username, nickname: data.nickname || DEFAULT_NICKNAME, questions: data.questions || [] };
   favModeSet('user');
   if (data.collections) favCollections = data.collections;
   if (data.collections_limit) favCollectionsLimit = data.collections_limit;
@@ -4707,7 +4947,7 @@ function favToast(text) {
 }
 
 function setFavStatus(text, isError = false) {
-  const status = document.getElementById('favStatus');
+  const status = document.getElementById(accountViewOpen ? 'accountStatus' : 'favStatus');
   status.textContent = text || '';
   status.classList.toggle('is-error', !!isError && !!text);
 }
@@ -5220,6 +5460,7 @@ function renderFavAccount(body) {
   const who = favEl('span', 'fav-account-name');
   who.appendChild(document.createTextNode('已登录：'));
   who.appendChild(favEl('strong', 'fav-mono', favUser.username));
+  who.appendChild(favEl('span', 'fav-nickname', `昵称：${favUser.nickname || DEFAULT_NICKNAME}`));
   account.appendChild(who);
   account.appendChild(favButton('退出登录', 'fav-ghost', async event => {
     const button = event.currentTarget;
@@ -5240,11 +5481,12 @@ function renderFavAccount(body) {
   const manageForm = favEl('div', 'fav-manage-form');
   manageForm.hidden = true;
   const builders = {
+    nickname: buildChangeNicknameForm,
     password: buildChangePasswordForm,
     questions: buildChangeQuestionsForm,
     delete: buildDeleteForm,
   };
-  [['password', '修改密码'], ['questions', '修改密保'], ['delete', '删除账号']].forEach(([key, label]) => {
+  [['nickname', '修改昵称'], ['password', '修改密码'], ['questions', '修改密保'], ['delete', '删除账号']].forEach(([key, label]) => {
     const button = favButton(label, 'fav-ghost' + (key === 'delete' ? ' is-danger' : ''), () => {
       const expanded = button.getAttribute('aria-expanded') === 'true';
       manage.querySelectorAll('button').forEach(other => other.setAttribute('aria-expanded', 'false'));
@@ -5426,6 +5668,7 @@ function openAccountView() {
   if (!favUser) { favTab = 'login'; openFavorites(); return; }
   accountReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   accountViewOpen = true;
+  setFavStatus('');
   activeCollectionId = null;
   setModalBackgroundInert(true);
   document.body.style.overflow = 'hidden';
@@ -5678,6 +5921,36 @@ async function removeCollection(id) {
   }
   if (res.status !== 401) favToast(favErrorText(res, { 409: '默认收藏夹不能删除', 404: '收藏夹不存在' }));
   return false;
+}
+
+function buildChangeNicknameForm(done) {
+  const form = favEl('form', 'fav-form fav-form-inline');
+  form.appendChild(favField('昵称', {
+    name: 'nickname', autocomplete: 'nickname', maxlength: '30', required: true,
+    value: favUser.nickname || DEFAULT_NICKNAME,
+  }));
+  form.appendChild(favEl('p', 'fav-form-note', '1 到 30 个字，用于新留言和新回复，历史发言保留当时的昵称。'));
+  const foot = favEl('div', 'fav-form-foot');
+  foot.appendChild(favButton('取消', 'fav-ghost', () => done()));
+  foot.appendChild(favSubmit('保存昵称'));
+  form.appendChild(foot);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (favBusy) return;
+    const nickname = form.elements.nickname.value.trim();
+    if (!nickname) { setFavStatus('昵称不能为空', true); return; }
+    favSetBusy(form, true);
+    const res = await favApi('POST', '/api/account/nickname', { nickname });
+    favSetBusy(form, false);
+    if (!res.ok) { setFavStatus(favErrorText(res), true); return; }
+    if (favUser) favUser.nickname = res.data.nickname;
+    document.querySelectorAll('.fav-nickname').forEach(label => {
+      label.textContent = `昵称：${res.data.nickname}`;
+    });
+    done();
+    setFavStatus('昵称已保存');
+  });
+  return form;
 }
 
 function buildChangePasswordForm(done) {

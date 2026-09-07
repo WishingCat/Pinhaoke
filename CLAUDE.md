@@ -121,11 +121,11 @@ git diff --check
 
 `get_reviews_db()` 以相同的 SQLite URI `mode=ro` 和 `PRAGMA query_only = ON` 打开 `树洞课程评测.db`。`GET /api/health` 检查五个课程库的表、详情行数、ID 集合、外键与完整性，同时检查评测库的必需表、元数据行数、外键和完整性。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
 
-`get_messages_db()` 打开可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表；六个正式库保持只读，`GET /api/health` 不检查留言库。
+`get_messages_db()` 打开可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表并迁移到版本 1，增加昵称与回复关系（详见留言板 API 契约）；六个正式库保持只读，`GET /api/health` 不检查留言库。
 
 `get_stats_db()` 以同样方式打开可写的访问统计数据库：路径来自 `PINHAOKE_STATS_DB`，本地默认仓库根目录 `访问统计.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/访问统计.db`，首次使用时自建 `visit_days(day, ip_hash, views, last_at)` 表。`record_visit()` 在 `/` 和 `/reviews` 页面路由中记录访问，按北京时间分日、以 IP 哈希对当日访客去重、`views` 累加，并过滤明显的 bot User-Agent；任何异常都被吞掉，绝不影响页面返回。`GET /api/health` 不检查统计库。
 
-`get_accounts_db()` 打开可写的账户数据库：路径来自 `PINHAOKE_ACCOUNTS_DB`，本地默认仓库根目录 `账户.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/账户.db`。连接启用 WAL、`busy_timeout` 与 `PRAGMA foreign_keys = ON`，由 `_migrate_accounts_db()` 按 `PRAGMA user_version` 迁移：版本 1 建 `users`、`security_questions`、`sessions`、`favorites`、`auth_events` 五张表；版本 2 增建 `collections` 与 `favorite_collections`，并为已有收藏回填默认收藏夹与成员映射，回填在显式 `BEGIN IMMEDIATE` 事务内锁后重查版本以对齐 `--workers 2` 首连竞争。`collections` 以 `UNIQUE(user_id, name)` 和 `is_default = 1` 的唯一部分索引约束每账号恰一个默认夹；`favorite_collections` 复合外键指向 `favorites(user_id, fav_key)`，删收藏行级联清成员映射，删收藏夹级联清该夹映射且不动 `favorites`。删除用户时经两条 `ON DELETE CASCADE` 一并清除密保、会话、收藏、收藏夹与成员映射。默认收藏夹不可删除（409）但可改名，删除自定义收藏夹后清理不再属于任何夹的孤儿收藏行。收藏夹上限 `COLLECTIONS_MAX = 50`（不含默认夹），夹名 `strip()` 后 1 到 `COLLECTION_NAME_MAX = 30` 字，默认夹名为 `DEFAULT_COLLECTION_NAME`。密码与密保答案用标准库 `hashlib.scrypt` 加盐哈希，参数 `SCRYPT_PARAMS` 为 n=2^14、r=8、p=1，序列化为 `scrypt$n$r$p$salt$hash` 并随记录保存，登录成功时低于当前参数的哈希会重算；所有 scrypt 调用经过 `_SCRYPT_GATE`，每个进程最多两个并发。会话令牌由 `secrets.token_urlsafe(32)` 生成，库内只存 SHA-256；cookie `pinhaoke_session` 为 HttpOnly、SameSite=Lax、Path=/，只在 `X-Forwarded-Proto` 或请求 scheme 为 https 时带 Secure，有效期 180 天，`GET /api/account` 每天最多顺延一次。`auth_events(kind, subject, at)` 只保存 IP 哈希、`username_key` 或 `*` 作为限流主体，两天后清除。`GET /api/health` 不检查账户库。
+`get_accounts_db()` 打开可写的账户数据库：路径来自 `PINHAOKE_ACCOUNTS_DB`，本地默认仓库根目录 `账户.db`（已 `.gitignore`），生产为 `/var/lib/pinhaoke/账户.db`。连接启用 WAL、`busy_timeout` 与 `PRAGMA foreign_keys = ON`，由 `_migrate_accounts_db()` 按 `PRAGMA user_version` 迁移：版本 1 建 `users`、`security_questions`、`sessions`、`favorites`、`auth_events` 五张表；版本 2 增建 `collections` 与 `favorite_collections`，并为已有收藏回填默认收藏夹与成员映射，回填在显式 `BEGIN IMMEDIATE` 事务内锁后重查版本以对齐 `--workers 2` 首连竞争；版本 3 给 `users` 增列 `last_collection_id` 以兼容已有开发版结构（当前发布不改变收藏落点），同样在显式 `BEGIN IMMEDIATE` 事务内锁后重查版本恰执行一次，只加列不回填；版本 4 增加 `nickname`，为新旧用户提供默认昵称“路过的 PKUer”，同样通过锁内版本复查保证只迁移一次。`collections` 以 `UNIQUE(user_id, name)` 和 `is_default = 1` 的唯一部分索引约束每账号恰一个默认夹；`favorite_collections` 复合外键指向 `favorites(user_id, fav_key)`，删收藏行级联清成员映射，删收藏夹级联清该夹映射且不动 `favorites`。删除用户时经两条 `ON DELETE CASCADE` 一并清除密保、会话、收藏、收藏夹与成员映射。默认收藏夹不可删除（409）但可改名，删除自定义收藏夹后清理不再属于任何夹的孤儿收藏行。收藏夹上限 `COLLECTIONS_MAX = 50`（不含默认夹），夹名 `strip()` 后 1 到 `COLLECTION_NAME_MAX = 30` 字，默认夹名为 `DEFAULT_COLLECTION_NAME`。密码与密保答案用标准库 `hashlib.scrypt` 加盐哈希，参数 `SCRYPT_PARAMS` 为 n=2^14、r=8、p=1，序列化为 `scrypt$n$r$p$salt$hash` 并随记录保存，登录成功时低于当前参数的哈希会重算；所有 scrypt 调用经过 `_SCRYPT_GATE`，每个进程最多两个并发。会话令牌由 `secrets.token_urlsafe(32)` 生成，库内只存 SHA-256；cookie `pinhaoke_session` 为 HttpOnly、SameSite=Lax、Path=/，只在 `X-Forwarded-Proto` 或请求 scheme 为 https 时带 Secure，有效期 180 天，`GET /api/account` 每天最多顺延一次。`auth_events(kind, subject, at)` 只保存 IP 哈希、`username_key` 或 `*` 作为限流主体，两天后清除。`GET /api/health` 不检查账户库。
 
 ## API 契约
 
@@ -187,8 +187,13 @@ git diff --check
 
 - `GET /api/messages`：`page` 为 1 到 10000，`page_size` 为 1 到 50。
 - `POST /api/messages`：`content` 去除首尾空白后为 1 到 `500` 字，非法 payload 返回 422。
-- 留言只保存发布时间与正文；来源 IP 以 SHA-256 哈希形式仅用于发布频率限制，同一 IP 哈希每小时最多 `5` 条、每天最多 `20` 条，超限返回 429。任何响应都不包含 IP 或身份字段。
-- 前端渲染留言正文必须使用 `textContent`，禁止拼入 `innerHTML`。
+- `GET /api/messages/{message_id}/replies`：只查询根留言的回复，按 ID 倒序；`before_id` 默认为 0，后续使用上一页最后一条 ID，`page_size` 为 1 到 50，返回 `{replies, has_more}`。不存在的留言或回复 ID 返回 404。
+- `POST /api/messages/{message_id}/replies`：与发布留言使用相同的 `{content}` 校验；所有留言写入都校验可信 Origin。根留言列表只计算根留言数量，每项另带 `reply_count`。
+- 留言与回复保存发布时间、正文、发言时的 `nickname` 和内部 `parent_id`；昵称仅由服务器读取当前有效会话确定，匿名、失效会话和旧留言使用 `DEFAULT_NICKNAME = "路过的 PKUer"`，不接受客户端伪造身份。历史昵称保留快照，不关联公开账号 ID。
+- 来源 IP 以 SHA-256 哈希形式仅用于发布频率限制，同一 IP 哈希的留言和回复共用每小时最多 `5` 条、每天最多 `20` 条，超限返回 429；限流检查与插入在 `BEGIN IMMEDIATE` 内执行。公开响应仅包含 `id`、`posted_at`、`content`、`nickname`、`reply_count`，不包含 IP、登录用户名或账号主键。
+- 留言库 schema 版本 1 增加 `nickname`、`parent_id` 和 `(parent_id, id)` 索引；锁内重查版本后迁移，保留旧 ID、正文、时间与 IP 哈希。账户库版本 4 同样在锁内新增 `nickname`，为旧账号补默认昵称，保留会话、密保与收藏。
+- 前端渲染留言、回复、昵称和更新日志必须使用 `textContent` 或 DOM API，禁止拼入 `innerHTML`。两页的留言板 UI 与行为保持一致。
+- `GET /api/changelog` 从 `BASE_DIR / "changelog.json"` 读取唯一的中文更新记录并返回 `no-store`；留言板顶部按钮在留言与更新日志子页面间切换，隐藏子页退出键盘焦点顺序，沿用弹窗焦点约束。
 
 访问统计契约：
 
@@ -200,6 +205,7 @@ git diff --check
 账号与收藏契约：
 
 - 用户名 `strip()` 后必须匹配 `^[A-Za-z0-9_]{3,20}$`，按注册时写法显示，以小写 `username_key` 判定唯一，大小写变体注册返回 409。密码为 8 到 128 字符，`casefold()` 后不得等于用户名。
+- `GET /api/account` 增加 `nickname`。`POST /api/account/nickname` 必须登录并校验 Origin，昵称 `strip()` 后为 1 到 `NICKNAME_MAX_LENGTH = 30` 字，拒绝控制字符和孤立代理字符；只修改当前用户昵称，不修改登录用户名，返回 `{nickname}` 与 `no-store`。新账号、旧账号默认昵称都是“路过的 PKUer”。
 - 密保问题 1 到 3 个，问题 `strip()` 后 1 到 60 字且互不重复；答案经 NFKC 规范化、去除全部空白并 `casefold()` 后为 2 到 64 字，且不得等于 `username_key`。找回密码只需答对任意一个问题，成功后吊销该用户全部会话。
 - 所有 `POST` 端点先经 `_require_trusted_origin()`：有 `Origin` 时其主机必须等于 `Host`（尊重 `X-Forwarded-Host`），`Origin: null` 返回 403；无 `Origin` 时按 `Referer` 判定；两者都缺失放行。请求体只接受 JSON。
 - 登录失败与用户名不存在返回同一 401 文案，不存在的用户名也对假哈希校验一次；全部限流检查在 scrypt 之前执行，`AUTH_RATE_LIMITS` 的注册、登录失败、找回、全局校验与收藏写入窗口超限返回 429 并带 `Retry-After`。按用户名限流只按字符串计数，不泄露用户是否存在。

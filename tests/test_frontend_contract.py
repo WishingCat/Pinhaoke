@@ -139,6 +139,36 @@ class FrontendContractTests(unittest.TestCase):
             self.assertIn("closeMsgBoard()", page)
             self.assertIn('aria-label="关闭留言板"', page)
 
+    def test_message_replies_nickname_and_changelog_contract(self):
+        blocks = []
+        for page in (HTML, REVIEWS_HTML):
+            for fragment in (
+                'id="msgChangelogButton"', 'aria-controls="msgChangelog"',
+                'id="msgBoardView"', 'id="msgChangelog" role="region"',
+                "function addMessageReplies", "form.hidden = true", "input.maxLength = 500",
+                "message.nickname || DEFAULT_NICKNAME", "renderMessage(reply, true)",
+                "before_id=${beforeId}", "if (!loaded) await loadReplies()",
+                "body: JSON.stringify({ content })", "replies.hidden = !replies.hidden",
+                "button.setAttribute('aria-expanded', String(changelog))",
+                "document.getElementById('msgBoardView').hidden = changelog",
+                "document.getElementById('msgChangelog').hidden = !changelog",
+                "fetch('/api/changelog'", "返回留言板", "路过的 PKUer",
+            ):
+                self.assertIn(fragment, page)
+            start = page.index('let msgReturnFocus = null;')
+            end = page.index('function trapMsgFocus', start)
+            block = page[start:end]
+            inert_helper = re.search(r'  (set\w+BackgroundInert)\(true\);', block).group(1)
+            self.assertIn(f'function {inert_helper}(', page)
+            self.assertIn(f'{inert_helper}(false);', block)
+            blocks.append(block.replace('setThreadModalBackgroundInert', 'setModalBackgroundInert'))
+            self.assertNotIn('innerHTML', page[start:end])
+        self.assertEqual(blocks[0], blocks[1])
+        self.assertIn("nickname: buildChangeNicknameForm", HTML)
+        self.assertIn("favApi('POST', '/api/account/nickname', { nickname })", HTML)
+        self.assertIn("autocomplete: 'nickname', maxlength: '30'", HTML)
+        self.assertIn('id="accountStatus" role="status"', HTML)
+
     def test_visit_stats_button_and_panel_contract(self):
         # 两页顶栏都有统计按钮，且排在留言按钮之前
         lang = HTML.index('id="langSelector"')

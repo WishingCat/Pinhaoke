@@ -25,6 +25,7 @@ import base64
 from contextlib import contextmanager
 import hashlib
 import hmac
+import json
 import math
 import os
 from pathlib import Path
@@ -49,13 +50,15 @@ FALL_UG_DB = DB_DIR / "2026秋季学期本科生课程.db"
 FALL_GR_DB = DB_DIR / "2026秋季学期研究生课程.db"
 REVIEWS_DB = DB_DIR / "树洞课程评测.db"
 
-# 留言板是唯一可写库，与六个只读正式库分离，不进入仓库。
+# 留言板与六个只读正式库分离，不进入仓库。
 # 生产由 systemd StateDirectory 提供 /var/lib/pinhaoke 并通过环境变量指定路径。
 MESSAGES_DB_PATH = Path(
     os.environ.get("PINHAOKE_MESSAGES_DB", "") or (BASE_DIR / "留言板.db")
 )
 MESSAGE_MAX_LENGTH = 500
 MESSAGE_PAGE_SIZE_MAX = 50
+DEFAULT_NICKNAME = "路过的 PKUer"
+NICKNAME_MAX_LENGTH = 30
 # (窗口秒数, 每个 IP 哈希在窗口内的发布上限)
 MESSAGE_RATE_LIMITS = ((3600, 5), (86400, 20))
 
@@ -201,6 +204,7 @@ def get_messages_db():
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS messages ("
             " id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -212,6 +216,20 @@ def get_messages_db():
             "CREATE INDEX IF NOT EXISTS idx_messages_ip_time"
             " ON messages(ip_hash, posted_at)"
         )
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+            # 锁内复查，兼容两个 worker 同时首次访问旧留言库。
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+                conn.execute(
+                    "ALTER TABLE messages ADD COLUMN nickname TEXT NOT NULL"
+                    " DEFAULT '路过的 PKUer'"
+                )
+                conn.execute(
+                    "ALTER TABLE messages ADD COLUMN parent_id INTEGER REFERENCES messages(id)"
+                )
+                conn.execute("CREATE INDEX idx_messages_parent ON messages(parent_id, id)")
+                conn.execute("PRAGMA user_version = 1")
+            conn.commit()
         yield conn
     finally:
         if conn is not None:
@@ -346,8 +364,12 @@ _BACKFILL_DEFAULT_MEMBERSHIPS = """
 def _migrate_accounts_db(conn) -> None:
     version = conn.execute("PRAGMA user_version").fetchone()[0]
     if version < 1:
-        conn.executescript(_ACCOUNTS_SCHEMA_V1)
-        conn.execute("PRAGMA user_version = 1")
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+            for statement in _ACCOUNTS_SCHEMA_V1.split(";"):
+                if statement.strip():
+                    conn.execute(statement)
+            conn.execute("PRAGMA user_version = 1")
         conn.commit()
         version = 1
     if version < 2:
@@ -360,6 +382,23 @@ def _migrate_accounts_db(conn) -> None:
             conn.execute(_BACKFILL_DEFAULT_COLLECTIONS, {"now": now, "name": DEFAULT_COLLECTION_NAME})
             conn.execute(_BACKFILL_DEFAULT_MEMBERSHIPS, {"now": now})
             conn.execute("PRAGMA user_version = 2")
+        conn.commit()
+        version = 2
+    if version < 3:
+        # 保留与已有开发版 v3 兼容的列；当前发布不改变收藏落点行为。
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 3:
+            conn.execute("ALTER TABLE users ADD COLUMN last_collection_id INTEGER")
+            conn.execute("PRAGMA user_version = 3")
+        conn.commit()
+        version = 3
+    if version < 4:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 4:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN nickname TEXT NOT NULL DEFAULT '路过的 PKUer'"
+            )
+            conn.execute("PRAGMA user_version = 4")
         conn.commit()
 
 
@@ -1815,9 +1854,32 @@ def get_stats():
     )
 
 
-def _insert_message(content: str, ip_hash: str) -> dict:
+def _message_nickname(request) -> str:
+    if _request_token(request):
+        with get_accounts_db() as conn:
+            session = _current_session(conn, request, int(time.time()))
+            if session is not None:
+                return session["nickname"]
+    return DEFAULT_NICKNAME
+
+
+def _require_root_message(conn, message_id: int) -> None:
+    if isinstance(message_id, bool) or not isinstance(message_id, int) or not 1 <= message_id <= 2**63 - 1:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if conn.execute(
+        "SELECT 1 FROM messages WHERE id=? AND parent_id IS NULL", (message_id,)
+    ).fetchone() is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+
+def _insert_message(content: str, ip_hash: str, nickname: str = DEFAULT_NICKNAME,
+                    parent_id: int | None = None) -> dict:
     now = int(time.time())
     with get_messages_db() as conn:
+        # 回复与留言共享频率限制；串行化检查与写入以防并发绕过。
+        conn.execute("BEGIN IMMEDIATE")
+        if parent_id is not None:
+            _require_root_message(conn, parent_id)
         for window, limit in MESSAGE_RATE_LIMITS:
             recent = conn.execute(
                 "SELECT COUNT(*) FROM messages WHERE ip_hash=? AND posted_at>?",
@@ -1828,12 +1890,14 @@ def _insert_message(content: str, ip_hash: str) -> dict:
                     status_code=429, detail="Too many messages, please retry later"
                 )
         cursor = conn.execute(
-            "INSERT INTO messages (posted_at, content, ip_hash) VALUES (?, ?, ?)",
-            (now, content, ip_hash),
+            "INSERT INTO messages (posted_at, content, ip_hash, nickname, parent_id)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (now, content, ip_hash, nickname, parent_id),
         )
         conn.commit()
         message_id = cursor.lastrowid
-    return {"id": message_id, "posted_at": now, "content": content}
+    return {"id": message_id, "posted_at": now, "content": content,
+            "nickname": nickname, "reply_count": 0}
 
 
 @app.get("/api/messages")
@@ -1844,10 +1908,12 @@ def list_messages(
     _validate_message_pagination(page, page_size)
     offset = (page - 1) * page_size
     with get_messages_db() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM messages WHERE parent_id IS NULL").fetchone()[0]
         rows = conn.execute(
-            "SELECT id, posted_at, content FROM messages "
-            "ORDER BY id DESC LIMIT ? OFFSET ?",
+            "SELECT m.id, m.posted_at, m.content, m.nickname,"
+            " (SELECT COUNT(*) FROM messages r WHERE r.parent_id=m.id) AS reply_count"
+            " FROM messages m WHERE m.parent_id IS NULL"
+            " ORDER BY m.id DESC LIMIT ? OFFSET ?",
             (page_size, offset),
         ).fetchall()
     return {
@@ -1860,8 +1926,41 @@ def list_messages(
 
 @app.post("/api/messages", status_code=201)
 def create_message(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
     content = _validate_message_content(payload)
-    return _insert_message(content, _client_ip_hash(request))
+    return _insert_message(content, _client_ip_hash(request), _message_nickname(request))
+
+
+@app.get("/api/messages/{message_id}/replies")
+def list_message_replies(
+    message_id: int,
+    before_id: int = Query(0, ge=0, le=2**63 - 1),
+    page_size: int = Query(20, ge=1, le=MESSAGE_PAGE_SIZE_MAX),
+):
+    _validate_message_pagination(1, page_size)
+    if isinstance(before_id, bool) or not isinstance(before_id, int) or not 0 <= before_id <= 2**63 - 1:
+        raise HTTPException(status_code=422, detail="Invalid message query parameter")
+    with get_messages_db() as conn:
+        _require_root_message(conn, message_id)
+        rows = conn.execute(
+            "SELECT id, posted_at, content, nickname, 0 AS reply_count FROM messages"
+            " WHERE parent_id=? AND (?=0 OR id<?) ORDER BY id DESC LIMIT ?",
+            (message_id, before_id, before_id, page_size + 1),
+        ).fetchall()
+    return {"replies": [dict(row) for row in rows[:page_size]],
+            "has_more": len(rows) > page_size}
+
+
+@app.post("/api/messages/{message_id}/replies", status_code=201)
+def create_message_reply(message_id: int, request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    content = _validate_message_content(payload)
+    return _insert_message(content, _client_ip_hash(request), _message_nickname(request), message_id)
+
+
+@app.get("/api/changelog")
+def get_changelog():
+    return _no_store(json.loads((BASE_DIR / "changelog.json").read_text(encoding="utf-8")))
 
 
 # Accounts and favorites ----------------------------------------------------------
@@ -2060,7 +2159,7 @@ def _current_session(conn, request, now: int):
     token_hash = _session_token_hash(token)
     row = conn.execute(
         "SELECT s.token_hash, s.user_id, s.last_seen_at, s.expires_at,"
-        " u.username, u.username_key, u.password_hash"
+        " u.username, u.username_key, u.password_hash, u.nickname"
         " FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash=?",
         (token_hash,),
     ).fetchone()
@@ -2412,6 +2511,7 @@ def get_account(request: Request):
         payload = {
             "authenticated": True,
             "username": session["username"],
+            "nickname": session["nickname"],
             "questions": _public_questions(conn, session["user_id"]),
         }
         payload.update(_favorites_payload(conn, session["user_id"]))
@@ -2419,6 +2519,22 @@ def get_account(request: Request):
     if refreshed:
         _set_session_cookie(response, request, _request_token(request))
     return response
+
+
+@app.post("/api/account/nickname")
+def change_nickname(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    data = _payload_dict(payload)
+    nickname = data.get("nickname")
+    if (not isinstance(nickname, str) or not 1 <= len(nickname.strip()) <= NICKNAME_MAX_LENGTH
+            or any(unicodedata.category(char) in {"Cc", "Cs"} for char in nickname)):
+        raise HTTPException(status_code=422, detail="昵称需为 1 到 30 个字，不能包含换行或控制字符")
+    nickname = nickname.strip()
+    with get_accounts_db() as conn:
+        session = _require_user(conn, request, int(time.time()))
+        conn.execute("UPDATE users SET nickname=? WHERE id=?", (nickname, session["user_id"]))
+        conn.commit()
+    return _no_store({"nickname": nickname})
 
 
 @app.post("/api/auth/register", status_code=201)

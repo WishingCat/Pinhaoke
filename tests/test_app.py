@@ -248,12 +248,13 @@ class MessageBoardApiTests(unittest.TestCase):
 
     def test_post_then_list_roundtrip_without_identity_fields(self):
         created = app.create_message(self.request(), {"content": "  希望增加成绩分布查询  "})
-        self.assertEqual(set(created), {"id", "posted_at", "content"})
+        self.assertEqual(set(created), {"id", "posted_at", "content", "nickname", "reply_count"})
         self.assertEqual(created["content"], "希望增加成绩分布查询")
         listing = app.list_messages(page=1, page_size=20)
         self.assertEqual(listing["total"], 1)
         self.assertEqual(set(listing), {"total", "page", "page_size", "messages"})
-        self.assertEqual(set(listing["messages"][0]), {"id", "posted_at", "content"})
+        self.assertEqual(set(listing["messages"][0]), {"id", "posted_at", "content", "nickname", "reply_count"})
+        self.assertEqual(listing["messages"][0]["nickname"], "路过的 PKUer")
         self.assertEqual(listing["messages"][0]["content"], "希望增加成绩分布查询")
 
     def test_list_is_newest_first_and_paginated(self):
@@ -531,7 +532,7 @@ class AccountApiTests(unittest.TestCase):
         payload = self.body(account)
         self.assertEqual(
             set(payload),
-            {"authenticated", "username", "questions", "favorites", "limit",
+            {"authenticated", "username", "nickname", "questions", "favorites", "limit",
              "collections", "collections_limit"},
         )
         self.assertTrue(payload["authenticated"])
@@ -943,13 +944,66 @@ class AccountApiTests(unittest.TestCase):
                 row[0]
                 for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+            user_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(users)")
+            }
+            self.assertIn("last_collection_id", user_cols)
         self.assertTrue(
             {"users", "security_questions", "sessions", "favorites", "auth_events",
              "collections", "favorite_collections"} <= tables
         )
         self.assertNotIn("basic_info", tables)
         self.assertNotIn("messages", tables)
+
+    def test_migrates_v2_database_preserving_data(self):
+        # 手工构造一个 v2 账户库（含用户、默认夹、一条收藏与映射），模拟生产升级
+        now = 1700000000
+        with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH)) as conn:
+            conn.executescript(app._ACCOUNTS_SCHEMA_V1)
+            for statement in app._ACCOUNTS_SCHEMA_V2:
+                conn.execute(statement)
+            conn.execute(
+                "INSERT INTO users (id, username, username_key, password_hash,"
+                " created_at, password_changed_at) VALUES (1, 'Old_01', 'old_01',"
+                " 'scrypt$16384$8$1$aa$bb', ?, ?)",
+                (now, now),
+            )
+            conn.execute(
+                "INSERT INTO collections (id, user_id, name, is_default, position, created_at)"
+                " VALUES (7, 1, ?, 1, 0, ?)",
+                (app.DEFAULT_COLLECTION_NAME, now),
+            )
+            conn.execute(
+                "INSERT INTO favorites (user_id, fav_key, course_id, term, term_label, level,"
+                " course_code, class_no, teacher, course_name, credits, schedule, department,"
+                " added_at) VALUES (1, 'fall|ug|001|1|师', 'a1', 'fall', '2026秋季学期', 'ug',"
+                " '001', '1', '师', '课', 2.0, 'x', 'y', ?)",
+                (now,),
+            )
+            conn.execute(
+                "INSERT INTO favorite_collections (user_id, fav_key, collection_id, added_at)"
+                " VALUES (1, 'fall|ug|001|1|师', 7, ?)",
+                (now,),
+            )
+            conn.execute("PRAGMA user_version = 2")
+            conn.commit()
+        # 打开一次即触发迁移
+        with app.get_accounts_db() as conn:
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+            self.assertEqual(conn.execute("SELECT nickname FROM users WHERE id=1").fetchone()[0], "路过的 PKUer")
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+            self.assertIn("last_collection_id", cols)
+            self.assertEqual(
+                conn.execute("SELECT username FROM users WHERE id=1").fetchone()[0], "Old_01"
+            )
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM favorites").fetchone()[0], 1)
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM favorite_collections").fetchone()[0], 1
+            )
+            self.assertIsNone(
+                conn.execute("SELECT last_collection_id FROM users WHERE id=1").fetchone()[0]
+            )
 
 
 class FavoritesApiTests(unittest.TestCase):
