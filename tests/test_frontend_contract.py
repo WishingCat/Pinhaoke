@@ -242,10 +242,12 @@ class FrontendContractTests(unittest.TestCase):
             self.assertIn("focusReturnTarget(returnTarget)", page)
 
     def test_developer_contact_is_consistent_in_about_panel_and_footer(self):
-        self.assertEqual(HTML.count("VX 联系方式："), 2)
+        self.assertEqual(HTML.count("VX 联系方式："), 1)
+        self.assertIn("<dt>微信联系</dt>", HTML)
         self.assertEqual(HTML.count("tuzengji"), 2)
         self.assertEqual(HTML.count("如果有问题或需求 欢迎联系！"), 2)
-        self.assertIn('class="about-contact"', HTML)
+        self.assertIn('class="about-details"', HTML)
+        self.assertNotIn('class="about-avatar"', HTML)
         self.assertIn('class="footer-contact"', HTML)
 
     def test_about_panel_stays_open_and_allows_text_selection(self):
