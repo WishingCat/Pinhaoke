@@ -1517,6 +1517,8 @@ html[data-theme="dark"] .fav-submit { color: #0E1013; }
 /* 个人中心全屏视图 */
 .account-view { display: none; position: fixed; inset: 0; z-index: 1100; background: var(--bg); flex-direction: column; }
 .account-view.open { display: flex; }
+/* 从个人中心点开收藏的课程时，详情浮层需盖过 z-index 1100 的个人视图 */
+.modal-overlay.modal-over-account { z-index: 1200; }
 .account-header {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 20px; border-bottom: 1px solid var(--border);
@@ -3907,7 +3909,7 @@ function trapModalFocus(event) {
   }
 }
 
-async function showDetail(courseId) {
+async function showDetail(courseId, opts = {}) {
   const lang = i18n[currentLang];
   const overlay = document.getElementById('modalOverlay');
   const content = document.getElementById('modalContent');
@@ -3918,9 +3920,18 @@ async function showDetail(courseId) {
   detailController = new AbortController();
 
   const opening = !overlay.classList.contains('open');
+  // 首次打开时决定是否叠在个人中心之上；重入（如切换语言重渲）保持当前叠层态。
+  const overAccount = opening ? !!opts.overAccount : modalStackedOnAccount;
   if (opening) {
     modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setModalBackgroundInert(true);
+    if (overAccount) {
+      modalStackedOnAccount = true;
+      overlay.classList.add('modal-over-account');
+      const view = document.getElementById('accountView');
+      if (view) view.inert = true;
+    } else {
+      setModalBackgroundInert(true);
+    }
   }
   currentModalCourseId = courseId;
   content.innerHTML = `
@@ -3931,7 +3942,12 @@ async function showDetail(courseId) {
     <div class="modal-loading"><div class="spinner"></div><span>${esc(lang.modalLoading)}</span></div>`;
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
-  syncURL();
+  if (modalStackedOnAccount) {
+    // 叠层详情不写课程 URL（避免覆盖个人视图的历史状态），改压一条历史项供返回键关闭。
+    if (opening) { history.pushState({ phk: 'coursemodal' }, ''); courseModalHistoryPushed = true; }
+  } else {
+    syncURL();
+  }
   focusModalClose();
 
   try {
@@ -4125,12 +4141,28 @@ async function copyCourseLink() {
   }
 }
 
-function closeModal() {
+function closeModal({ viaPopstate = false } = {}) {
   const overlay = document.getElementById('modalOverlay');
   if (!overlay.classList.contains('open')) return;
   if (detailController) detailController.abort();
   detailController = null;
   overlay.classList.remove('open');
+  if (modalStackedOnAccount) {
+    // 叠在个人中心之上的详情：关闭后回到个人中心，不解除背景 inert、不改 URL。
+    overlay.classList.remove('modal-over-account');
+    modalStackedOnAccount = false;
+    const view = document.getElementById('accountView');
+    if (view) view.inert = false;
+    document.body.style.overflow = 'hidden';
+    currentModalCourseId = null;
+    const owned = courseModalHistoryPushed;
+    courseModalHistoryPushed = false;
+    if (!viaPopstate && owned) { try { history.back(); } catch (e) {} }
+    const backTarget = modalReturnFocus;
+    modalReturnFocus = null;
+    if (backTarget && backTarget.isConnected) requestAnimationFrame(() => backTarget.focus());
+    return;
+  }
   document.body.style.overflow = '';
   setModalBackgroundInert(false);
   currentModalCourseId = null;
@@ -4646,6 +4678,8 @@ let favLimit = 300;
 let pendingFavoriteId = null;    // 未登录时点的那门课，登录成功后自动补收藏
 let favReturnFocus = null;
 let favStackedOnModal = false;   // 面板叠在课程详情弹窗之上打开
+let modalStackedOnAccount = false;   // 课程详情浮层叠在个人中心之上
+let courseModalHistoryPushed = false; // 叠层详情是否压入了历史项
 let favTab = 'login';
 let favResetState = null;        // 找回密码第二步：{ username, questions }
 let favPrefillUsername = '';
@@ -5504,8 +5538,8 @@ function buildFavItem(item) {
 
 function openFavoriteItem(item) {
   if (accountViewOpen) {
-    closeAccountView({ viaPopstate: true, keepFocus: true });
-    showDetail(item.id);
+    // 不再跳回首页：详情浮层叠在个人中心之上打开，关闭后回到个人中心。
+    showDetail(item.id, { overAccount: true });
     return;
   }
   const stacked = favStackedOnModal;
@@ -5741,8 +5775,16 @@ function closeAccountView({ viaPopstate = false, keepFocus = false } = {}) {
   }
 }
 
-window.addEventListener('popstate', () => {
-  if (accountViewOpen) closeAccountView({ viaPopstate: true });
+window.addEventListener('popstate', e => {
+  // 按目标历史状态决定关闭哪一层：先关叠层详情（返回个人中心），再关个人中心。
+  const phk = e.state && e.state.phk;
+  const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
+  if (modalStackedOnAccount && modalOpen && phk !== 'coursemodal') {
+    closeModal({ viaPopstate: true });
+  }
+  if (accountViewOpen && phk !== 'account' && phk !== 'coursemodal') {
+    closeAccountView({ viaPopstate: true });
+  }
 });
 
 function trapAccountFocus(event) {
@@ -6141,6 +6183,16 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  // 叠在个人中心之上的详情浮层优先接管 Escape 与焦点循环。
+  if (modalStackedOnAccount && document.getElementById('modalOverlay').classList.contains('open')) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    } else {
+      trapModalFocus(e);
+    }
+    return;
+  }
   if (accountViewOpen) {
     if (e.key === 'Escape') {
       e.preventDefault();

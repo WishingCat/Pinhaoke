@@ -1189,6 +1189,32 @@ class FrontendContractTests(unittest.TestCase):
         # 从个人视图打开某条收藏
         self.assertIn("if (accountViewOpen) {", function_body("openFavoriteItem"))
 
+        # ---- 任务一：个人中心内浮层看课（详情叠在个人视图之上，不跳首页）----
+        ofi = function_body("openFavoriteItem")
+        self.assertIn("showDetail(item.id, { overAccount: true })", ofi)
+        self.assertNotIn("closeAccountView", ofi)  # 不再关闭个人视图
+        self.assertIn(".modal-overlay.modal-over-account { z-index: 1200; }", HTML)
+        detail3 = function_body("showDetail")
+        self.assertIn("opts.overAccount", detail3)
+        self.assertIn("modalStackedOnAccount = true", detail3)
+        self.assertIn("view.inert = true", detail3)
+        self.assertIn("history.pushState({ phk: 'coursemodal' }", detail3)
+        self.assertIn("function closeModal({ viaPopstate = false } = {})", HTML)
+        closem = function_body("closeModal")
+        self.assertIn("view.inert = false", closem)
+        self.assertIn("modalStackedOnAccount = false", closem)
+        # 叠层详情的 Escape 与焦点优先于个人视图
+        self.assertLess(
+            keydown_new.index("modalStackedOnAccount"),
+            keydown_new.index("if (accountViewOpen) {"),
+        )
+        # popstate 按目标历史状态决策：先关叠层详情，再关个人视图
+        pop = HTML[HTML.index("window.addEventListener('popstate'"):][:500]
+        self.assertIn("const phk = e.state && e.state.phk;", pop)
+        self.assertIn("phk !== 'coursemodal'", pop)
+        self.assertIn("phk !== 'account'", pop)
+        self.assertIn("closeModal({ viaPopstate: true })", pop)
+
     def test_favorite_key_matches_server_normalization(self):
         term_map = re.search(r"const TERM_BY_PREFIX = \{[^}]*\};", HTML).group(0)
         level_map = re.search(r"const LEVEL_BY_PREFIX = \{[^}]*\};", HTML).group(0)
