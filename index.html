@@ -1636,13 +1636,19 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   letter-spacing: 0;
 }
 
-.course-messages { margin: 0 0 22px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.course-message-summary { margin: 0 0 14px; padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: 6px; background: var(--accent-mist); }
 .course-message-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.course-message-head h3 { margin: 0; font-size: 0.94rem; color: var(--ink); }
-.course-message-hint { margin: 6px 0 10px; font-size: 0.76rem; line-height: 1.7; color: var(--ink-3); }
-.course-messages .course-message-list { padding: 0; max-height: 310px; overflow-y: auto; gap: 8px; }
+.course-message-label { font-size: 0.74rem; font-weight: 700; color: var(--ink-2); }
+.course-correction-button { padding: 4px 8px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); font-size: 0.74rem; font-weight: 600; white-space: nowrap; }
+.course-summary-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; padding: 0; margin-top: 4px; text-align: left; background: transparent; color: var(--ink-2); font-size: 0.74rem; line-height: 1.6; overflow-wrap: anywhere; }
+#courseCorrectionOverlay { z-index: 1500; }
+.course-correction-panel { max-width: 600px; max-height: 88vh; }
+.course-correction-name { margin: 0; padding: 0 18px 8px; color: var(--ink-2); font-size: 0.82rem; font-weight: 600; }
+.course-correction-body { overflow-y: auto; min-height: 0; padding: 0 18px 18px; }
+.course-existing-notes { margin: 18px 0 10px; font-size: 0.85rem; color: var(--ink); }
+.course-messages .course-message-list { padding: 0; gap: 8px; overflow: visible; }
 .course-messages .msg-more { width: 100%; margin: 10px 0 0; }
-.course-messages .course-message-form { padding: 12px 0 0; border-bottom: 0; }
+.course-messages .course-message-form { padding: 0; border-bottom: 0; }
 .course-messages > .msg-status { margin: 6px 0 0; }
 .course-messages [hidden] { display: none !important; }
 
@@ -2435,6 +2441,19 @@ window._hmt.push(['_trackPageview', location.pathname]);
       <li class="sponsor-chip"><span class="sponsor-name">罗淦-PKU</span><span class="sponsor-amount">¥100</span></li>
       <li class="sponsor-chip"><span class="sponsor-name">林哲-政管-23MPA</span><span class="sponsor-amount">¥200</span></li>
     </ul>
+  </div>
+</div>
+
+<!-- Course information corrections -->
+<div class="modal-overlay" id="courseCorrectionOverlay" role="dialog" aria-modal="true" aria-labelledby="courseCorrectionTitle" onclick="if(event.target===this)closeCourseCorrection()">
+  <div class="msg-panel course-correction-panel">
+    <div class="msg-head">
+      <span class="modal-title" id="courseCorrectionTitle">修正信息</span>
+      <button class="modal-close" type="button" onclick="closeCourseCorrection()" aria-label="关闭课程修正窗口">&times;</button>
+    </div>
+    <p class="course-correction-name" id="courseCorrectionName"></p>
+    <p class="msg-hint">这里用于补充或修正课程信息，例如上课时间、地点、考核方式或课程资料的变化。提交的备注公开可见，供其他同学参考。</p>
+    <div class="course-correction-body" id="courseCorrectionBody"></div>
   </div>
 </div>
 
@@ -4294,23 +4313,60 @@ function trapSponsorFocus(event) {
 }
 
 /* ===== Message board ===== */
+let courseCorrectionReturnFocus = null;
+let courseCorrectionHistoryPushed = false;
+
+function openCourseCorrection(content, course) {
+  const overlay = document.getElementById('courseCorrectionOverlay');
+  if (overlay.classList.contains('open') || currentModalCourseId !== course.id) return;
+  courseCorrectionReturnFocus = document.activeElement;
+  document.getElementById('courseCorrectionName').textContent = course.course_name;
+  document.getElementById('courseCorrectionBody').replaceChildren(content);
+  document.getElementById('modalOverlay').inert = true;
+  overlay.classList.add('open');
+  history.pushState({ phk: 'coursecorrection' }, '');
+  courseCorrectionHistoryPushed = true;
+  requestAnimationFrame(() => overlay.querySelector('textarea')?.focus());
+}
+
+function closeCourseCorrection({ viaPopstate = false, returnFocus = true } = {}) {
+  const overlay = document.getElementById('courseCorrectionOverlay');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  document.getElementById('modalOverlay').inert = false;
+  const owned = courseCorrectionHistoryPushed;
+  courseCorrectionHistoryPushed = false;
+  if (!viaPopstate && owned) history.back();
+  const target = courseCorrectionReturnFocus;
+  courseCorrectionReturnFocus = null;
+  if (returnFocus && target?.isConnected) requestAnimationFrame(() => target.focus({ preventScroll: true }));
+}
+
+function trapCourseCorrectionFocus(event) {
+  if (event.key !== 'Tab') return;
+  const overlay = document.getElementById('courseCorrectionOverlay');
+  const focusable = [...overlay.querySelectorAll('button, textarea, input, [href], [tabindex]:not([tabindex="-1"])')]
+    .filter(element => !element.disabled && element.offsetParent !== null);
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    event.preventDefault(); last?.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+    event.preventDefault(); first?.focus();
+  }
+}
+
 function mountCourseMessages(host, course) {
-  const section = msgElement('section', 'course-messages');
-  section.setAttribute('aria-label', '课程留言');
+  const section = msgElement('div', 'course-messages');
+  const summary = msgElement('section', 'course-message-summary');
+  summary.setAttribute('aria-label', '课程补充信息');
   const head = msgElement('div', 'course-message-head');
-  const title = msgElement('h3', null, '课程留言');
+  const title = msgElement('span', 'course-message-label', '课程补充');
   const form = msgElement('form', 'msg-form course-message-form');
-  form.hidden = true;
-  form.id = `courseMessageForm-${course.id}`;
-  const write = msgButton('写留言', 'msg-action', () => {
-    form.hidden = !form.hidden;
-    write.setAttribute('aria-expanded', String(!form.hidden));
-    if (!form.hidden) input.focus();
-  });
-  write.setAttribute('aria-expanded', 'false');
-  write.setAttribute('aria-controls', form.id);
+  const write = msgButton('修正信息', 'course-correction-button', () => openCourseCorrection(section, course));
+  write.setAttribute('aria-haspopup', 'dialog');
   head.append(title, write);
-  const hint = msgElement('p', 'course-message-hint', '分享课程变化、选课提醒，或提出信息修改建议。');
+  const preview = msgButton('正在查看课程补充…', 'course-summary-preview', () => openCourseCorrection(section, course));
+  preview.setAttribute('aria-label', '查看课程补充信息');
   const list = msgElement('div', 'msg-list course-message-list');
   list.setAttribute('aria-label', '本课程留言，最新优先');
   const status = msgElement('p', 'msg-status');
@@ -4319,20 +4375,21 @@ function mountCourseMessages(host, course) {
   more.hidden = true;
   const input = msgElement('textarea');
   input.maxLength = 500; input.rows = 3;
-  input.placeholder = '写下你想补充的课程信息…（最多 500 字，所有人可见）';
-  input.setAttribute('aria-label', '课程留言内容');
+  input.placeholder = '例如：教室或时间变化、考核方式调整、课程资料中的错误…（最多 500 字）';
+  input.setAttribute('aria-label', '补充或修正课程信息');
   const postStatus = msgElement('span', 'msg-status');
   postStatus.setAttribute('role', 'status');
-  const submit = msgElement('button', 'msg-submit', '发布课程留言');
+  const submit = msgElement('button', 'msg-submit', '提交补充');
   submit.type = 'submit';
   const foot = msgElement('div', 'msg-form-foot');
   foot.append(postStatus, submit); form.append(input, foot);
-  section.append(head, hint, list, status, more, form);
-  host.prepend(section);
+  section.append(form, msgElement('h3', 'course-existing-notes', '已有补充'), list, status, more);
+  summary.append(head, preview);
+  host.prepend(summary);
 
   const url = `/api/courses/${encodeURIComponent(course.id)}/messages`;
   const signal = detailController?.signal;
-  const current = () => section.isConnected && currentModalCourseId === course.id && !signal?.aborted;
+  const current = () => summary.isConnected && currentModalCourseId === course.id && !signal?.aborted;
   let beforeId = 0, total = 0, loading = false, posting = false, request = 0;
   async function load(reset) {
     if (loading && !reset) return;
@@ -4351,13 +4408,15 @@ function mountCourseMessages(host, course) {
       });
       if (data.messages.length) beforeId = data.messages[data.messages.length - 1].id;
       total = data.total;
-      title.textContent = total ? `课程留言（${total}）` : '课程留言';
+      title.textContent = total ? `课程补充（${total}）` : '课程补充';
+      if (reset || beforeId === 0) preview.textContent = data.messages[0]?.content || '有课程变化？点击“修正信息”补充。';
       more.hidden = !data.has_more;
       more.textContent = '加载更多留言';
       status.textContent = total ? '' : '还没有课程留言，欢迎补充。';
     } catch (error) {
       if (!current() || sequence !== request) return;
       status.textContent = '课程留言加载失败，请重试';
+      if (!total) preview.textContent = '补充信息暂时无法加载，点击重试。';
       more.hidden = false; more.textContent = '重试加载';
     } finally {
       if (current() && sequence === request) { loading = false; more.disabled = false; }
@@ -4379,7 +4438,8 @@ function mountCourseMessages(host, course) {
       if (!current()) return;
       input.value = ''; postStatus.textContent = '课程留言已发布';
       list.prepend(renderMessage(message));
-      title.textContent = `课程留言（${++total}）`;
+      title.textContent = `课程补充（${++total}）`;
+      preview.textContent = message.content;
       await load(true);
     } catch (error) {
       if (current()) postStatus.textContent = '发布失败，请稍后再试';
@@ -5870,6 +5930,8 @@ function closeAccountView({ viaPopstate = false, keepFocus = false } = {}) {
 window.addEventListener('popstate', e => {
   // 按目标历史状态决定关闭哪一层：先关叠层详情（返回个人中心），再关个人中心。
   const phk = e.state && e.state.phk;
+  if (document.getElementById('courseCorrectionOverlay').classList.contains('open') && phk !== 'coursecorrection') closeCourseCorrection({ viaPopstate: true });
+  if (phk === 'coursecorrection') return;
   const modalOpen = document.getElementById('modalOverlay').classList.contains('open');
   if (modalStackedOnAccount && modalOpen && phk !== 'coursemodal') {
     closeModal({ viaPopstate: true });
@@ -6281,6 +6343,11 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (document.getElementById('courseCorrectionOverlay').classList.contains('open')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeCourseCorrection(); }
+    else trapCourseCorrectionFocus(e);
+    return;
+  }
   // 叠在个人中心之上的详情浮层优先接管 Escape 与焦点循环。
   if (modalStackedOnAccount && document.getElementById('modalOverlay').classList.contains('open')) {
     if (e.key === 'Escape') {

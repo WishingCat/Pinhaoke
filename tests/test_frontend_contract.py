@@ -146,14 +146,18 @@ class FrontendContractTests(unittest.TestCase):
     def test_course_messages_are_first_and_rendered_safely(self):
         self.assertIn("mountCourseMessages(content.querySelector('.modal-body'), c)", function_body('showDetail'))
         body = function_body('mountCourseMessages')
-        self.assertIn('host.prepend(section)', body)
-        self.assertIn('section.isConnected', body)
+        self.assertIn('host.prepend(summary)', body)
+        self.assertIn('summary.isConnected', body)
         self.assertIn('currentModalCourseId === course.id', body)
         self.assertIn('sequence !== request', body)
         self.assertIn('encodeURIComponent(course.id)', body)
         self.assertIn('renderMessage(message)', body)
         self.assertIn('JSON.stringify({content})', body)
         self.assertNotIn('innerHTML', body)
+        self.assertIn('openCourseCorrection(section, course)', body)
+        self.assertIn('-webkit-line-clamp: 2', HTML)
+        self.assertIn('这里用于补充或修正课程信息', HTML)
+        self.assertIn("history.pushState({ phk: 'coursecorrection' }", function_body('openCourseCorrection'))
 
     def run_node(self, script):
         if not NODE:
@@ -1247,7 +1251,7 @@ class FrontendContractTests(unittest.TestCase):
             keydown_new.index("if (accountViewOpen) {"),
         )
         # popstate 按目标历史状态决策：先关叠层详情，再关个人视图
-        pop = HTML[HTML.index("window.addEventListener('popstate'"):][:500]
+        pop = HTML[HTML.index("window.addEventListener('popstate'"):][:1000]
         self.assertIn("const phk = e.state && e.state.phk;", pop)
         self.assertIn("phk !== 'coursemodal'", pop)
         self.assertIn("phk !== 'account'", pop)
