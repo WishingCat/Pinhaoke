@@ -195,6 +195,12 @@ git diff --check
 - 前端渲染留言、回复、昵称和更新日志必须使用 `textContent` 或 DOM API，禁止拼入 `innerHTML`。两页的留言板 UI 与行为保持一致。
 - `GET /api/changelog` 从 `BASE_DIR / "changelog.json"` 读取唯一的中文更新记录并返回 `no-store`；日志只收录主要功能与数据更新，不记录功能回退、修复和细微调整，重大记录设 `major: true`，两页均加粗日期、标题与内容；留言板顶部按钮在留言与更新日志子页面间切换，隐藏子页退出键盘焦点顺序，沿用弹窗焦点约束。
 
+课程留言契约：
+
+- `GET /api/courses/{course_id}/messages` 使用 `before_id` 游标倒序分页（默认 5 条，最多 50 条），返回 `{messages, total, has_more}`；`POST` 使用 `{content}`，校验真实课程与可信 Origin，沿用昵称、长度和全站留言限流，响应 `no-store`。
+- 留言库版本 2 在锁内新增 `course_key`（旧记录默认空字符串）及 `(course_key, parent_id, id)` 索引。课程讨论键由服务器按实际学期名称、培养层次、课程号、班号生成，不依赖本地行 ID 或教师；课程留言回复继承根留言的键。站点留言板只列出空键的根留言，旧留言和回复保留。
+- 课程详情正文最上方挂载独立留言区，先显示最新内容，再按需展开输入框；复用安全的留言和回复渲染。读取绑定详情的取消信号，配合课程 ID、节点存活与请求序号检查，避免切课或关闭后写入新课程的页面。
+
 访问统计契约：
 
 - `visit_days` 按北京时间（UTC+8）分日，主键 `(day, ip_hash)`；同一访客当天多次访问只累加 `views`，`COUNT(*)` 即当日访客数，跨日访客用 `COUNT(DISTINCT ip_hash)`。

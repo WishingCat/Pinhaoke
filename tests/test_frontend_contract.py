@@ -143,6 +143,18 @@ class FrontendContractTests(unittest.TestCase):
             }})().catch(error => {{ console.error(error); process.exit(1); }});
         """)
 
+    def test_course_messages_are_first_and_rendered_safely(self):
+        self.assertIn("mountCourseMessages(content.querySelector('.modal-body'), c)", function_body('showDetail'))
+        body = function_body('mountCourseMessages')
+        self.assertIn('host.prepend(section)', body)
+        self.assertIn('section.isConnected', body)
+        self.assertIn('currentModalCourseId === course.id', body)
+        self.assertIn('sequence !== request', body)
+        self.assertIn('encodeURIComponent(course.id)', body)
+        self.assertIn('renderMessage(message)', body)
+        self.assertIn('JSON.stringify({content})', body)
+        self.assertNotIn('innerHTML', body)
+
     def run_node(self, script):
         if not NODE:
             self.skipTest("node is unavailable; JavaScript behavior contract skipped")

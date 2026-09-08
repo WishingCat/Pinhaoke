@@ -1636,6 +1636,16 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   letter-spacing: 0;
 }
 
+.course-messages { margin: 0 0 22px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.course-message-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.course-message-head h3 { margin: 0; font-size: 0.94rem; color: var(--ink); }
+.course-message-hint { margin: 6px 0 10px; font-size: 0.76rem; line-height: 1.7; color: var(--ink-3); }
+.course-messages .course-message-list { padding: 0; max-height: 310px; overflow-y: auto; gap: 8px; }
+.course-messages .msg-more { width: 100%; margin: 10px 0 0; }
+.course-messages .course-message-form { padding: 12px 0 0; border-bottom: 0; }
+.course-messages > .msg-status { margin: 6px 0 0; }
+.course-messages [hidden] { display: none !important; }
+
 .course-save-actions { display: flex; align-items: center; gap: 8px; }
 
 .modal-head-actions {
@@ -4091,6 +4101,7 @@ async function showDetail(courseId, opts = {}) {
     syncFavButton(favToggle, lang);
     const timetableAction = createTimetableButton(c);
     favToggle.before(timetableAction);
+    mountCourseMessages(content.querySelector('.modal-body'), c);
     if (favUser && !timetableLoaded) loadTimetable();
     refreshDetailChooser();
     if (!overlay.contains(document.activeElement)) focusModalClose();
@@ -4283,6 +4294,103 @@ function trapSponsorFocus(event) {
 }
 
 /* ===== Message board ===== */
+function mountCourseMessages(host, course) {
+  const section = msgElement('section', 'course-messages');
+  section.setAttribute('aria-label', '课程留言');
+  const head = msgElement('div', 'course-message-head');
+  const title = msgElement('h3', null, '课程留言');
+  const form = msgElement('form', 'msg-form course-message-form');
+  form.hidden = true;
+  form.id = `courseMessageForm-${course.id}`;
+  const write = msgButton('写留言', 'msg-action', () => {
+    form.hidden = !form.hidden;
+    write.setAttribute('aria-expanded', String(!form.hidden));
+    if (!form.hidden) input.focus();
+  });
+  write.setAttribute('aria-expanded', 'false');
+  write.setAttribute('aria-controls', form.id);
+  head.append(title, write);
+  const hint = msgElement('p', 'course-message-hint', '分享课程变化、选课提醒，或提出信息修改建议。');
+  const list = msgElement('div', 'msg-list course-message-list');
+  list.setAttribute('aria-label', '本课程留言，最新优先');
+  const status = msgElement('p', 'msg-status');
+  status.setAttribute('role', 'status');
+  const more = msgButton('加载更多留言', 'msg-more', () => load(false));
+  more.hidden = true;
+  const input = msgElement('textarea');
+  input.maxLength = 500; input.rows = 3;
+  input.placeholder = '写下你想补充的课程信息…（最多 500 字，所有人可见）';
+  input.setAttribute('aria-label', '课程留言内容');
+  const postStatus = msgElement('span', 'msg-status');
+  postStatus.setAttribute('role', 'status');
+  const submit = msgElement('button', 'msg-submit', '发布课程留言');
+  submit.type = 'submit';
+  const foot = msgElement('div', 'msg-form-foot');
+  foot.append(postStatus, submit); form.append(input, foot);
+  section.append(head, hint, list, status, more, form);
+  host.prepend(section);
+
+  const url = `/api/courses/${encodeURIComponent(course.id)}/messages`;
+  const signal = detailController?.signal;
+  const current = () => section.isConnected && currentModalCourseId === course.id && !signal?.aborted;
+  let beforeId = 0, total = 0, loading = false, posting = false, request = 0;
+  async function load(reset) {
+    if (loading && !reset) return;
+    const sequence = ++request;
+    loading = true; more.disabled = true;
+    status.textContent = '正在加载课程留言…';
+    try {
+      const resp = await fetch(`${url}?before_id=${reset ? 0 : beforeId}&page_size=5`, { cache:'no-store', signal });
+      if (!resp.ok) throw new Error('load failed');
+      const data = await resp.json();
+      if (!current() || sequence !== request) return;
+      if (reset) { list.textContent = ''; beforeId = 0; list.scrollTop = 0; }
+      const existing = new Set([...list.children].map(item => item.dataset.messageId));
+      data.messages.forEach(message => {
+        if (!existing.has(String(message.id))) list.appendChild(renderMessage(message));
+      });
+      if (data.messages.length) beforeId = data.messages[data.messages.length - 1].id;
+      total = data.total;
+      title.textContent = total ? `课程留言（${total}）` : '课程留言';
+      more.hidden = !data.has_more;
+      more.textContent = '加载更多留言';
+      status.textContent = total ? '' : '还没有课程留言，欢迎补充。';
+    } catch (error) {
+      if (!current() || sequence !== request) return;
+      status.textContent = '课程留言加载失败，请重试';
+      more.hidden = false; more.textContent = '重试加载';
+    } finally {
+      if (current() && sequence === request) { loading = false; more.disabled = false; }
+    }
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (posting) return;
+    const content = input.value.trim();
+    if (!content || [...content].length > 500) { postStatus.textContent = '请输入 1 到 500 字的内容'; return; }
+    posting = true; submit.disabled = true; input.readOnly = true;
+    postStatus.textContent = '发布中…';
+    try {
+      const resp = await fetch(url, { method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify({content}) });
+      if (!current()) return;
+      if (!resp.ok) { postStatus.textContent = resp.status === 404 ? '课程已不在课程库中，请刷新后重试' : messagePostError(resp); return; }
+      const message = await resp.json();
+      if (!current()) return;
+      input.value = ''; postStatus.textContent = '课程留言已发布';
+      list.prepend(renderMessage(message));
+      title.textContent = `课程留言（${++total}）`;
+      await load(true);
+    } catch (error) {
+      if (current()) postStatus.textContent = '发布失败，请稍后再试';
+    } finally {
+      posting = false;
+      if (current()) { submit.disabled = false; input.readOnly = false; }
+    }
+  });
+  load(true);
+}
+
 let msgReturnFocus = null;
 let msgPage = 0;
 let msgTotal = 0;

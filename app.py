@@ -227,6 +227,13 @@ def get_messages_db():
                 conn.execute("CREATE INDEX idx_messages_parent ON messages(parent_id, id)")
                 conn.execute("PRAGMA user_version = 1")
             conn.commit()
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 2:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("PRAGMA user_version").fetchone()[0] < 2:
+                conn.execute("ALTER TABLE messages ADD COLUMN course_key TEXT NOT NULL DEFAULT ''")
+                conn.execute("CREATE INDEX idx_messages_course ON messages(course_key, parent_id, id)")
+                conn.execute("PRAGMA user_version = 2")
+            conn.commit()
         yield conn
     finally:
         if conn is not None:
@@ -1883,13 +1890,14 @@ def _require_root_message(conn, message_id: int) -> None:
 
 
 def _insert_message(content: str, ip_hash: str, nickname: str = DEFAULT_NICKNAME,
-                    parent_id: int | None = None) -> dict:
+                    parent_id: int | None = None, course_key: str = "") -> dict:
     now = int(time.time())
     with get_messages_db() as conn:
         # 回复与留言共享频率限制；串行化检查与写入以防并发绕过。
         conn.execute("BEGIN IMMEDIATE")
         if parent_id is not None:
             _require_root_message(conn, parent_id)
+            course_key = conn.execute("SELECT course_key FROM messages WHERE id=?", (parent_id,)).fetchone()[0]
         for window, limit in MESSAGE_RATE_LIMITS:
             recent = conn.execute(
                 "SELECT COUNT(*) FROM messages WHERE ip_hash=? AND posted_at>?",
@@ -1900,9 +1908,9 @@ def _insert_message(content: str, ip_hash: str, nickname: str = DEFAULT_NICKNAME
                     status_code=429, detail="Too many messages, please retry later"
                 )
         cursor = conn.execute(
-            "INSERT INTO messages (posted_at, content, ip_hash, nickname, parent_id)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (now, content, ip_hash, nickname, parent_id),
+            "INSERT INTO messages (posted_at, content, ip_hash, nickname, parent_id, course_key)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (now, content, ip_hash, nickname, parent_id, course_key),
         )
         conn.commit()
         message_id = cursor.lastrowid
@@ -1918,11 +1926,11 @@ def list_messages(
     _validate_message_pagination(page, page_size)
     offset = (page - 1) * page_size
     with get_messages_db() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM messages WHERE parent_id IS NULL").fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM messages WHERE parent_id IS NULL AND course_key=''").fetchone()[0]
         rows = conn.execute(
             "SELECT m.id, m.posted_at, m.content, m.nickname,"
             " (SELECT COUNT(*) FROM messages r WHERE r.parent_id=m.id) AS reply_count"
-            " FROM messages m WHERE m.parent_id IS NULL"
+            " FROM messages m WHERE m.parent_id IS NULL AND m.course_key=''"
             " ORDER BY m.id DESC LIMIT ? OFFSET ?",
             (page_size, offset),
         ).fetchall()
@@ -1966,6 +1974,45 @@ def create_message_reply(message_id: int, request: Request, payload: dict = Body
     _require_trusted_origin(request)
     content = _validate_message_content(payload)
     return _insert_message(content, _client_ip_hash(request), _message_nickname(request), message_id)
+
+
+def _course_message_key(course_id: str) -> str:
+    # 绑定真实学期、培养层次、课程号和班号；换教师或重建本地 ID 不丢失讨论。
+    snapshot = _favorite_snapshot(course_id)
+    return json.dumps([snapshot[field] for field in ("term_label", "level", "course_code", "class_no")],
+                      ensure_ascii=False, separators=(",", ":"))
+
+
+@app.get("/api/courses/{course_id}/messages")
+def list_course_messages(
+    course_id: str,
+    before_id: int = Query(0, ge=0, le=2**63 - 1),
+    page_size: int = Query(5, ge=1, le=MESSAGE_PAGE_SIZE_MAX),
+):
+    _validate_message_pagination(1, page_size)
+    if isinstance(before_id, bool) or not isinstance(before_id, int) or not 0 <= before_id <= 2**63 - 1:
+        raise HTTPException(status_code=422, detail="Invalid message query parameter")
+    key = _course_message_key(course_id)
+    with get_messages_db() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM messages WHERE course_key=? AND parent_id IS NULL", (key,)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT m.id, m.posted_at, m.content, m.nickname,"
+            " (SELECT COUNT(*) FROM messages r WHERE r.parent_id=m.id) AS reply_count"
+            " FROM messages m WHERE m.course_key=? AND m.parent_id IS NULL"
+            " AND (?=0 OR m.id<?) ORDER BY m.id DESC LIMIT ?",
+            (key, before_id, before_id, page_size + 1),
+        ).fetchall()
+    return _no_store({"messages": [dict(row) for row in rows[:page_size]],
+                      "total": total, "has_more": len(rows) > page_size})
+
+
+@app.post("/api/courses/{course_id}/messages", status_code=201)
+def create_course_message(course_id: str, request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    content = _validate_message_content(payload)
+    key = _course_message_key(course_id)
+    return _no_store(_insert_message(content, _client_ip_hash(request), _message_nickname(request), course_key=key),
+                     status_code=201)
 
 
 @app.get("/api/changelog")

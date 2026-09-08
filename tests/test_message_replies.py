@@ -214,7 +214,7 @@ class MessageRepliesAndNicknameTests(unittest.TestCase):
         self.assertIn("3152", json.dumps(entries, ensure_ascii=False))
         self.assertNotIn("语言切换与手机导航优化", {e["title"] for e in entries})
         self.assertEqual({e["title"] for e in entries if e.get("major")},
-                         {"2026 秋季课程数据更新", "账号、收藏夹与个人中心", "我的课表与收藏课程卡片"})
+                         {"2026 秋季课程数据更新", "账号、收藏夹与个人中心", "我的课表与收藏课程卡片", "课程留言与信息补充"})
 
 
 if __name__ == "__main__":
