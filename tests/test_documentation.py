@@ -60,7 +60,7 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("七份 tracked Markdown", text)
         self.assertNotIn("AGENTS.md", text)
 
-    def test_readme_has_https_terms_and_correct_sponsor_labels(self):
+    def test_readme_has_https_terms_and_no_sponsor_display(self):
         text = read("README.md")
         self.assertIn("https://www.pinhaoke.love", text)
         self.assertIn("### 留言板", text)
@@ -78,8 +78,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("POST /api/favorites/remove", text)
         self.assertIn("POST /api/favorites/set-collections", text)
         self.assertIn("POST /api/collections", text)
-        self.assertIn("### 赞助面板", text)
-        self.assertIn("不再跳转 GitHub", text)
+        self.assertIn("### 关于项目", text)
+        self.assertIn("## 反馈与联系", text)
         self.assertLess(text.index("2026 春季"), text.index("2026 暑期"))
         self.assertLess(text.index("2026 暑期"), text.index("2026 秋季"))
         self.assertIn("秋季为默认学期", text)
@@ -106,14 +106,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", text)
         self.assertIn("AbortController", text)
         self.assertIn("完整树洞仅指输入快照", text)
-        self.assertRegex(
-            text,
-            r'wechat_sponsor\.jpg"[^>]*alt="微信赞助码"[^\n]*微信赞助码',
-        )
-        self.assertRegex(
-            text,
-            r'alipay_sponsor\.jpg"[^>]*alt="支付宝赞助码"[^\n]*支付宝赞助码',
-        )
+        self.assertNotIn("赞助", text)
+        self.assertNotIn("sponsor", text)
 
     def test_claude_matches_engineering_contracts(self):
         text = read("CLAUDE.md")

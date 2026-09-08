@@ -269,8 +269,8 @@ class FrontendContractTests(unittest.TestCase):
             self.assertIn('aria-label="关闭访问统计"', page)
 
     def test_sponsor_button_opens_in_page_panel_with_qr_codes_and_thanks(self):
-        readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
-        sponsors = re.findall(r"^\| (?!赞助者)([^|]+?) \| (¥\d+) \|$", readme, flags=re.M)
+        sponsor_list = re.search(r'<ul class="sponsor-list">.*?</ul>', HTML, flags=re.S).group(0)
+        sponsors = re.findall(r'<li class="sponsor-chip">.*?</li>', sponsor_list, flags=re.S)
         self.assertGreaterEqual(len(sponsors), 3)
         for page in (HTML, REVIEWS_HTML):
             # 赞助按钮不再跳转 GitHub，而是打开站内悬浮面板
@@ -280,22 +280,26 @@ class FrontendContractTests(unittest.TestCase):
                 page,
             )
             self.assertIn('id="sponsorOverlay" role="dialog" aria-modal="true"', page)
+            panel = re.search(
+                r'<div[^>]+id="sponsorOverlay".*?</ul>\s*</div>\s*</div>', page, flags=re.S
+            ).group(0)
+            outside_panel = page.replace(panel, "", 1)
             # 面板依次展示两个赞助码、微信联系二维码和鸣谢名单，图片来自 /Images/
             for asset in (
                 'src="/Images/wechat_sponsor.jpg?v=2" alt="微信赞助码"',
                 'src="/Images/alipay_sponsor.jpg?v=2" alt="支付宝赞助码"',
                 'src="/Images/MyWeChat.jpg" alt="微信联系方式"',
             ):
-                self.assertIn(asset, page)
+                self.assertIn(asset, panel)
+            for asset in ("wechat_sponsor.jpg", "alipay_sponsor.jpg"):
+                self.assertNotIn(asset, outside_panel)
             self.assertLess(page.index('alt="微信赞助码"'), page.index('alt="支付宝赞助码"'))
             self.assertLess(page.index('alt="支付宝赞助码"'), page.index('alt="微信联系方式"'))
             self.assertLess(page.index('alt="微信联系方式"'), page.index(">鸣谢赞助<"))
-            # 鸣谢名单必须与 README 的“鸣谢赞助”表一致
-            for name, amount in sponsors:
-                self.assertIn(
-                    f'<span class="sponsor-name">{name}</span><span class="sponsor-amount">{amount}</span>',
-                    page,
-                )
+            # 两个网页的名单、金额与日期保持一致，且只在赞助面板内展示。
+            self.assertIn(sponsor_list, panel)
+            self.assertNotIn('class="sponsor-name"', outside_panel)
+            self.assertNotIn('class="sponsor-amount"', outside_panel)
             self.assertEqual(page.count('class="sponsor-chip"'), len(sponsors))
             # 焦点与键盘契约；关闭后先钉住悬浮卡再把焦点还给赞助按钮
             self.assertIn("function trapSponsorFocus", page)

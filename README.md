@@ -85,13 +85,9 @@
 - 按学期和周次（含源记录中的第 0 周）查看星期 / 节次表，支持单双周和多段时间；移动端可横向滚动。可能重叠的课程高亮提示，无法识别的时间保留在下方课程列表供核对。
 - `GET /api/timetable`、`POST /api/timetable`（`id`）、`POST /api/timetable/remove`（`course_key`）均要求登录；写入校验来源并限流，每账号最多 100 门，重复添加不会产生重复记录。
 
-### 赞助面板
+### 关于项目
 
-关于面板显示“纯公益项目 · 实时更新”；项目开发为 Zengji Tu，鸣谢 Ningjing Wang、Tingyi Huang，页脚同步。面板采用简洁的标签与内容对齐布局，GitHub 和赞助入口统一放在底部。面板与首页共用 Logo，浏览器标签页使用同图的圆形图标。
-
-- 关于悬浮卡中的“赞助”按钮不再跳转 GitHub，而是打开站内悬浮赞助面板
-- 面板顶部强调赞助后可微信联系或转账备注留名，以便加入赞助列表；随后依次展示微信赞助码、支付宝赞助码、开发者微信二维码和鸣谢赞助名单，图片直接来自 `Images/`
-- 鸣谢名单与本文档“鸣谢赞助”表保持一致，由前端契约测试校验
+关于面板显示“纯公益项目 · 实时更新”；项目开发为 Zengji Tu，鸣谢 Ningjing Wang、Tingyi Huang，页脚同步。面板采用简洁的标签与内容对齐布局，GitHub 入口位于底部。面板与首页共用 Logo，浏览器标签页使用同图的圆形图标。
 
 ### 通用体验
 
@@ -228,7 +224,7 @@ python3 -m unittest discover -s tests -v
 app.py                         FastAPI API 与只读 SQLite 查询
 index.html                     无构建步骤的课程搜索页
 reviews.html                   无构建步骤的树洞课程评测页
-Images/                        Logo、联系方式与赞助图片
+Images/                        Logo、联系方式与网站图片
 数据库/                        五个课程库与一个树洞评测库
 课程数据/                      九份 JSON（含历史快照和合并结果）与数据口径说明
 数据库构建脚本/                春季、树洞评测建库及共享原子构建工具
@@ -248,24 +244,8 @@ tests/                         后端、数据、前端契约、部署与文档�
 - [生产部署与回滚](deploy/README.md)
 - [V1 归档说明](归档/README.md)
 
-## 反馈与赞助
+## 反馈与联系
 
 只要课程搜索仍被需要，项目会按学期维护。问题与功能建议可通过微信联系：
 
 <p align="center"><img src="Images/MyWeChat.jpg" alt="微信联系方式" width="200"></p>
-
-<table align="center"><tr>
-<td align="center"><img src="Images/wechat_sponsor.jpg" alt="微信赞助码" width="150"><br>微信赞助码</td>
-<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
-<td align="center"><img src="Images/alipay_sponsor.jpg" alt="支付宝赞助码" width="150"><br>支付宝赞助码</td>
-</tr></table>
-
-以上二维码与下方鸣谢名单同样可在网站关于悬浮卡的“赞助”面板中查看，不再需要访问 GitHub。
-
-### 鸣谢赞助
-
-| 赞助者 | 金额 |
-|---|---:|
-| 噬铁侠 | ¥300 |
-| 罗淦-PKU | ¥100 |
-| 林哲-政管-23MPA | ¥200 |
