@@ -11,9 +11,9 @@ REVIEWS_HTML = (Path(__file__).resolve().parents[1] / "reviews.html").read_text(
 NODE = shutil.which("node")
 
 
-def function_body(name):
+def function_body(name, page=HTML):
     """Return a complete JS function body without stopping at nested braces."""
-    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{", HTML)
+    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{", page)
     if not match:
         raise AssertionError(f"JavaScript function {name!r} is missing")
 
@@ -25,9 +25,9 @@ def function_body(name):
     block_comment = False
     index = start
 
-    while index < len(HTML):
-        char = HTML[index]
-        nxt = HTML[index + 1] if index + 1 < len(HTML) else ""
+    while index < len(page):
+        char = page[index]
+        nxt = page[index + 1] if index + 1 < len(page) else ""
 
         if line_comment:
             if char == "\n":
@@ -56,17 +56,17 @@ def function_body(name):
         elif char == "}":
             depth -= 1
             if depth == 0:
-                return HTML[start:index]
+                return page[start:index]
         index += 1
 
     raise AssertionError(f"JavaScript function {name!r} has an unclosed body")
 
 
-def function_source(name):
-    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{", HTML)
+def function_source(name, page=HTML):
+    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{", page)
     if not match:
         raise AssertionError(f"JavaScript function {name!r} is missing")
-    return match.group(0) + function_body(name) + "}"
+    return match.group(0) + function_body(name, page) + "}"
 
 
 class FrontendContractTests(unittest.TestCase):
@@ -117,7 +117,7 @@ class FrontendContractTests(unittest.TestCase):
         self.run_node(f"""
             const assert = require('node:assert/strict');
             let favUser = {{username:'qa'}}, timetableCourses = [], timetableLoaded = false;
-            let timetableLoading = false, timetableRequest = 0, accountViewOpen = false;
+            let timetableLoading = false, timetableRequest = 0, accountViewOpen = false, favSessionVersion = 0;
             let failRemove = false, callback, loaded = 0, added = 0;
             const ICONS = {{calendar:'<svg></svg>'}};
             const course = {{id:'a1'}}, favoriteKey = () => 'stable-key';
@@ -193,6 +193,290 @@ class FrontendContractTests(unittest.TestCase):
             assert.equal(cards[0].children.length, 0);
             assert.equal(cards[0].classes.has('has-corrections'), false);
             assert.equal(currentCourses[0].has_course_corrections, false);
+        """)
+
+    def test_collection_debounce_keeps_course_snapshot_and_discards_old_session(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            let currentKey = 'course-A', currentIds = [1], favSessionVersion = 0;
+            let favUser = {{username: 'qa'}}, timerId = 0;
+            const timers = new Map(), favCollTimers = new Map();
+            const favItems = new Map([['course-A', {{}}]]), posts = [];
+            const setTimeout = callback => {{ timers.set(++timerId, callback); return timerId; }};
+            const clearTimeout = id => timers.delete(id);
+            const document = {{getElementById: id => id === 'favToggleBtn'
+              ? {{dataset: {{key: currentKey}}}}
+              : {{querySelectorAll: () => currentIds.map(value => ({{value}}))}}}};
+            const favApi = async (method, path, body) => {{ posts.push(body); return {{ok:true,data:{{}}}}; }};
+            const applyFavData = () => {{}}, refreshDetailChooser = () => {{}}, favToast = () => {{}};
+            {function_source('scheduleSetCollections')}
+            (async () => {{
+              scheduleSetCollections('course-A');
+              currentIds = [1, 3]; scheduleSetCollections('course-A');
+              assert.equal(timers.size, 1);
+              currentKey = 'course-B'; currentIds = [2];
+              await [...timers.values()][0]();
+              assert.deepEqual(posts, [{{fav_key:'course-A',collection_ids:[1,3]}}]);
+              timers.clear(); currentKey = 'course-A';
+              scheduleSetCollections('course-A'); favSessionVersion++;
+              await [...timers.values()][0]();
+              assert.equal(posts.length, 1);
+              timers.clear(); scheduleSetCollections('course-A'); favItems.clear();
+              await [...timers.values()][0]();
+              assert.equal(posts.length, 1);
+            }})().catch(error => {{console.error(error); process.exit(1);}});
+        """)
+
+    def test_review_pagination_retries_failed_page_without_discarding_results(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            const PAGE_SIZE=20, requested=[];
+            const state={{query:'',page:1,loaded:20,total:60,loading:false,failed:false,requestId:0,fetchController:null}};
+            const resultsEl={{children:['page-one'],
+              replaceChildren(...children){{this.children=children;}},
+              appendChild(child){{this.children.push(child);}},
+              querySelector(){{ const found=this.children.find(child => child.id==='reviewLoadError');
+                return found ? {{remove:()=>{{this.children=this.children.filter(child=>child!==found);}}}} : null; }} }};
+            const document={{createDocumentFragment:()=>({{children:[],appendChild(child){{this.children.push(child);}}}})}};
+            const loadMoreButton={{querySelector:()=>({{}})}};
+            const makeElement=()=>({{setAttribute(){{}}}}), renderThread=thread=>thread;
+            const renderState=()=>resultsEl.replaceChildren('error'), renderSkeletons=()=>resultsEl.replaceChildren('skeleton');
+            const updateResultHeader=()=>{{}};
+            let fail=true;
+            const fetch=async url=>{{
+              requested.push(Number(new URL(url,'http://local').searchParams.get('page')));
+              return {{ok:!fail,status:503,json:async()=>({{threads:[{{pid:21}}],total:60}})}};
+            }};
+            {function_source('updateLoadMore', REVIEWS_HTML)}
+            {function_source('fetchReviews', REVIEWS_HTML)}
+            (async()=>{{
+              await fetchReviews();
+              assert.equal(state.page,1); assert.equal(state.loaded,20);
+              assert.equal(resultsEl.children[0],'page-one'); assert.equal(state.failed,true);
+              assert.equal(loadMoreButton.hidden,false); assert.equal(loadMoreButton.disabled,false);
+              fail=false; await fetchReviews();
+              assert.deepEqual(requested,[2,2]); assert.equal(state.page,2); assert.equal(state.loaded,21);
+              assert.equal(resultsEl.children[0],'page-one'); assert.equal(resultsEl.children.length,2);
+              fail=true; await fetchReviews({{reset:true}});
+              assert.equal(state.loaded,0); assert.equal(state.failed,true); assert.equal(loadMoreButton.hidden,false);
+              fail=false; await fetchReviews({{reset:true}});
+              assert.deepEqual(requested,[2,2,1,1]); assert.equal(state.page,1); assert.equal(state.loaded,1);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_account_refresh_cannot_restore_logged_out_or_superseded_state(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favUser={{username:'old'}}, favSessionVersion=0, accountRefreshRequest=0;
+            const pending=[], favApi=()=>new Promise(resolve=>pending.push(resolve));
+            const applyAccount=data=>{{favUser={{username:data.username}};}}, setFavUser=user=>{{favUser=user;favSessionVersion++;}};
+            {function_source('refreshAccount')}
+            (async()=>{{
+              const beforeLogout=refreshAccount(); setFavUser(null);
+              pending.shift()({{ok:true,data:{{authenticated:true,username:'old'}}}});
+              assert.equal(await beforeLogout,false); assert.equal(favUser,null);
+              const first=refreshAccount(), second=refreshAccount();
+              const resolveFirst=pending.shift(),resolveSecond=pending.shift();
+              resolveSecond({{ok:true,data:{{authenticated:true,username:'new'}}}}); assert.equal(await second,true);
+              resolveFirst({{ok:true,data:{{authenticated:true,username:'old'}}}}); assert.equal(await first,false);
+              assert.equal(favUser.username,'new');
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_saved_course_api_serializes_writes_and_ignores_old_session_responses(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favSessionVersion=0,accountRefreshRequest=0,favMutationQueue=Promise.resolve(),favUser={{username:'old'}};
+            let favAuthBusy=false,favCookieQueue=Promise.resolve();
+            const favCollTimers=new Map(),requests=[];
+            const favToast=()=>{{}},setFavUser=user=>{{favUser=user;invalidateFavSession();}};
+            const fetch=(url,options)=>new Promise(resolve=>requests.push({{url,options,resolve}}));
+            const finish=(request,status,data)=>request.resolve({{status,ok:status>=200&&status<300,json:async()=>data}});
+            const tick=()=>new Promise(resolve=>setImmediate(resolve));
+            {function_source('invalidateFavSession')}
+            {function_source('favApi')}
+            (async()=>{{
+              const a=favApi('POST','/api/favorites',{{id:'a1'}});
+              const b=favApi('POST','/api/favorites',{{id:'a2'}});
+              await tick(); assert.equal(requests.length,1);
+              finish(requests[0],200,{{favorites:[1]}}); assert.equal((await a).ok,true);
+              await tick(); assert.equal(requests.length,2);
+              finish(requests[1],200,{{favorites:[1,2]}}); assert.equal((await b).ok,true);
+              assert.equal(accountRefreshRequest,2);
+              const oldRead=favApi('GET','/api/account');
+              const oldWrite=favApi('POST','/api/favorites',{{id:'a3'}});
+              await tick();
+              const queuedOldWrite=favApi('POST','/api/favorites',{{id:'a4'}});
+              setFavUser(null); favUser={{username:'new'}};
+              finish(requests[2],401,{{}}); assert.equal((await oldRead).stale,true);
+              assert.equal(favUser.username,'new');
+              finish(requests[3],200,{{favorites:[1,2,3]}}); assert.equal((await oldWrite).stale,true);
+              assert.equal((await queuedOldWrite).stale,true); assert.equal(requests.length,4);
+              const login=favApi('POST','/api/auth/login',{{username:'next'}});
+              await tick();
+              finish(requests[4],200,{{}}); const version=favSessionVersion;
+              assert.equal((await login).ok,true); assert.equal(favSessionVersion,version+1);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_auth_requests_remain_exclusive_across_form_changes_and_cookie_reads(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favUser=null,favSessionVersion=0,accountRefreshRequest=0,favMutationQueue=Promise.resolve();
+            let favAuthBusy=false,favCookieQueue=Promise.resolve(),favBusy=false,browserCookie='old';
+            const favCollTimers=new Map(),requests=[];
+            const favToast=()=>{{}},setFavUser=user=>{{favUser=user;invalidateFavSession();}};
+            const fetch=(url,options)=>new Promise((resolve,reject)=>requests.push({{url,options,resolve,reject}}));
+            const finish=(index,cookie,data={{}})=>{{
+              browserCookie=cookie;
+              requests[index].resolve({{status:200,ok:true,json:async()=>data}});
+            }};
+            const tick=()=>new Promise(resolve=>setImmediate(resolve));
+            {function_source('invalidateFavSession')}
+            {function_source('favApi')}
+            {function_source('favErrorText')}
+            (async()=>{{
+              const initialRead=favApi('GET','/api/account');await tick();
+              const login=favApi('POST','/api/auth/login',{{username:'A'}});
+              // 标签切换会重置表单 busy，但不能解除独立的认证互斥。
+              favBusy=false;
+              for(const action of ['login','register','logout','reset','delete']){{
+                const blocked=await favApi('POST','/api/auth/'+action,{{username:'B'}});
+                assert.equal(blocked.authBusy,true);
+                assert.equal(favErrorText(blocked,{{409:'duplicate name'}}),'账号操作正在进行，请稍后重试');
+              }}
+              for(const endpoint of ['favorites','collections','timetable']){{
+                assert.equal((await favApi('POST','/api/'+endpoint,{{id:'a1'}})).authBusy,true);
+              }}
+              assert.equal(requests.length,1);
+              finish(0,'',{{authenticated:false}});await initialRead;await tick();
+              assert.equal(requests.length,2);assert.equal(requests[1].url,'/api/auth/login');
+              const accountRead=favApi('GET','/api/account');
+              // 较早的账号读取重绘了本地状态，认证结果仍须与浏览器已应用的 Cookie 同步。
+              favSessionVersion++;
+              finish(1,'A',{{username:'A'}});const loggedIn=await login;
+              assert.equal(loggedIn.ok,true);assert.equal(loggedIn.stale,undefined);assert.equal(browserCookie,'A');
+              assert.equal(favUser,null);
+              assert.equal(favAuthBusy,false);await tick();
+              assert.equal(requests.length,3);assert.equal(requests[2].url,'/api/account');
+              const logout=favApi('POST','/api/auth/logout');await tick();
+              assert.equal(requests.length,3);
+              finish(2,'A',{{authenticated:true,username:'A'}});await accountRead;await tick();
+              assert.equal(requests.length,4);assert.equal(requests[3].url,'/api/auth/logout');
+              finish(3,'');assert.equal((await logout).ok,true);assert.equal(browserCookie,'');
+              const failed=favApi('POST','/api/auth/register',{{username:'B'}});await tick();
+              requests[4].reject(new Error('network'));assert.equal((await failed).ok,false);assert.equal(favAuthBusy,false);
+              const retry=favApi('POST','/api/auth/register',{{username:'B'}});await tick();
+              finish(5,'B',{{username:'B'}});assert.equal((await retry).ok,true);assert.equal(browserCookie,'B');
+              favUser={{username:'B'}};
+              const incorrect=favApi('POST','/api/auth/login',{{username:'C'}});await tick();
+              requests[6].resolve({{status:401,ok:false,json:async()=>({{}})}});
+              assert.equal((await incorrect).status,401);assert.equal(favUser.username,'B');assert.equal(browserCookie,'B');
+              const saving=favApi('POST','/api/favorites',{{id:'a1'}});
+              const savingNext=favApi('POST','/api/timetable',{{id:'a2'}});
+              const signingOut=favApi('POST','/api/auth/logout');await tick();
+              assert.equal(requests.length,8);assert.equal(requests[7].url,'/api/favorites');
+              assert.equal((await favApi('POST','/api/timetable',{{id:'a2'}})).authBusy,true);
+              finish(7,'B',{{favorites:[]}});await saving;await tick();
+              assert.equal(requests.length,9);assert.equal(requests[8].url,'/api/timetable');
+              finish(8,'B',{{courses:[]}});await savingNext;await tick();
+              assert.equal(requests.length,10);assert.equal(requests[9].url,'/api/auth/logout');
+              finish(9,'');assert.equal((await signingOut).ok,true);
+              assert.equal(favUser,null);assert.equal(browserCookie,'');
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_expired_favorite_removal_does_not_restore_private_state(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favUser={{username:'qa'}},favSessionVersion=0;
+            const favItems=new Map([['key',{{course_name:'course'}}]]),favCollTimers=new Map();
+            const trCourseName=course=>course.course_name,favoriteKey=()=> 'key',refreshFavoriteButtons=()=>{{}};
+            let expire=true;const notices=[],favLimit=300,favToast=text=>notices.push(text);
+            const favApi=async()=>{{
+              if(!expire)return {{ok:false,status:409,authBusy:true}};
+              favUser=null;favSessionVersion++;favItems.clear();return {{ok:false,status:401}};
+            }};
+            {function_source('favErrorText')}
+            {function_source('toggleFavorite')}
+            (async()=>{{
+              await toggleFavorite({{id:'a1',course_name:'course'}});
+              assert.equal(favUser,null); assert.equal(favItems.size,0);
+              expire=false;favUser={{username:'qa'}};favItems.set('key',{{course_name:'course'}});
+              await toggleFavorite({{id:'a1',course_name:'course'}});
+              assert.equal(favItems.get('key').course_name,'course');
+              favItems.clear();await toggleFavorite({{id:'a1',course_name:'course'}});
+              assert.equal(favItems.size,0);
+              assert.deepEqual(notices,['账号操作正在进行，请稍后重试','账号操作正在进行，请稍后重试']);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_timetable_queued_success_survives_later_failure_and_stale_reads(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favUser={{username:'qa'}},timetableRequest=0,timetableLoading=false,timetableCourses=[];
+            let timetableLoaded=false,timetableTerm='fall',accountViewOpen=false,accountSection='timetable';
+            let favSessionVersion=0,accountRefreshRequest=0,favMutationQueue=Promise.resolve();
+            let favAuthBusy=false,favCookieQueue=Promise.resolve();
+            const favCollTimers=new Map(),requests=[];
+            const fetch=(url,options)=>new Promise((resolve,reject)=>requests.push({{url,options,resolve,reject}}));
+            const finish=(index,courses)=>requests[index].resolve({{status:200,ok:true,json:async()=>({{courses}})}});
+            const tick=()=>new Promise(resolve=>setImmediate(resolve));
+            const updateTimetableButtons=()=>{{}},renderAccountView=()=>{{}},favToast=()=>{{}},favErrorText=()=> 'network';
+            const setFavUser=user=>{{favUser=user;invalidateFavSession();}};
+            {function_source('invalidateFavSession')}
+            {function_source('favApi')}
+            {function_source('loadTimetable')}
+            {function_source('addToTimetable')}
+            {function_source('removeFromTimetable')}
+            (async()=>{{
+              const a=addToTimetable('a1'),b=addToTimetable('a2');
+              await tick();assert.equal(requests.length,1);
+              finish(0,[{{id:'a1'}}]);await a;
+              assert.deepEqual(timetableCourses,[{{id:'a1'}}]);
+              await tick();assert.equal(requests.length,2);
+              requests[1].reject(new Error('network'));await b;
+              assert.deepEqual(timetableCourses,[{{id:'a1'}}]);
+
+              const adding=addToTimetable('a3');await tick();
+              const reading=loadTimetable();
+              assert.equal(requests[2].options.method,'POST');assert.equal(requests[3].options.method,'GET');
+              finish(2,[{{id:'a1'}},{{id:'a3'}}]);await adding;
+              finish(3,[{{id:'a1'}}]);await reading;
+              assert.deepEqual(timetableCourses,[{{id:'a1'}},{{id:'a3'}}]);
+
+              const removing=removeFromTimetable('a1'),later=addToTimetable('a4');
+              await tick();assert.equal(requests.length,5);
+              finish(4,[{{id:'a3'}}]);assert.equal(await removing,true);
+              await tick();requests[5].reject(new Error('network'));await later;
+              assert.deepEqual(timetableCourses,[{{id:'a3'}}]);
+
+              const oldRead=loadTimetable(),oldWrite=addToTimetable('a5');await tick();
+              invalidateFavSession();timetableCourses=[{{id:'new-session'}}];
+              finish(6,[{{id:'a3'}}]);await oldRead;
+              finish(7,[{{id:'a3'}},{{id:'a5'}}]);await oldWrite;
+              assert.deepEqual(timetableCourses,[{{id:'new-session'}}]);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
+    def test_timetable_click_cannot_continue_after_account_changes_while_loading(self):
+        self.run_node(f"""
+            const assert=require('node:assert/strict');
+            let favUser={{username:'A'}},favSessionVersion=0,timetableLoaded=false,timetableCourses=[];
+            let callback,finishLoad,adds=0,removes=0;
+            const ICONS={{calendar:'<svg></svg>'}},favEl=()=>({{}}),favoriteKey=()=> 'key';
+            const favButton=(text,cls,handler)=>{{callback=handler;return {{dataset:{{}},appendChild(){{}},setAttribute(){{}}}};}};
+            const loadTimetable=()=>new Promise(resolve=>finishLoad=resolve);
+            const addToTimetable=async()=>{{adds++;}},removeFromTimetable=async()=>{{removes++;}};
+            {function_source('timetableHas')}
+            {function_source('createTimetableButton')}
+            (async()=>{{
+              const button=createTimetableButton({{id:'a1'}}),pending=callback();
+              assert.equal(button.disabled,true);
+              favUser={{username:'B'}};favSessionVersion++;timetableLoaded=true;
+              finishLoad();await pending;
+              assert.equal(adds,0);assert.equal(removes,0);assert.equal(button.disabled,false);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
         """)
 
     def run_node(self, script):

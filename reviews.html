@@ -273,6 +273,7 @@ html[data-theme="dark"] .entity-alias.entity-color-5 { color: #FFB27A; }
 .state strong { display: block; color: var(--ink); font-size: 1rem; }
 .state span { display: block; margin-top: 6px; font-size: 0.84rem; }
 .state.error strong { color: var(--danger); }
+.review-load-error { margin: 12px 0 0; color: var(--danger); font-size: 0.84rem; text-align: center; }
 .skeleton { height: 210px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; position: relative; }
 .skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 5%, transparent), transparent); transform: translateX(-100%); animation: shimmer 1.2s infinite; }
 
@@ -762,6 +763,7 @@ const state = {
   total: 0,
   loaded: 0,
   loading: false,
+  failed: false,
   requestId: 0,
   fetchController: null,
   popularController: null,
@@ -1177,9 +1179,9 @@ function updateResultHeader() {
 }
 
 function updateLoadMore() {
-  loadMoreButton.hidden = state.loaded >= state.total || state.total === 0;
+  loadMoreButton.hidden = !state.failed && (state.loaded >= state.total || state.total === 0);
   loadMoreButton.disabled = state.loading;
-  loadMoreButton.querySelector('span').textContent = state.loading ? '加载中' : '加载更多';
+  loadMoreButton.querySelector('span').textContent = state.loading ? '加载中' : state.failed ? '重试加载' : '加载更多';
 }
 
 async function fetchReviews({ reset = false } = {}) {
@@ -1189,16 +1191,20 @@ async function fetchReviews({ reset = false } = {}) {
   const controller = new AbortController();
   state.fetchController = controller;
   state.loading = true;
+  state.failed = false;
+  const page = reset ? 1 : state.page + 1;
+  resultsEl.querySelector('#reviewLoadError')?.remove();
   if (reset) {
     state.page = 1;
     state.loaded = 0;
+    state.total = 0;
     renderSkeletons();
   }
   updateResultHeader();
   updateLoadMore();
   const params = new URLSearchParams({
     q: state.query,
-    page: String(state.page),
+    page: String(page),
     page_size: String(PAGE_SIZE),
   });
   try {
@@ -1207,15 +1213,23 @@ async function fetchReviews({ reset = false } = {}) {
     const data = await response.json();
     if (requestId !== state.requestId || controller.signal.aborted) return;
     const fragment = document.createDocumentFragment();
-    data.threads.forEach((thread, index) => fragment.appendChild(renderThread(thread, index)));
+    data.threads.forEach((thread, index) => fragment.appendChild(renderThread(thread, state.loaded + index)));
     if (reset) resultsEl.replaceChildren(fragment);
     else resultsEl.appendChild(fragment);
     state.total = data.total;
+    state.page = page;
     state.loaded += data.threads.length;
     if (state.total === 0) renderState('没有找到相关评测', '可以尝试课程全名或更短的关键词。');
   } catch (error) {
     if (error.name !== 'AbortError' && requestId === state.requestId) {
-      renderState('评测加载失败', '请稍后重试。', true);
+      state.failed = true;
+      if (reset) renderState('评测加载失败', '请点击下方按钮重试。', true);
+      else {
+        const note = makeElement('p', 'review-load-error', '更多评测加载失败，已加载的内容仍可查看。');
+        note.id = 'reviewLoadError';
+        note.setAttribute('role', 'status');
+        resultsEl.appendChild(note);
+      }
     }
   } finally {
     if (requestId === state.requestId) {
@@ -1318,9 +1332,8 @@ clearSearchButton.addEventListener('click', () => {
   searchInput.focus();
 });
 loadMoreButton.addEventListener('click', async () => {
-  if (state.loading || state.loaded >= state.total) return;
-  state.page += 1;
-  await fetchReviews();
+  if (state.loading || (!state.failed && state.loaded >= state.total)) return;
+  await fetchReviews({ reset: state.loaded === 0 });
 });
 document.addEventListener('click', event => {
   if (!event.target.closest('.popular-control')) hidePopularCourses();

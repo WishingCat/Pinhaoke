@@ -1,4 +1,5 @@
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import importlib
 import json
@@ -7,6 +8,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -433,7 +435,7 @@ def _build_course_db(path, courses):
             " id INTEGER PRIMARY KEY, course_type TEXT, course_code TEXT, class_no TEXT,"
             " course_name TEXT, category TEXT, credits REAL, teacher TEXT, department TEXT,"
             " major TEXT, grade TEXT, schedule TEXT, classroom TEXT, enrollment TEXT,"
-            " pnp TEXT, notes TEXT, weekdays TEXT)"
+            " pnp TEXT, notes TEXT, weekdays TEXT, first_period INTEGER)"
         )
         conn.execute(
             "CREATE TABLE detail_info("
@@ -513,6 +515,31 @@ class AccountApiTests(unittest.TestCase):
 
     def db(self):
         return closing(sqlite3.connect(app.ACCOUNTS_DB_PATH))
+
+    def assert_stale_verification_rejected(self, pending_call, concurrent_call):
+        verified = threading.Event()
+        resume = threading.Event()
+        verify_secret = app._verify_secret
+
+        def pause_after_verification(secret, stored):
+            result = verify_secret(secret, stored)
+            if threading.current_thread().name.startswith("stale-auth"):
+                verified.set()
+                if not resume.wait(5):
+                    raise AssertionError("Concurrent account update did not finish")
+            return result
+
+        with patch.object(app, "_verify_secret", side_effect=pause_after_verification):
+            with ThreadPoolExecutor(1, thread_name_prefix="stale-auth") as pool:
+                pending = pool.submit(pending_call)
+                try:
+                    self.assertTrue(verified.wait(5), "Password verification did not start")
+                    concurrent_call()
+                finally:
+                    resume.set()
+                with self.assertRaises(app.HTTPException) as ctx:
+                    pending.result(timeout=5)
+                self.assertEqual(ctx.exception.status_code, 401)
 
     def test_register_logs_in_and_never_leaks_secrets(self):
         response, token = self.register()
@@ -601,12 +628,14 @@ class AccountApiTests(unittest.TestCase):
             "long password": {"password": "x" * 129},
             "password equals username": {"password": "bob_2026"},
             "non-string password": {"password": ["x"] * 8},
+            "surrogate password": {"password": "password\ud800"},
             "no questions": {"questions": []},
             "too many questions": {"questions": [{"question": f"q{i}", "answer": "abc"} for i in range(4)]},
             "question not dict": {"questions": ["q"]},
             "questions not list": {"questions": {"question": "q", "answer": "abc"}},
             "empty question": {"questions": [{"question": "   ", "answer": "abc"}]},
             "long question": {"questions": [{"question": "问" * 61, "answer": "abc"}]},
+            "surrogate question": {"questions": [{"question": "问\ud800", "answer": "abc"}]},
             "duplicate questions": {
                 "questions": [
                     {"question": "Same", "answer": "abc"},
@@ -617,6 +646,7 @@ class AccountApiTests(unittest.TestCase):
             "long answer": {"questions": [{"question": "q", "answer": "a" * 65}]},
             "answer equals username": {"questions": [{"question": "q", "answer": "Bob_2026"}]},
             "non-string answer": {"questions": [{"question": "q", "answer": 12}]},
+            "surrogate answer": {"questions": [{"question": "q", "answer": "ab\udfff"}]},
         }
         for label, override in bad_cases.items():
             with self.subTest(label):
@@ -629,6 +659,14 @@ class AccountApiTests(unittest.TestCase):
             app.register_account(self.request(ip="198.51.100.20"), ["not", "a", "dict"])
         self.assertEqual(ctx.exception.status_code, 422)
         self.assertFalse(app.ACCOUNTS_DB_PATH.exists())
+
+    def test_password_validation_keeps_existing_unicode_and_control_characters(self):
+        password = "课表\npassword\x00🔒"
+        self.register(password=password)
+        self.assertEqual(self.login(password=password)[0].status_code, 200)
+        with self.assertRaises(app.HTTPException) as ctx:
+            self.login(password="password\ud800")
+        self.assertEqual(ctx.exception.status_code, 422)
 
     def test_login_errors_are_uniform(self):
         self.register()
@@ -853,6 +891,85 @@ class AccountApiTests(unittest.TestCase):
         response, _ = self.login(password="third-password", ip="198.51.100.81")
         self.assertEqual(response.status_code, 200)
 
+    def test_inflight_login_cannot_issue_session_after_password_change(self):
+        _, token = self.register()
+        request = self.request(cookie=token)
+        self.assert_stale_verification_rejected(
+            lambda: self.login(),
+            lambda: app.change_password(request, {
+                "current_password": "correct-horse", "new_password": "updated-password",
+            }),
+        )
+        self.assertEqual(self.login(password="updated-password")[0].status_code, 200)
+        with self.db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 2)
+
+    def test_inflight_login_cannot_restore_a_session_after_password_reset(self):
+        self.register()
+        self.assert_stale_verification_rejected(
+            lambda: self.login(),
+            lambda: app.reset_password(self.request(), {
+                "username": "Alice_01", "position": 1, "answer": "hello world",
+                "new_password": "reset-password",
+            }),
+        )
+        with self.db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+        self.assertEqual(self.login(password="reset-password")[0].status_code, 200)
+
+    def test_sensitive_changes_reject_password_verification_superseded_by_change(self):
+        for index, operation in enumerate(("password", "questions", "delete")):
+            with self.subTest(operation=operation):
+                username = f"race_user_{index}"
+                _, token = self.register(username=username, ip=f"198.51.110.{index}")
+                request = self.request(cookie=token)
+                calls = {
+                    "password": lambda: app.change_password(request, {
+                        "current_password": "correct-horse", "new_password": "stale-password",
+                    }),
+                    "questions": lambda: app.change_questions(request, {
+                        "current_password": "correct-horse",
+                        "questions": [{"question": "stale question", "answer": "stale answer"}],
+                    }),
+                    "delete": lambda: app.delete_account(request, {"password": "correct-horse"}),
+                }
+                self.assert_stale_verification_rejected(
+                    calls[operation],
+                    lambda: app.change_password(request, {
+                        "current_password": "correct-horse", "new_password": "updated-password",
+                    }),
+                )
+                self.assertEqual(self.login(username=username, password="updated-password")[0].status_code, 200)
+                account = self.body(app.get_account(request))
+                self.assertEqual(account["questions"], [{"position": 1, "question": "最喜欢的课？"}])
+
+    def test_sensitive_change_rejects_session_revoked_during_verification(self):
+        _, token = self.register()
+        request = self.request(cookie=token)
+        self.assert_stale_verification_rejected(
+            lambda: app.delete_account(request, {"password": "correct-horse"}),
+            lambda: app.logout_account(request),
+        )
+        self.assertEqual(self.login()[0].status_code, 200)
+
+    def test_inflight_reset_rejects_replaced_security_answers(self):
+        _, token = self.register()
+        self.assert_stale_verification_rejected(
+            lambda: app.reset_password(self.request(), {
+                "username": "Alice_01", "position": 1, "answer": "hello world",
+                "new_password": "stale-password",
+            }),
+            lambda: app.change_questions(self.request(cookie=token), {
+                "current_password": "correct-horse",
+                "questions": [{"question": "updated question", "answer": "updated answer"}],
+            }),
+        )
+        self.assertEqual(self.login()[0].status_code, 200)
+        self.assertEqual(app.reset_password(self.request(), {
+            "username": "Alice_01", "position": 1, "answer": "updated answer",
+            "new_password": "updated-password",
+        }).status_code, 204)
+
     def test_change_questions_requires_current_password_and_replaces_all(self):
         _, token = self.register()
         new_questions = [
@@ -1047,6 +1164,42 @@ class FavoritesApiTests(unittest.TestCase):
 
     def favorites(self, token=None):
         return self.body(app.list_favorites(self.request(cookie=token or self.token)))["favorites"]
+
+    def test_saved_courses_use_homepage_representative_badges_and_coherent_fallback(self):
+        richer = {
+            **FIXTURE_COURSES[0], "id": 3, "course_name": "完整课程名",
+            "schedule": "1~16周 每周周二5~6节",
+        }
+        _build_course_db(self.course_db, [*FIXTURE_COURSES, richer])
+        with closing(sqlite3.connect(self.course_db)) as conn:
+            conn.execute("UPDATE basic_info SET classroom='理教 101' WHERE id=1")
+            conn.execute("UPDATE basic_info SET course_type='通识课',category='任选' WHERE id=3")
+            conn.execute("UPDATE detail_info SET intro_cn='完整介绍',syllabus='完整大纲',textbook='教材' WHERE course_id=3")
+            conn.commit()
+        with patch.dict(app.TERM_UNION_SQL, {"fall": app.LIST_SELECT_FALL_UG}):
+            expected = CourseListTests().call(q=FIXTURE_COURSES[0]["course_code"])["courses"][0]
+        self.assertEqual(expected["id"], "a3")
+        self.assertEqual(expected["classroom"], "理教 101")
+        for save in (
+            lambda: self.body(self.add("a3"))["favorites"][0],
+            lambda: self.body(app.add_timetable_course(self.request(cookie=self.token), {"id": "a3"}))["courses"][0],
+        ):
+            item = save()
+            for field in ("id", "course_name", "teacher", "credits", "schedule", "classroom", "department", "course_type", "category"):
+                self.assertEqual(item[field], expected[field], field)
+            self.assertEqual(item["fav_key"], app._favorite_snapshot("a3")["fav_key"])
+
+    def test_saved_course_without_teacher_keeps_its_independent_source_row(self):
+        other = {**FIXTURE_COURSES[1], "id": 4, "teacher": None, "course_name": "另一门未公布教师的课程"}
+        _build_course_db(self.course_db, [*FIXTURE_COURSES, other])
+        request = self.request(cookie=self.token)
+        favorite = self.body(self.add("a4"))["favorites"][0]
+        app.add_timetable_course(request, {"id": "a4"})
+        timetable = self.body(app.get_timetable(request))["courses"][0]
+        for saved in (favorite, timetable):
+            self.assertTrue(saved["available"])
+            self.assertEqual(saved["id"], "a4")
+            self.assertEqual(saved["course_name"], other["course_name"])
 
     def test_favorites_require_login(self):
         for call in (
@@ -1273,7 +1426,7 @@ class FavoritesApiTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 409)
 
     def test_create_collection_name_validation(self):
-        for bad in ("", "   ", "x" * (app.COLLECTION_NAME_MAX + 1), 5, None, ["a"]):
+        for bad in ("", "   ", "x" * (app.COLLECTION_NAME_MAX + 1), "夹\ud800", 5, None, ["a"]):
             with self.subTest(bad=bad), self.assertRaises(app.HTTPException) as ctx:
                 self.create_coll(bad)
             self.assertEqual(ctx.exception.status_code, 422)
@@ -1317,6 +1470,51 @@ class FavoritesApiTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(app.HTTPException) as ctx:
                 self.set_colls(fav_key, bad)
             self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_collection_ids_outside_sqlite_range_return_validation_errors(self):
+        fav_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]
+        request = self.request(cookie=self.token)
+        for invalid_id in (0, -1, 2**63, -(2**63) - 1, 10**100, True):
+            for operation in (
+                lambda: app.rename_collection(request, {"collection_id": invalid_id, "name": "课程夹"}),
+                lambda: app.remove_collection(request, {"collection_id": invalid_id}),
+                lambda: self.set_colls(fav_key, [invalid_id]),
+            ):
+                with self.subTest(invalid_id=invalid_id), self.assertRaises(app.HTTPException) as ctx:
+                    operation()
+                self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(len(self.favorites()), 1)
+
+    def test_saved_course_keys_reject_unencodable_text(self):
+        request = self.request(cookie=self.token)
+        for operation in (
+            lambda: app.remove_favorite(request, {"fav_key": "course\ud800"}),
+            lambda: self.set_colls("course\ud800", []),
+            lambda: app.remove_timetable_course(request, {"course_key": "course\ud800"}),
+        ):
+            with self.assertRaises(app.HTTPException) as ctx:
+                operation()
+            self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_collection_cannot_be_deleted_between_ownership_check_and_assignment(self):
+        favorite = self.body(self.add("a1"))["favorites"][0]
+        created = self.body(self.create_coll("并发修改"))
+        collection_id = next(c["id"] for c in created["collections"] if not c["is_default"])
+        owned_collection_ids = app._owned_collection_ids
+
+        def delete_after_ownership_check(conn, user_id, raw):
+            result = owned_collection_ids(conn, user_id, raw)
+            with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH, timeout=0)) as other:
+                other.execute("PRAGMA foreign_keys=ON")
+                with self.assertRaisesRegex(sqlite3.OperationalError, "locked"):
+                    other.execute("DELETE FROM collections WHERE id=?", (collection_id,))
+            return result
+
+        with patch.object(app, "_owned_collection_ids", side_effect=delete_after_ownership_check):
+            result = self.body(self.set_colls(favorite["fav_key"], [collection_id]))
+        self.assertEqual(result["favorites"][0]["collection_ids"], [collection_id])
+        removed = app.remove_collection(self.request(cookie=self.token), {"collection_id": collection_id})
+        self.assertEqual(self.body(removed)["favorites"], [])
 
     def test_remove_custom_collection_cleans_orphans(self):
         fav_key = self.body(self.add("a1"))["favorites"][0]["fav_key"]

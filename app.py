@@ -23,6 +23,8 @@ NOT need to pass ?term= when fetching a specific course.
 """
 import base64
 from contextlib import contextmanager
+from copy import deepcopy
+from functools import lru_cache
 import hashlib
 import hmac
 import json
@@ -136,7 +138,7 @@ VALID_SORTS = frozenset({
     "", "name_asc", "name_desc", "pinyin", "pinyin_desc",
     "credits_asc", "credits_desc", "time_asc", "random",
 })
-COURSE_ID_RE = re.compile(r"^[ugsar][1-9][0-9]*$")
+COURSE_ID_RE = re.compile(r"^[ugsar][1-9][0-9]{0,18}$")
 REVIEW_QUERY_MAX_LENGTH = 120
 # 默认列表把 2026 年（北京时间）质量分最高的若干树洞置顶，其余按时间倒序。
 REVIEW_FEATURED_COUNT = 10
@@ -158,8 +160,30 @@ _health_cache_payload = None
 _health_cache_checked_at = None
 
 
+def _valid_text(value) -> bool:
+    # JSON 可携带孤立代理字符，但 UTF-8 哈希、SQLite 和响应编码都无法保存它。
+    # 不限制其余字符，保持已有密码（包括空白、控制字符）的验证语义。
+    return isinstance(value, str) and not any(0xD800 <= ord(char) <= 0xDFFF for char in value)
+
+
 def _readonly_uri(path: Path) -> str:
-    return f"file:{path.resolve().as_posix()}?mode=ro"
+    return path.resolve().as_uri() + "?mode=ro"
+
+
+def _database_revision(paths) -> tuple:
+    # 正式库只读。原子替换、原位更新和 WAL 写入都会使缓存键改变。
+    revision = []
+    for path in paths:
+        path = path.resolve()
+        for candidate in (path, Path(str(path) + "-wal")):
+            try:
+                info = candidate.stat()
+            except FileNotFoundError:
+                revision.append((str(candidate), None))
+            else:
+                revision.append((str(candidate), info.st_dev, info.st_ino, info.st_size,
+                                 info.st_mtime_ns, info.st_ctime_ns))
+    return tuple(revision)
 
 
 @contextmanager
@@ -1260,6 +1284,15 @@ def _validate_list_params(
     return value
 
 
+@lru_cache(maxsize=32)
+def _course_page_rows(term, count_sql, list_sql, params, page_size, offset, revision):
+    # 缓存只读源行，响应列表每次重新生成，课程留言状态仍实时查询。
+    with get_db(term) as conn:
+        total = conn.execute(count_sql, params).fetchone()[0]
+        rows = conn.execute(list_sql, (*params, page_size, offset)).fetchall()
+    return total, tuple(rows)
+
+
 @app.get("/api/courses")
 def list_courses(
     q: str = Query("", description="Search query (course name / teacher / classroom / course code / english name)"),
@@ -1288,6 +1321,8 @@ def list_courses(
     response: Response = None,
 ):
     credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
+    if any(not _valid_text(value) for value in (q, type, category, department, grading, classroom)):
+        raise HTTPException(status_code=422, detail="Invalid course query parameter")
     # Translation is disabled site-wide; accept old lang links but use source fields.
     lang = "zh"
     period_bounds = _period_bounds(period)
@@ -1311,10 +1346,8 @@ def list_courses(
     count_sql = _count_course_sql(source_sql, matching_where)
     list_sql = f"{ctes} SELECT * FROM grouped ORDER BY {order_by} LIMIT ? OFFSET ?"
 
-    with get_db(term) as conn:
-        cur = conn.cursor()
-        total = cur.execute(count_sql, params).fetchone()[0]
-        rows = cur.execute(list_sql, params + [page_size, offset]).fetchall()
+    revision = _database_revision(path for _, path, _ in TERM_DBS[term])
+    total, rows = _course_page_rows(term, count_sql, list_sql, tuple(params), page_size, offset, revision)
 
     courses = []
     for r in rows:
@@ -1370,7 +1403,10 @@ def _parse_id(course_id: str):
     term = _PREFIX_TERM.get(prefix)
     if term is None:
         return None, None, None
-    return term, prefix, int(course_id[1:])
+    local_id = int(course_id[1:])
+    if local_id > 2**63 - 1:
+        return None, None, None
+    return term, prefix, local_id
 
 
 # Fields the translations table can override per (course_id, field, lang).
@@ -1488,7 +1524,7 @@ def _normalize_review_query(value: str) -> str:
 
 
 def _validate_review_query(q: str) -> str:
-    if not isinstance(q, str) or len(q) > REVIEW_QUERY_MAX_LENGTH:
+    if not _valid_text(q) or len(q) > REVIEW_QUERY_MAX_LENGTH:
         raise HTTPException(status_code=422, detail="Invalid review query parameter")
     return q.strip()
 
@@ -1601,14 +1637,8 @@ def _load_review_threads(conn, rows):
     return results
 
 
-@app.get("/api/reviews")
-def list_reviews(
-    q: str = Query("", max_length=REVIEW_QUERY_MAX_LENGTH),
-    page: int = Query(1, ge=1, le=10000),
-    page_size: int = Query(20, ge=1, le=100),
-):
-    query = _validate_review_query(q)
-    _validate_review_pagination(page, page_size)
+@lru_cache(maxsize=32)
+def _review_page(query, page, page_size, revision):
     where, params = _review_search_where(query)
     offset = (page - 1) * page_size
     with get_reviews_db() as conn:
@@ -1636,13 +1666,21 @@ def list_reviews(
                 [*REVIEW_FEATURED_RANGE, REVIEW_FEATURED_COUNT, page_size, offset],
             ).fetchall()
         threads = _load_review_threads(conn, rows)
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "query": query,
-        "threads": threads,
-    }
+    return {"total": total, "page": page, "page_size": page_size,
+            "query": query, "threads": threads}
+
+
+@app.get("/api/reviews")
+def list_reviews(
+    q: str = Query("", max_length=REVIEW_QUERY_MAX_LENGTH),
+    page: int = Query(1, ge=1, le=10000),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    query = _validate_review_query(q)
+    _validate_review_pagination(page, page_size)
+    revision = _database_revision((REVIEWS_DB,))
+    # 响应不能共享可变列表，避免调用方污染其他请求的缓存。
+    return deepcopy(_review_page(query, page, page_size, revision))
 
 
 @app.get("/api/review-courses")
@@ -1720,7 +1758,7 @@ def get_review_meta():
 
 @app.get("/api/reviews/{pid}")
 def get_review_thread(pid: int):
-    if isinstance(pid, bool) or not isinstance(pid, int) or pid < 1:
+    if isinstance(pid, bool) or not isinstance(pid, int) or not 1 <= pid <= 2**63 - 1:
         raise HTTPException(status_code=422, detail="Invalid review thread id")
 
     with get_reviews_db() as conn:
@@ -1769,7 +1807,7 @@ def _validate_message_content(payload) -> str:
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="Invalid message payload")
     content = payload.get("content")
-    if not isinstance(content, str):
+    if not _valid_text(content):
         raise HTTPException(status_code=422, detail="Invalid message payload")
     content = content.strip()
     if not content or len(content) > MESSAGE_MAX_LENGTH:
@@ -2144,7 +2182,7 @@ def _validate_username(value):
 
 
 def _validate_password(value, username_key: str) -> str:
-    if not isinstance(value, str):
+    if not _valid_text(value):
         raise _invalid_account_payload()
     if not PASSWORD_MIN_LENGTH <= len(value) <= PASSWORD_MAX_LENGTH:
         raise _invalid_account_payload()
@@ -2155,7 +2193,7 @@ def _validate_password(value, username_key: str) -> str:
 
 def _validate_password_input(value) -> str:
     # 校验已有密码时只检查形状，不重复套用注册规则。
-    if not isinstance(value, str) or not 1 <= len(value) <= PASSWORD_MAX_LENGTH:
+    if not _valid_text(value) or not 1 <= len(value) <= PASSWORD_MAX_LENGTH:
         raise _invalid_account_payload()
     return value
 
@@ -2172,7 +2210,7 @@ def _validate_questions(value, username_key: str):
             raise _invalid_account_payload()
         question = item.get("question")
         answer = item.get("answer")
-        if not isinstance(question, str) or not isinstance(answer, str):
+        if not _valid_text(question) or not _valid_text(answer):
             raise _invalid_account_payload()
         question = " ".join(question.split())
         if not 1 <= len(question) <= SECURITY_QUESTION_TEXT_MAX:
@@ -2352,6 +2390,18 @@ def _verify_current_password(conn, session, password: str, request, now: int) ->
         raise HTTPException(status_code=401, detail="当前密码错误")
 
 
+def _begin_verified_account_write(conn, session) -> None:
+    # scrypt 在写锁外执行；提交敏感变更前锁内复查，防止过时验证覆盖改密或退出。
+    conn.execute("BEGIN IMMEDIATE")
+    current = conn.execute(
+        "SELECT u.password_hash FROM sessions s JOIN users u ON u.id=s.user_id"
+        " WHERE s.token_hash=? AND s.user_id=? AND s.expires_at>?",
+        (session["token_hash"], session["user_id"], int(time.time())),
+    ).fetchone()
+    if current is None or current["password_hash"] != session["password_hash"]:
+        raise HTTPException(status_code=401, detail="账号状态已变化，请重新登录后重试")
+
+
 def _public_questions(conn, user_id: int) -> list:
     rows = conn.execute(
         "SELECT position, question FROM security_questions WHERE user_id=? ORDER BY position",
@@ -2360,14 +2410,18 @@ def _public_questions(conn, user_id: int) -> list:
     return [{"position": row["position"], "question": row["question"]} for row in rows]
 
 
-def _store_questions(conn, user_id: int, questions) -> None:
+def _hash_questions(questions) -> list:
+    return [(question, _hash_secret(answer)) for question, answer in questions]
+
+
+def _store_questions(conn, user_id: int, hashed_questions) -> None:
     conn.execute("DELETE FROM security_questions WHERE user_id=?", (user_id,))
     conn.executemany(
         "INSERT INTO security_questions (user_id, position, question, answer_hash)"
         " VALUES (?, ?, ?, ?)",
         [
-            (user_id, index + 1, question, _hash_secret(answer))
-            for index, (question, answer) in enumerate(questions)
+            (user_id, index + 1, question, answer_hash)
+            for index, (question, answer_hash) in enumerate(hashed_questions)
         ],
     )
 
@@ -2441,26 +2495,55 @@ def _enrich_saved_courses(items: list) -> None:
             continue
         aliases = {prefix: alias for alias, _, prefix in TERM_DBS[term]}
         try:
+            eligible = []
+            for item in group:
+                _, prefix, _ = _parse_id(item.get("id", ""))
+                if prefix not in aliases or item.get("term_label") != _term_label(term):
+                    item["available"] = False
+                else:
+                    eligible.append((prefix, item))
+            if not eligible:
+                continue
+
+            # 先缩到所需课程号，再按主页完整规则归并；同一身份的所有源记录仍保留。
+            codes = tuple(dict.fromkeys(item["course_code"] for _, item in eligible))
+            base_sql = " UNION ALL ".join(
+                select for alias, select in TERM_LIST_SELECTS[term] if alias in aliases.values()
+            )
+            source_sql, params = _translated_source_select(base_sql, "main", "zh")
+            source_sql = (
+                f"SELECT * FROM ({source_sql}) WHERE course_code IN "
+                f"({','.join('?' for _ in codes)})"
+            )
+            sql = f"{_grouped_course_ctes(source_sql, '')} SELECT * FROM grouped"
             with get_db(term) as course_conn:
-                for item in group:
-                    _, prefix, _ = _parse_id(item.get("id", ""))
-                    alias = aliases.get(prefix)
-                    if alias is None or item.get("term_label") != _term_label(term):
-                        item["available"] = False
-                        continue
-                    row = course_conn.execute(
-                        f"SELECT * FROM {alias}.basic_info WHERE course_code=? "
-                        "AND CAST(class_no AS TEXT)=? AND TRIM(COALESCE(teacher,''))=? ORDER BY id LIMIT 1",
-                        (item["course_code"], item["class_no"], item["teacher"]),
-                    ).fetchone()
-                    if row is None:
-                        item["available"] = False
-                        continue
-                    source = dict(row)
-                    item["id"] = f"{prefix}{row['id']}"
-                    item["available"] = True
-                    for field in ("course_name", "teacher", "credits", "schedule", "classroom", "department", "course_type", "category"):
-                        item[field] = source.get(field, "研究生课" if field == "course_type" and prefix in ("g", "r") else "")
+                rows = course_conn.execute(sql, (*params, *codes)).fetchall()
+            by_identity = {}
+            for row in rows:
+                identity = (
+                    row["id"][0], str(row["course_code"]), str(row["class_no"]),
+                    (row["teacher"] or "").strip(),
+                )
+                by_identity.setdefault(identity, []).append(row)
+            for prefix, item in eligible:
+                identity = (
+                    prefix, str(item["course_code"]), str(item["class_no"]),
+                    (item["teacher"] or "").strip(),
+                )
+                candidates = by_identity.get(identity, [])
+                if not candidates:
+                    item["available"] = False
+                    continue
+                # 空教师的源记录在主页保持独立，优先保留原 ID 对应的一组。
+                source = next((row for row in candidates if row["id"] == item["id"]), None)
+                if source is None:
+                    source = min(candidates, key=lambda row: int(row["id"][1:]))
+                item["id"] = source["id"]
+                item["available"] = True
+                for field in ("course_name", "teacher", "credits", "schedule", "classroom", "department"):
+                    item[field] = source[field]
+                for field in ("course_type", "category"):
+                    item[field] = [value for value in (source[field] or "").split(",") if value]
         except (sqlite3.Error, OSError, HTTPException):
             for item in group:
                 item["available"] = False
@@ -2520,12 +2603,18 @@ def _refresh_favorite_ids(conn, user_id: int, items: list) -> None:
 
 
 def _validate_collection_name(value) -> str:
-    if not isinstance(value, str):
+    if not _valid_text(value):
         raise _invalid_account_payload()
     name = value.strip()
     if not 1 <= len(name) <= COLLECTION_NAME_MAX:
         raise _invalid_account_payload()
     return name
+
+
+def _validate_collection_id(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 2**63 - 1:
+        raise _invalid_account_payload()
+    return value
 
 
 def _ensure_default_collection(conn, user_id: int, now: int) -> int:
@@ -2578,20 +2667,14 @@ def _collection_memberships(conn, user_id: int) -> dict:
 def _owned_collection_ids(conn, user_id: int, raw) -> list:
     if not isinstance(raw, list):
         raise _invalid_account_payload()
-    ids: list = []
-    for value in raw:
-        if not isinstance(value, int) or isinstance(value, bool):
-            raise _invalid_account_payload()
-        if value not in ids:
-            ids.append(value)
+    ids = list(dict.fromkeys(_validate_collection_id(value) for value in raw))
     if not ids:
         return []
-    placeholders = ",".join("?" for _ in ids)
     owned = {
         row["id"]
         for row in conn.execute(
-            f"SELECT id FROM collections WHERE user_id=? AND id IN ({placeholders})",
-            (user_id, *ids),
+            "SELECT id FROM collections WHERE user_id=?",
+            (user_id,),
         ).fetchall()
     }
     if any(value not in owned for value in ids):
@@ -2701,7 +2784,7 @@ def add_timetable_course(request: Request, payload: dict = Body(...)):
 def remove_timetable_course(request: Request, payload: dict = Body(...)):
     _require_trusted_origin(request)
     key = _payload_dict(payload).get('course_key')
-    if not isinstance(key, str) or not 1 <= len(key) <= 2000:
+    if not _valid_text(key) or not 1 <= len(key) <= 2000:
         raise HTTPException(status_code=422, detail="Invalid course key")
     with get_accounts_db() as conn:
         now = int(time.time())
@@ -2784,6 +2867,7 @@ def register_account(request: Request, payload: dict = Body(...)):
         _record_event(conn, "secret_verify_global", "*", now, count=1 + len(questions))
         conn.commit()
         password_hash = _hash_secret(password)
+        hashed_questions = _hash_questions(questions)
         try:
             cursor = conn.execute(
                 "INSERT INTO users (username, username_key, password_hash,"
@@ -2794,7 +2878,7 @@ def register_account(request: Request, payload: dict = Body(...)):
             conn.rollback()
             raise HTTPException(status_code=409, detail="Username already taken")
         user_id = cursor.lastrowid
-        _store_questions(conn, user_id, questions)
+        _store_questions(conn, user_id, hashed_questions)
         _ensure_default_collection(conn, user_id, now)
         token = _new_session(conn, user_id, now)
         _purge_expired(conn, now)
@@ -2829,15 +2913,20 @@ def login_account(request: Request, payload: dict = Body(...)):
             _record_event(conn, "login_fail_user", username_key, now)
             conn.commit()
             raise HTTPException(status_code=401, detail="用户名或密码错误")
+        upgraded_hash = _hash_secret(password) if _secret_needs_rehash(stored) else None
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
+        if current is None or current["password_hash"] != stored:
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
         old_token = _request_token(request)
         if old_token:
             conn.execute(
                 "DELETE FROM sessions WHERE token_hash=?", (_session_token_hash(old_token),)
             )
-        if _secret_needs_rehash(stored):
+        if upgraded_hash is not None:
             conn.execute(
                 "UPDATE users SET password_hash=? WHERE id=?",
-                (_hash_secret(password), user["id"]),
+                (upgraded_hash, user["id"]),
             )
         token = _new_session(conn, user["id"], now)
         _purge_expired(conn, now)
@@ -2872,9 +2961,11 @@ def change_password(request: Request, payload: dict = Body(...)):
         current = _validate_password_input(data.get("current_password"))
         new_password = _validate_password(data.get("new_password"), session["username_key"])
         _verify_current_password(conn, session, current, request, now)
+        password_hash = _hash_secret(new_password)
+        _begin_verified_account_write(conn, session)
         conn.execute(
             "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
-            (_hash_secret(new_password), now, session["user_id"]),
+            (password_hash, now, session["user_id"]),
         )
         conn.execute(
             "DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
@@ -2895,7 +2986,10 @@ def change_questions(request: Request, payload: dict = Body(...)):
         questions = _validate_questions(data.get("questions"), session["username_key"])
         _verify_current_password(conn, session, current, request, now)
         _record_event(conn, "secret_verify_global", "*", now, count=len(questions))
-        _store_questions(conn, session["user_id"], questions)
+        conn.commit()
+        hashed_questions = _hash_questions(questions)
+        _begin_verified_account_write(conn, session)
+        _store_questions(conn, session["user_id"], hashed_questions)
         conn.commit()
     return _empty_no_store()
 
@@ -2933,7 +3027,7 @@ def reset_password(request: Request, payload: dict = Body(...)):
     ):
         raise _invalid_account_payload()
     answer = data.get("answer")
-    if not isinstance(answer, str) or not 1 <= len(answer) <= 200:
+    if not _valid_text(answer) or not 1 <= len(answer) <= 200:
         raise _invalid_account_payload()
     new_password = _validate_password(data.get("new_password"), username_key)
     normalized = _normalize_answer(answer)
@@ -2946,7 +3040,7 @@ def reset_password(request: Request, payload: dict = Body(...)):
         _record_event(conn, "secret_verify_global", "*", now)
         conn.commit()
         row = conn.execute(
-            "SELECT u.id, q.answer_hash FROM users u"
+            "SELECT u.id, u.password_hash, q.answer_hash FROM users u"
             " LEFT JOIN security_questions q ON q.user_id = u.id AND q.position=?"
             " WHERE u.username_key=?",
             (position, username_key),
@@ -2958,9 +3052,19 @@ def reset_password(request: Request, payload: dict = Body(...)):
             _record_event(conn, "reset_fail_user", username_key, now)
             conn.commit()
             raise HTTPException(status_code=401, detail="密保答案错误")
+        password_hash = _hash_secret(new_password)
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute(
+            "SELECT u.password_hash, q.answer_hash FROM users u"
+            " JOIN security_questions q ON q.user_id=u.id AND q.position=? WHERE u.id=?",
+            (position, row["id"]),
+        ).fetchone()
+        if (current is None or current["password_hash"] != row["password_hash"]
+                or current["answer_hash"] != stored):
+            raise HTTPException(status_code=401, detail="账号状态已变化，请重新验证密保后重试")
         conn.execute(
             "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
-            (_hash_secret(new_password), now, row["id"]),
+            (password_hash, now, row["id"]),
         )
         conn.execute("DELETE FROM sessions WHERE user_id=?", (row["id"],))
         conn.execute(
@@ -2981,6 +3085,7 @@ def delete_account(request: Request, payload: dict = Body(...)):
         session = _require_user(conn, request, now)
         password = _validate_password_input(data.get("password"))
         _verify_current_password(conn, session, password, request, now)
+        _begin_verified_account_write(conn, session)
         # 外键级联删除会话、密保与收藏。
         conn.execute("DELETE FROM users WHERE id=?", (session["user_id"],))
         conn.commit()
@@ -3057,7 +3162,7 @@ def remove_favorite(request: Request, payload: dict = Body(...)):
     _require_trusted_origin(request)
     data = _payload_dict(payload)
     fav_key = data.get("fav_key")
-    if not isinstance(fav_key, str) or not 1 <= len(fav_key) <= 300:
+    if not _valid_text(fav_key) or not 1 <= len(fav_key) <= 300:
         raise _invalid_account_payload()
     now = int(time.time())
     with get_accounts_db() as conn:
@@ -3076,7 +3181,7 @@ def set_favorite_collections(request: Request, payload: dict = Body(...)):
     _require_trusted_origin(request)
     data = _payload_dict(payload)
     fav_key = data.get("fav_key")
-    if not isinstance(fav_key, str) or not 1 <= len(fav_key) <= 300:
+    if not _valid_text(fav_key) or not 1 <= len(fav_key) <= 300:
         raise _invalid_account_payload()
     now = int(time.time())
     ip_hash = _client_ip_hash(request)
@@ -3086,8 +3191,8 @@ def set_favorite_collections(request: Request, payload: dict = Body(...)):
         _record_event(conn, "favorite_write_ip", ip_hash, now)
         conn.commit()
         user_id = session["user_id"]
-        collection_ids = _owned_collection_ids(conn, user_id, data.get("collection_ids"))
         conn.execute("BEGIN IMMEDIATE")
+        collection_ids = _owned_collection_ids(conn, user_id, data.get("collection_ids"))
         exists = conn.execute(
             "SELECT 1 FROM favorites WHERE user_id=? AND fav_key=?", (user_id, fav_key)
         ).fetchone()
@@ -3155,9 +3260,7 @@ def create_collection(request: Request, payload: dict = Body(...)):
 def rename_collection(request: Request, payload: dict = Body(...)):
     _require_trusted_origin(request)
     data = _payload_dict(payload)
-    collection_id = data.get("collection_id")
-    if not isinstance(collection_id, int) or isinstance(collection_id, bool):
-        raise _invalid_account_payload()
+    collection_id = _validate_collection_id(data.get("collection_id"))
     name = _validate_collection_name(data.get("name"))
     now = int(time.time())
     ip_hash = _client_ip_hash(request)
@@ -3191,9 +3294,7 @@ def rename_collection(request: Request, payload: dict = Body(...)):
 def remove_collection(request: Request, payload: dict = Body(...)):
     _require_trusted_origin(request)
     data = _payload_dict(payload)
-    collection_id = data.get("collection_id")
-    if not isinstance(collection_id, int) or isinstance(collection_id, bool):
-        raise _invalid_account_payload()
+    collection_id = _validate_collection_id(data.get("collection_id"))
     now = int(time.time())
     ip_hash = _client_ip_hash(request)
     with get_accounts_db() as conn:

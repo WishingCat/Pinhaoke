@@ -351,7 +351,7 @@ class ApiAndFailureStatusTests(unittest.TestCase):
 
     def test_courses_main_returns_one_for_unexpected_worker_failure(self):
         module = import_script("translate_courses")
-        with patch.object(module, "setup_db"):
+        with patch.object(module, "setup_db"), patch.object(module, "reuse_english_for_intros", return_value=0):
             with patch.object(
                 module, "fetch_pending_undergrad", return_value=[(1, "原文", ["en"])]
             ):
@@ -419,6 +419,81 @@ class ApiAndFailureStatusTests(unittest.TestCase):
                         "fixture.db", "intro_cn", "intro_cn", "UG intro", workers=1
                     )
         self.assertEqual((ok, failed), (0, 1))
+
+
+class IntroductionScopeTests(unittest.TestCase):
+    def setUp(self):
+        self.module = import_script("translate_courses")
+        self.common = importlib.import_module(f"{PACKAGE}.translation_common")
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        network = patch.object(self.module.urllib.request, "urlopen", side_effect=AssertionError("Network forbidden in tests"))
+        network.start()
+        self.addCleanup(network.stop)
+
+    def fixture(self, name, rows):
+        path = self.root / name
+        make_translation_db(path)
+        self.common.setup_translation_db(path)
+        with closing(sqlite3.connect(path)) as conn, conn:
+            conn.executemany("INSERT INTO detail_info(course_id, intro_cn, intro_en) VALUES (?, ?, ?)", rows)
+            conn.executemany("INSERT INTO translations(course_id, field, lang, text) VALUES (?, 'intro_cn', ?, '已有译文')",
+                             [(cid, lang) for cid, _source, _english in rows for lang in self.module.LANGS if lang != "en"])
+        return path
+
+    def english_rows(self, path):
+        with closing(sqlite3.connect(path)) as conn:
+            return conn.execute("SELECT course_id, text FROM translations WHERE field='intro_cn' AND lang='en' ORDER BY course_id").fetchall()
+
+    def run_main(self, databases, args, jobs=None):
+        with patch.dict(self.module.DATABASES, databases), \
+                patch.object(self.module, "JOBS", jobs or self.module.JOBS), \
+                contextlib.redirect_stdout(io.StringIO()):
+            return self.module.main(args)
+
+    def test_pending_scan_does_not_seed_unselected_english_rows(self):
+        path = self.fixture("ug.db", [(1, "简介", "Original English")])
+        before = path.read_bytes()
+        pending = self.module.fetch_pending_undergrad(path)
+        self.assertEqual(pending, [(1, "简介", ["en"])])
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_limit_caps_english_only_reuse_without_api_calls(self):
+        path = self.fixture("ug.db", [(i, f"简介 {i}", f" English {i} ") for i in range(1, 4)])
+        with patch.object(self.module, "call_api") as api:
+            status = self.run_main({"ug": path}, ["--only", "ug_intro", "--limit", "1"])
+        self.assertEqual(status, 0)
+        api.assert_not_called()
+        self.assertEqual(self.english_rows(path), [(1, "English 1")])
+
+    def test_limit_is_shared_between_english_reuse_and_api_rows(self):
+        path = self.fixture("ug.db", [(1, "简介 1", "Original English"), (2, "简介 2", ""),
+                                      (3, "简介 3", None), (4, "简介 4", "")])
+        with patch.object(self.module, "call_api", side_effect=lambda source, langs: ({lang: f"API {source}" for lang in langs}, {})) as api:
+            status = self.run_main({"ug": path}, ["--only", "ug_intro", "--limit", "3", "--workers", "1"])
+        self.assertEqual(status, 0)
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(self.english_rows(path), [(1, "Original English"), (2, "API 简介 2"), (3, "API 简介 3")])
+
+    def test_limit_is_global_across_selected_undergraduate_databases(self):
+        first = self.fixture("ug.db", [(1, "简介", "UG English")])
+        second = self.fixture("summer.db", [(i, "简介", f"Summer {i}") for i in range(1, 4)])
+        jobs = tuple(job for job in self.module.JOBS if job[0] in {"ug_intro", "summer_intro"})
+        with patch.object(self.module, "call_api") as api:
+            status = self.run_main({"ug": first, "summer": second}, ["--limit", "2"], jobs=jobs)
+        self.assertEqual(status, 0)
+        api.assert_not_called()
+        self.assertEqual(self.english_rows(first), [(1, "UG English")])
+        self.assertEqual(self.english_rows(second), [(1, "Summer 1")])
+
+    def test_unlimited_run_preserves_reuse_and_api_behavior(self):
+        path = self.fixture("ug.db", [(1, "简介 1", "Original English"), (2, "简介 2", "")])
+        with patch.object(self.module, "call_api", return_value=({"en": "API English"}, {})) as api:
+            status = self.run_main({"ug": path}, ["--only", "ug_intro", "--workers", "1"])
+        self.assertEqual(status, 0)
+        api.assert_called_once_with("简介 2", ["en"])
+        self.assertEqual(self.english_rows(path), [(1, "Original English"), (2, "API English")])
 
 
 class StubbornMatrixTests(unittest.TestCase):

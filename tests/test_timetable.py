@@ -2,6 +2,7 @@ import json
 import sqlite3
 import threading
 import unittest
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 import app
@@ -51,11 +52,56 @@ class TimetableTests(unittest.TestCase):
         request = self.request(cookie=token)
         for cid in ['a1','r1','u1','g1','s1']:
             detail=app.get_course_detail(cid,'zh')
+            term = app._parse_id(cid)[0]
+            expected = next(card for card in account_tests.CourseListTests().call(
+                term=term, q=detail['course_code'],
+            )['courses'] if card['id'] == cid)
             payload=self.body(app.add_favorite(request,{'id':cid}))
             item=next(i for i in payload['favorites'] if i['fav_key']==app._favorite_snapshot(cid)['fav_key'])
             for field in ['classroom','schedule','department','course_name']:
-                self.assertEqual(item[field],detail[field])
+                self.assertEqual(item[field],expected[field])
             self.assertIn('course_type',item)
+
+    def test_saved_course_enrichment_batches_each_term_and_keeps_search_representatives(self):
+        ids = ['a2712', 'a2713', 'a2979', 'a2331', 'a2330', 'a534', 'u860', 'u2426']
+        snapshots = [app._favorite_snapshot(cid) for cid in ids]
+        for snapshot in snapshots:
+            snapshot['id'] = snapshot.pop('course_id')
+        statements = []
+        get_db = app.get_db
+
+        @contextmanager
+        def traced_db(term='fall'):
+            with get_db(term) as conn:
+                conn.set_trace_callback(lambda sql: statements.append(sql) if sql.lstrip().upper().startswith(('SELECT', 'WITH')) else None)
+                yield conn
+
+        with patch.object(app, 'get_db', traced_db):
+            app._enrich_saved_courses(snapshots)
+        self.assertEqual(len(statements), 2, '补齐应按学期批量查询，不逐课程发起 SELECT')
+        for item in snapshots:
+            expected = next(card for card in account_tests.CourseListTests().call(
+                term=item['term'], q=item['course_code'],
+            )['courses'] if card['id'] == item['id'])
+            self.assertTrue(item['available'])
+            for field in ('id', 'course_name', 'schedule', 'classroom', 'course_type', 'category'):
+                self.assertEqual(item[field], expected[field], field)
+
+    def test_enrichment_keeps_unavailable_snapshot_fields_and_never_reuses_wrong_identity(self):
+        source = app._favorite_snapshot('a1')
+        source['id'] = source.pop('course_id')
+        previous_term = {**source, 'term_label': '2025秋季学期', 'course_name': '旧学期课程', 'schedule': '旧时间'}
+        disappeared = {**source, 'course_code': 'REMOVED', 'course_name': '已移除的课程', 'schedule': '原时间'}
+        app._enrich_saved_courses([source, previous_term, disappeared])
+        self.assertTrue(source['available'])
+        for item, name, schedule in (
+            (previous_term, '旧学期课程', '旧时间'),
+            (disappeared, '已移除的课程', '原时间'),
+        ):
+            self.assertFalse(item['available'])
+            self.assertEqual(item['id'], 'a1')
+            self.assertEqual(item['course_name'], name)
+            self.assertEqual(item['schedule'], schedule)
 
     def test_v4_upgrade_is_concurrent_and_cascades_user_deletion(self):
         _,token=self.register()

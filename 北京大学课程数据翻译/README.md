@@ -81,6 +81,8 @@ python3 北京大学课程数据翻译/translate_courses.py --only fall_gr_intro
 
 不传 `--only` 会扫描表中全部七项；执行前必须确认这是预期范围。
 
+`--limit N` 同时约束原始英文简介复用和 API 任务：先在选定本科库中按课程 ID 复用尚未入库的英文简介，再用剩余额度安排 API 任务；默认 `0` 表示不限量。pending 扫描本身只读，不会绕过小批试跑范围写入其余课程。
+
 ### `translate_misc.py`
 
 负责其余字段，使用 `--db` 选库，使用 `--phase` 选字段组：

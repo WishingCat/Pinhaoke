@@ -195,6 +195,38 @@ class DeployContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, self.update)
 
+    def test_materialized_lfs_verification_rejects_failed_file_listing(self):
+        script = textwrap.dedent(f"""\
+            source {shlex.quote(str(ROOT / 'deploy/update.sh'))}
+            git() {{
+                if [[ "$*" == "lfs ls-files --name-only broken" ]]; then
+                    return 23
+                fi
+                return 99
+            }}
+            verify_materialized_lfs /unused broken
+        """)
+        result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot list LFS paths", result.stderr)
+
+    def test_materialized_lfs_verification_checks_successful_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            asset = root / "course data.db"
+            script = textwrap.dedent(f"""\
+                source {shlex.quote(str(ROOT / 'deploy/update.sh'))}
+                git() {{ printf '%s\\n' 'course data.db'; }}
+                verify_materialized_lfs {shlex.quote(str(root))} release
+            """)
+            for contents, expected in ((None, False), ("version https://git-lfs.github.com/spec/v1\n", False),
+                                       ("materialized data\n", True)):
+                with self.subTest(contents=contents):
+                    if contents is not None:
+                        asset.write_text(contents)
+                    result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode == 0, expected, result.stderr)
+
     @unittest.skipUnless(shutil.which("git-lfs"), "git-lfs is unavailable")
     def test_materialized_tree_uses_target_attributes_for_new_lfs_paths(self):
         git_version = subprocess.run(

@@ -57,6 +57,8 @@ sudo bash /opt/pinhaoke/deploy/update.sh
 5. 从 staged target 的 `requirements.txt` 计算 SHA-256。
 6. 仅在活动 venv 缺失或 requirements 哈希变化时构建候选 venv，执行 `python -m pip install`、`pip check` 和依赖导入检查。
 
+LFS 文件清单读取失败同样属于预检失败，不能把失败产生的空输出当作“无需校验的文件”。
+
 只有这些步骤全部成功才停止 `pinhaoke.service`。旧版本或目标版本的 LFS 对象缺失、下载失败、未正确物化，以及依赖解析或候选环境错误都不会造成服务停机。
 
 ## 激活与烟测

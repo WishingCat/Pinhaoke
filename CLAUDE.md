@@ -67,6 +67,9 @@ tests/                          标准库 unittest 回归测试
 - `pinhaoke_theme` 保存共享主题；界面固定中文，不读取历史 `pinhaoke_lang`。课程页 URL 保存学期、搜索、筛选、排序和课程详情，忽略旧语言参数；评测页 URL 保存 `q`。使用 `history.replaceState`，不要让每次输入污染浏览历史。
 - 收藏、收藏夹与账号状态都不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏、收藏夹或账号参数；个人中心全屏视图 `#accountView` 用 `history.pushState` 支持系统返回键关闭并监听 `popstate`，不写查询参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
 - 搜索、筛选、热门课程和详情请求使用 `AbortController` 或请求序号拒绝过时响应。修改时不得重新引入快速切换导致旧请求覆盖新状态的竞态。
+- 收藏夹勾选在点击时保存课程身份与勾选结果，防抖期间切换课程不改变这次操作；账号变化时取消待提交操作。收藏、收藏夹与课表写入按顺序执行，逐次应用成功结果；后续操作失败不能丢弃前一次成功结果。账号世代与读取请求序号共同隔离迟到响应，旧会话的 401 不能清空新账号，等待课表加载的旧点击不能操作新账号。
+- 评测“加载更多”成功后才推进页码，失败时保留已有列表并允许重试同页；首次加载失败可以重试第一页。
+- 认证在途互斥独立于表单重绘，改变会话的认证 POST 与可能更新 Cookie 的 `GET /api/account` 共用顺序队列。认证先等待已有保存操作完成，在途期间的新保存操作提示稍后重试并回滚乐观状态；认证成功清除旧账号快照，再读取新身份，避免界面身份与 Cookie 不一致。
 - 卡片、筛选组合框、弹窗和图标按钮必须有语义角色、`aria-*` 标签及可见焦点。弹窗打开时使背景 `inert`，锁定焦点，支持 Escape/背景关闭，并在关闭后把焦点还给原触发元素。
 - 课程页所有插入模板的数据先经过 `esc()`；评测正文与高亮必须通过 `textContent` 或文本节点分段，禁止把树洞正文拼入 `innerHTML`。原树洞链接只允许 PKU 树洞主机。
 - 每次视觉或交互修改至少检查 `1440px`、`390px`、`320px`，覆盖浅色/深色、键盘路径、弹窗、无横向溢出和无控制台错误。页面行为变化同步更新 `tests/test_frontend_contract.py`。
@@ -120,6 +123,8 @@ git diff --check
 `get_db()` 用 SQLite URI `mode=ro` 打开主库，再按需 `ATTACH` 研究生库，并执行 `PRAGMA query_only = ON`。应用代码不得通过 API 请求写课程或评测数据库；允许的写入只有留言板 API 对留言库的插入、`record_visit()` 对统计库的累加，以及账号与收藏 API 对账户库的读写。静态文件路径全部从 `BASE_DIR` 解析，使模块可从任意工作目录导入。
 
 `get_reviews_db()` 以相同的 SQLite URI `mode=ro` 和 `PRAGMA query_only = ON` 打开 `树洞课程评测.db`。`GET /api/health` 检查五个课程库的表、详情行数、ID 集合、外键与完整性，同时检查评测库的必需表、元数据行数、外键和完整性。结果使用短时进程内缓存并返回 `Cache-Control: no-store`。
+
+课程列表 `_course_page_rows` 与评测搜索 `_review_page` 各使用 `lru_cache(maxsize=32)`。键包含查询参数、页码及源数据库版本；`_database_revision` 检查主文件与 WAL 的路径、设备、inode、大小及纳秒修改时间和变更时间，原子替换或库内写入均使缓存失效。缓存不保存数据库连接，课程行重新组装响应，评测结果深拷贝，避免请求间共享可变对象。课程补充状态在每次请求中另查留言库并返回 `no-store`，不缓存账号、收藏或课表响应。SQLite URI 由 `Path.as_uri()` 编码，含特殊字符的合法路径仍保持只读。
 
 `get_messages_db()` 打开可写的留言板数据库：路径来自环境变量 `PINHAOKE_MESSAGES_DB`，本地开发默认仓库根目录 `留言板.db`（已被 `.gitignore` 排除，不进入仓库），生产由 systemd `StateDirectory` 提供 `/var/lib/pinhaoke/留言板.db`。连接启用 WAL 与 `busy_timeout`，首次使用时自建 `messages` 表并迁移到版本 1，增加昵称与回复关系（详见留言板 API 契约）；六个正式库保持只读，`GET /api/health` 不检查留言库。
 
@@ -218,6 +223,8 @@ git diff --check
 - 所有 `POST` 端点先经 `_require_trusted_origin()`：有 `Origin` 时其主机必须等于 `Host`（尊重 `X-Forwarded-Host`），`Origin: null` 返回 403；无 `Origin` 时按 `Referer` 判定；两者都缺失放行。请求体只接受 JSON。
 - 登录失败与用户名不存在返回同一 401 文案，不存在的用户名也对假哈希校验一次；全部限流检查在 scrypt 之前执行，`AUTH_RATE_LIMITS` 的注册、登录失败、找回、全局校验与收藏写入窗口超限返回 429 并带 `Retry-After`。按用户名限流只按字符串计数，不泄露用户是否存在。
 - 账号与收藏响应一律 `Cache-Control: no-store`，不得包含用户主键、IP、任何哈希、令牌明文或密保答案。
+- 密码和密保答案的 scrypt 运算在写事务外完成，敏感写入在 `BEGIN IMMEDIATE` 内复查会话、用户及已验证的密码或密保哈希，避免重置、注销或并发修改后继续使用过期授权。收藏夹归属校验与成员替换在同一写事务中执行，防止并发删夹触发外键错误。
+- 搜索、留言与账号文本通过 `_valid_text` 拒绝无法编码的孤立代理字符；密码仍允许合法 Unicode、换行与 NUL。收藏夹 ID、课程 ID 与树洞号在访问 SQLite 前限制为 1 到 `2**63 - 1`，非法输入返回约定的 422/404。
 - 收藏稳定键为 `term|level|course_code|class_no|teacher`，各段 `strip()`，前端 `favoriteKey()` 与后端 `_favorite_key()` 必须保持同一规范化。客户端只提交课程 ID，快照字段由服务器通过 `get_course_detail()` 读取，`term_label` 取自学期主库文件名前缀；重复收藏只刷新快照并保留原 `added_at`；每账号上限 `FAVORITES_MAX = 300`，超限 409。
 - 收藏条目字段为 `fav_key`、`id`、`available`、`term`、`term_label`、`level`、`course_code`、`class_no`、`teacher`、`course_name`、`credits`、`schedule`、`department`、`added_at`，按 `added_at` 倒序、`fav_key` 收尾。`_refresh_favorite_ids()` 在返回前确认课程 ID 仍存在，漂移的条目按 `(course_code, class_no, teacher)` 在同一学期库重新解析并回写新 ID，只有 `term_label` 与快照相同时才回写，否则标记 `available: false` 且不落库。
 - 收藏夹数据模型的不变式：一条 `favorites` 行存在当且仅当该课程至少属于一个收藏夹。收藏一门课即建快照行并映射进默认收藏夹；取消收藏删 `favorites` 行并由复合外键级联清所有成员映射；`set-collections` 整集替换成员，勾选清空即删 `favorites` 行取消收藏；删自定义收藏夹级联清该夹映射后清理不再属于任何夹的孤儿收藏行。默认收藏夹每账号恰一个，`is_default = 1`，不可删除，可改名。
@@ -234,7 +241,7 @@ API ID 是带命名空间的字符串，不是整数：
 - `g<id>`：春季研究生
 - `s<id>`：暑期本科
 
-规范形式匹配 `^[ugsar][1-9][0-9]*$`。详情路由通过前缀选择数据库，所以共享链接无需额外 `term`。前端必须把 ID 当字符串；课程卡使用事件监听器传递 ID，不在 inline JavaScript 中插入未加引号的 ID。
+规范形式匹配 `^[ugsar][1-9][0-9]{0,18}$`，数字部分不得超过 `2**63 - 1`。详情路由通过前缀选择数据库，所以共享链接无需额外 `term`。前端必须把 ID 当字符串；课程卡使用事件监听器传递 ID，不在 inline JavaScript 中插入未加引号的 ID。
 
 ## 列表合并语义
 
@@ -264,7 +271,7 @@ API ID 是带命名空间的字符串，不是整数：
 
 - 账户库版本 5 新建 `timetable_courses(user_id, course_key, snapshot, added_at)`，以用户与稳定课程键去重，外键级联删除；显式写锁内复查版本保证多进程安全迁移，保留已有用户、会话和收藏。
 - `/api/timetable` 的 GET/POST 和 `/api/timetable/remove` POST 均要求登录，写入要求可信 Origin 并复用收藏写入限流；客户端只能提供课程 ID，课程信息由服务端读取原始数据库。每账号最多 100 门，重复添加幂等，课表和收藏互不影响。
-- 旧收藏与课表读取时按学期、课程号、班号、教师的稳定身份补齐当前地点、时间、类型等字段；找不到的课程保留快照并标记不可用，不误认复用的 ID。
+- 旧收藏与课表读取时按学期批量补齐字段，复用首页 `_grouped_course_ctes` 的完整度代表记录、成组 fallback 与全部类型/类别徽章；按课程号、班号、教师确认身份，空教师保留原始 ID 区分。找不到或实际学期已变化的课程保留快照并标记不可用，不误认复用的 ID。
 - 收藏复用 `createCard` 的转义模板和主页样式，卡片打开仍走 `openFavoriteItem`，移除按钮独立阻止事件传播，不影响收藏夹行为。
 - 个人中心提供收藏 / 课表切换，详情标题操作区的“加入课表”位于“加入收藏”左侧，复用相同按钮样式，手机端在标题下独立一行显示图标和文字，电脑端维持标题右侧；登录弹窗标题显示“个人中心”，登录、注册、找回密码切换按钮保留在正文；再次点击“已加入课表”调用移除接口，列表与详情同步状态；个人中心内查看详情保留视图与滚动位置；登录后补做待添加操作，退出后清空课表内存，不写入 localStorage。账号变化和请求序号可丢弃旧响应。
 - 课表按学期和原始第 0–30 周展示星期 / 第 1–14 节，解析周次范围、离散周次、单双周与多段上课时间；无法识别时显示原始记录，不臆造时间。重叠格子提示核对；移动端表格可横向滚动，下方列表支持详情和移除。

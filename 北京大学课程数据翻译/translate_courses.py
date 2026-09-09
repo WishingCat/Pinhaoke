@@ -69,15 +69,14 @@ def setup_db(db_path):
 
 
 def fetch_pending_undergrad(db_path=UG_DB):
-    """Return pending intro rows, seeding available English text first."""
+    """Return pending intro rows without mutating the database."""
     pending = []
-    english_reuse = []
     with closing(sqlite3.connect(db_path)) as conn:
         rows = conn.execute(
-            "SELECT course_id, intro_cn, intro_en FROM detail_info "
-            "WHERE intro_cn IS NOT NULL AND TRIM(intro_cn) != ''"
+            "SELECT course_id, intro_cn FROM detail_info "
+            "WHERE intro_cn IS NOT NULL AND TRIM(intro_cn) != '' ORDER BY course_id"
         ).fetchall()
-        for cid, source, intro_en in rows:
+        for cid, source in rows:
             existing = {
                 row[0]
                 for row in conn.execute(
@@ -86,14 +85,35 @@ def fetch_pending_undergrad(db_path=UG_DB):
                 )
             }
             missing = [lang for lang in LANGS if lang not in existing]
-            if "en" in missing and isinstance(intro_en, str) and intro_en.strip():
-                english_reuse.append((cid, clean_translation(intro_en)))
-                missing.remove("en")
             if missing:
                 pending.append((cid, source, missing))
-    for cid, english in english_reuse:
-        write_translation_with_retry(db_path, cid, "intro_cn", "en", english)
     return pending
+
+
+def reuse_english_for_intros(db_paths, limit=0):
+    """Seed original English introductions within the shared CLI row limit."""
+    reused = 0
+    for db_path in db_paths:
+        if limit and reused >= limit:
+            break
+        query = (
+            "SELECT course_id, intro_en FROM detail_info "
+            "WHERE intro_cn IS NOT NULL AND TRIM(intro_cn) != '' "
+            "AND intro_en IS NOT NULL AND TRIM(intro_en) != '' "
+            "AND NOT EXISTS (SELECT 1 FROM translations t "
+            "WHERE t.course_id=detail_info.course_id AND t.field='intro_cn' AND t.lang='en') "
+            "ORDER BY course_id"
+        )
+        params = ()
+        if limit:
+            query += " LIMIT ?"
+            params = (limit - reused,)
+        with closing(sqlite3.connect(db_path)) as conn:
+            rows = conn.execute(query, params).fetchall()
+        for cid, english in rows:
+            write_translation_with_retry(db_path, cid, "intro_cn", "en", clean_translation(english))
+            reused += 1
+    return reused
 
 
 def fetch_pending_grad(field_src, field_store, db_path=GR_DB):
@@ -201,7 +221,7 @@ def build_parser():
         "--limit",
         type=nonnegative_int,
         default=0,
-        help="Translate at most N rows total (for testing).",
+        help="Process at most N rows total, including original English reuse (for testing).",
     )
     parser.add_argument(
         "--workers", type=positive_int, default=10, help="Parallel API workers."
@@ -223,9 +243,15 @@ def main(argv=None):
         for db_path in selected_paths:
             setup_db(db_path)
 
+        undergrad_paths = list(dict.fromkeys(DATABASES[job[1]] for job in selected if job[2] == "undergrad"))
+        reused = reuse_english_for_intros(undergrad_paths, limit=args.limit)
+        remaining = max(args.limit - reused, 0) if args.limit else 0
         all_items = []
         print("== Pending lists ==")
+        print(f"  Original English introductions reused: {reused}")
         for _name, db_key, shape, source_field, store_field, label in selected:
+            if args.limit and not remaining:
+                break
             db_path = DATABASES[db_key]
             if shape == "undergrad":
                 pending = fetch_pending_undergrad(db_path)
@@ -238,10 +264,10 @@ def main(argv=None):
         return 1
 
     if args.limit:
-        all_items = all_items[: args.limit]
+        all_items = all_items[:remaining]
     total = len(all_items)
     if total == 0:
-        print("Nothing to translate. All up to date.")
+        print("No API tasks within this run's scope.")
         return 0
 
     print(f"== Starting {total} API calls with {args.workers} workers ==")

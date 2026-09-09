@@ -4849,6 +4849,11 @@ const FAV_TERM_ORDER = ['spring', 'summer', 'fall'];
 const FAV_USERNAME_PATTERN = '[A-Za-z0-9_]{3,20}';
 
 let favUser = null;              // { username, nickname, questions } | null
+let favSessionVersion = 0;
+let accountRefreshRequest = 0;
+let favMutationQueue = Promise.resolve();
+let favAuthBusy = false;
+let favCookieQueue = Promise.resolve();
 const favItems = new Map();      // fav_key -> favorite snapshot
 let favLimit = 300;
 let pendingFavoriteId = null;    // 未登录时点的那门课，登录成功后自动补收藏
@@ -4896,7 +4901,47 @@ function favModeSet(value) {
   } catch (e) {}
 }
 
+function invalidateFavSession() {
+  favSessionVersion++;
+  accountRefreshRequest++;
+  favMutationQueue = Promise.resolve();
+  favCollTimers.forEach(timer => clearTimeout(timer));
+  favCollTimers.clear();
+}
+
 async function favApi(method, path, body, options = {}) {
+  const sessionVersion = favSessionVersion;
+  const staleResult = () => ({ ok: false, status: 0, data: null, stale: true });
+  const changesSession = method === 'POST' && [
+    '/api/auth/login', '/api/auth/register', '/api/auth/logout', '/api/auth/delete', '/api/auth/reset',
+  ].includes(path);
+  if (changesSession && !options.authOwned) {
+    if (favAuthBusy) return { ok: false, status: 409, data: null, authBusy: true };
+    // 不依赖表单的 busy 状态；切换标签或重绘表单不能发起第二个认证请求。
+    favAuthBusy = true;
+    try {
+      await favMutationQueue;
+      return await favApi(method, path, body, { ...options, authOwned: true });
+    }
+    finally { favAuthBusy = false; }
+  }
+  if ((changesSession || (method === 'GET' && path === '/api/account')) && !options.cookieQueued) {
+    // 账号读取也会续期或清 Cookie，必须与认证请求顺序执行。会话变化不重置此队列。
+    const run = () => favApi(method, path, body, { ...options, cookieQueued: true });
+    const pending = favCookieQueue.then(run, run);
+    favCookieQueue = pending.then(() => undefined, () => undefined);
+    return pending;
+  }
+  const writesSavedCourses = method === 'POST' && /^\/api\/(favorites|collections|timetable)(\/|$)/.test(path);
+  if (writesSavedCourses && !options.queued) {
+    if (favAuthBusy) return { ok: false, status: 409, data: null, authBusy: true };
+    // 这些接口返回完整快照，按操作顺序提交可避免较旧的快照覆盖后续修改。
+    const run = () => sessionVersion === favSessionVersion
+      ? favApi(method, path, body, { ...options, queued: true }) : staleResult();
+    const pending = favMutationQueue.then(run, run);
+    favMutationQueue = pending.then(() => undefined, () => undefined);
+    return pending;
+  }
   const init = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
   if (body !== undefined) {
     init.headers['Content-Type'] = 'application/json';
@@ -4906,20 +4951,27 @@ async function favApi(method, path, body, options = {}) {
   try {
     resp = await fetch(path, init);
   } catch (e) {
+    if (sessionVersion !== favSessionVersion && !changesSession) return staleResult();
     return { ok: false, status: 0, data: null };
   }
   let data = null;
   if (resp.status !== 204) {
     try { data = await resp.json(); } catch (e) { data = null; }
   }
-  if (resp.status === 401 && favUser && !options.keepSession) {
+  // 唯一在途认证请求的 Set-Cookie 已由浏览器应用，必须处理其结果并同步界面。
+  if (sessionVersion !== favSessionVersion && !changesSession) return staleResult();
+  if (resp.status === 401 && favUser && !options.keepSession && !changesSession) {
     setFavUser(null);
     favToast('登录已过期，请重新登录');
   }
+  if (resp.ok && changesSession) setFavUser(null);
+  if (resp.ok && writesSavedCourses) accountRefreshRequest++;
   return { ok: resp.ok, status: resp.status, data };
 }
 
 function favErrorText(res, overrides = {}) {
+  if (res.authBusy) return '账号操作正在进行，请稍后重试';
+  if (res.stale) return '';
   if (overrides[res.status]) return overrides[res.status];
   if (res.status === 0) return '网络异常，请稍后再试';
   if (res.status === 429) return '操作太频繁，请稍后再试';
@@ -4940,6 +4992,13 @@ function replaceFavorites(list, limit) {
 }
 
 function applyAccount(data) {
+  if (favUser?.username !== data.username) {
+    invalidateFavSession();
+    timetableCourses = [];
+    timetableLoaded = false;
+    timetableLoading = false;
+    timetableRequest++;
+  }
   favUser = { username: data.username, nickname: data.nickname || DEFAULT_NICKNAME, questions: data.questions || [] };
   favModeSet('user');
   if (data.collections) favCollections = data.collections;
@@ -4949,11 +5008,13 @@ function applyAccount(data) {
 }
 
 function setFavUser(user) {
+  if (!user || favUser?.username !== user.username) invalidateFavSession();
   favUser = user;
   if (!user) {
     favItems.clear();
     timetableCourses = [];
     timetableLoaded = false;
+    timetableLoading = false;
     timetableRequest++;
     accountSection = 'favorites';
     favCollections = [];
@@ -4963,6 +5024,7 @@ function setFavUser(user) {
     if (accountViewOpen) closeAccountView({ keepFocus: true });
   }
   refreshFavoriteButtons();
+  updateTimetableButtons();
   if (document.getElementById('favOverlay').classList.contains('open')) renderFavoritesPanel();
 }
 
@@ -4971,23 +5033,23 @@ function initFavorites() {
   favInitStarted = true;
   refreshFavoriteButtons();
   if (favModeGet() !== 'user') return;
-  favApi('GET', '/api/account').then(res => {
-    if (res.ok && res.data && res.data.authenticated) {
-      applyAccount(res.data);
+  refreshAccount().then(ok => {
+    if (ok) {
       if (document.getElementById('favOverlay').classList.contains('open')) renderFavoritesPanel();
-    } else if (res.status && res.status !== 0) {
-      setFavUser(null);
     }
   });
 }
 
 async function refreshAccount() {
+  const request = ++accountRefreshRequest;
+  const sessionVersion = favSessionVersion;
   const res = await favApi('GET', '/api/account');
+  if (request !== accountRefreshRequest || sessionVersion !== favSessionVersion || res.stale) return false;
   if (res.ok && res.data && res.data.authenticated) {
     applyAccount(res.data);
     return true;
   }
-  if (res.ok) setFavUser(null);
+  if (res.ok || res.status === 401) setFavUser(null);
   return false;
 }
 
@@ -5019,6 +5081,7 @@ function refreshFavoriteButtons() {
 }
 
 function favToast(text) {
+  if (!text) return;
   const toast = document.getElementById('favToast');
   if (!toast) return;
   toast.textContent = text;
@@ -5047,14 +5110,20 @@ async function toggleFavorite(course, sourceBtn) {
     return;
   }
   const key = favoriteKey(course);
+  const sessionVersion = favSessionVersion;
   const wasOn = favItems.has(key);
   const previous = favItems.get(key);
-  if (wasOn) favItems.delete(key);
+  if (wasOn) {
+    clearTimeout(favCollTimers.get(key));
+    favCollTimers.delete(key);
+    favItems.delete(key);
+  }
   else favItems.set(key, { fav_key: key, id: course.id, course_name: name, pending: true });
   refreshFavoriteButtons();
   const res = wasOn
     ? await favApi('POST', '/api/favorites/remove', { fav_key: key })
     : await favApi('POST', '/api/favorites', { id: course.id });
+  if (res.stale || sessionVersion !== favSessionVersion || res.status === 401) return;
   if (res.ok && res.data) {
     applyFavData(res.data);
     favToast(wasOn ? `已取消收藏「${name}」` : `已收藏「${name}」`);
@@ -5775,10 +5844,11 @@ function createTimetableButton(course) {
   const label = timetableHas(course) ? '已加入课表' : '加入课表';
   const button = favButton('', 'modal-action timetable-add', async () => {
     if (!favUser) { pendingTimetableId = course.id; favTab = 'login'; openFavorites(); return; }
+    const sessionVersion = favSessionVersion;
     button.disabled = true;
     try {
       if (!timetableLoaded) await loadTimetable();
-      if (!favUser || !timetableLoaded) return;
+      if (!favUser || !timetableLoaded || sessionVersion !== favSessionVersion) return;
       const saved = timetableCourses.find(item => item.id === course.id || item.course_key === favoriteKey(course));
       if (saved) await removeFromTimetable(saved.course_key);
       else await addToTimetable(course.id);
@@ -5797,10 +5867,11 @@ function createTimetableButton(course) {
 async function loadTimetable() {
   if (!favUser) return;
   const username = favUser.username;
+  const sessionVersion = favSessionVersion;
   const request = ++timetableRequest;
   timetableLoading = true;
   const res = await favApi('GET', '/api/timetable');
-  if (request !== timetableRequest || favUser?.username !== username) return;
+  if (request !== timetableRequest || favUser?.username !== username || sessionVersion !== favSessionVersion || res.stale) return;
   timetableLoading = false;
   if (res.ok) { timetableCourses = res.data.courses; timetableLoaded = true; updateTimetableButtons(); }
   else { favToast(favErrorText(res)); }
@@ -5809,11 +5880,14 @@ async function loadTimetable() {
 
 async function addToTimetable(id) {
   const username = favUser?.username;
+  const sessionVersion = favSessionVersion;
   ++timetableRequest;
   const res = await favApi('POST', '/api/timetable', { id });
-  if (!favUser || favUser.username !== username) return;
+  if (!favUser || favUser.username !== username || sessionVersion !== favSessionVersion || res.stale) return;
   timetableLoading = false;
   if (res.ok) {
+    // 写请求已按顺序提交，每次成功都保留；同时作废写入期间启动的旧读取。
+    ++timetableRequest;
     timetableCourses = res.data.courses;
     timetableLoaded = true;
     const course = timetableCourses.find(item => item.id === id);
@@ -5826,13 +5900,15 @@ async function addToTimetable(id) {
 
 async function removeFromTimetable(courseKey) {
   const username = favUser?.username;
-  const request = ++timetableRequest;
+  const sessionVersion = favSessionVersion;
+  ++timetableRequest;
   const res = await favApi('POST', '/api/timetable/remove', { course_key: courseKey });
-  if (!favUser || favUser.username !== username || request !== timetableRequest) return false;
+  if (!favUser || favUser.username !== username || sessionVersion !== favSessionVersion || res.stale) return false;
+  timetableLoading = false;
   if (!res.ok) { favToast(favErrorText(res)); return false; }
+  ++timetableRequest;
   timetableCourses = res.data.courses;
   timetableLoaded = true;
-  timetableLoading = false;
   updateTimetableButtons();
   if (accountViewOpen && accountSection === 'timetable') renderAccountView();
   favToast('已从我的课表移除');
@@ -6164,11 +6240,14 @@ function refreshDetailChooser() {
 function scheduleSetCollections(favKey) {
   const existing = favCollTimers.get(favKey);
   if (existing) clearTimeout(existing);
+  const container = document.getElementById('favCollections');
+  if (!container || document.getElementById('favToggleBtn')?.dataset.key !== favKey) return;
+  // 在用户勾选时记录本课程的归属；延迟期间详情可能已经切换到另一门课。
+  const ids = [...container.querySelectorAll('.collection-chip-cb:checked')].map(cb => Number(cb.value));
+  const sessionVersion = favSessionVersion;
   favCollTimers.set(favKey, setTimeout(async () => {
     favCollTimers.delete(favKey);
-    const container = document.getElementById('favCollections');
-    if (!container) return;
-    const ids = [...container.querySelectorAll('.collection-chip-cb:checked')].map(cb => Number(cb.value));
+    if (!favUser || sessionVersion !== favSessionVersion || !favItems.has(favKey)) return;
     const res = await favApi('POST', '/api/favorites/set-collections', { fav_key: favKey, collection_ids: ids });
     if (res.ok && res.data) {
       applyFavData(res.data);

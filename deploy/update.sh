@@ -37,7 +37,12 @@ ROLLBACK_IN_PROGRESS=0
 verify_materialized_lfs() {
     local root=$1
     local commit=$2
-    local relative path first_line
+    local relative path first_line lfs_paths
+
+    if ! lfs_paths=$(git lfs ls-files --name-only "$commit"); then
+        echo "ERROR: cannot list LFS paths for release: $commit" >&2
+        return 1
+    fi
 
     while IFS= read -r relative; do
         [[ -z "$relative" ]] && continue
@@ -52,7 +57,7 @@ verify_materialized_lfs() {
             echo "ERROR: LFS pointer was not materialized: $relative" >&2
             return 1
         fi
-    done < <(git lfs ls-files --name-only "$commit")
+    done <<<"$lfs_paths"
 }
 
 materialize_release_tree() {
