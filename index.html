@@ -507,6 +507,8 @@ html[data-theme="dark"] .hero h1 {
 
 /* Course data views */
 .view-switcher {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2358,6 +2360,41 @@ body::before { animation: none; filter: none; }
   :is(.course-card, .thread):hover { transform: none !important; }
 }
 /* ===== End material and motion ===== */
+
+/* A single shared selection surface can travel between rows without moving labels. */
+.term-indicator {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+  transform-origin: top left;
+  background: linear-gradient(135deg, #08766B, #075F57);
+  box-shadow: 0 1px 3px rgba(22, 123, 114, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+html[data-theme="dark"] .term-indicator {
+  background: linear-gradient(135deg, #4FE0BE, #2BB593);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.term-indicator-ready .term-indicator { display: block; }
+.term-label { position: relative; z-index: 2; pointer-events: none; }
+.view-switcher.term-indicator-ready .term-toggle button {
+  /* Keep labels above the moving surface, including during touch/keyboard presses. */
+  animation: none;
+  transform: none;
+  transition: color 240ms ease;
+}
+.view-switcher.term-indicator-ready .term-toggle button.active,
+html[data-theme="dark"] .view-switcher.term-indicator-ready .term-toggle button.active {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+@media (forced-colors: active) {
+  .term-indicator { forced-color-adjust: none; background: Highlight; box-shadow: none; }
+  .term-indicator-ready .term-toggle button.active .term-label { color: HighlightText; }
+}
 </style>
 <script>
 window._hmt = window._hmt || [];
@@ -2447,11 +2484,12 @@ window._hmt.push(['_trackPageview', location.pathname]);
   <!-- Hero -->
   <div class="hero">
     <h1 id="title">拼好课</h1>
-    <div class="view-switcher">
+    <div class="view-switcher" id="termSwitcher">
+      <span class="term-indicator" id="termIndicator" aria-hidden="true"></span>
       <div class="term-toggle" role="tablist" aria-label="学期切换">
-        <button type="button" id="termSpringBtn" data-term="spring" role="tab" aria-selected="false" onclick="setTerm('spring')">2026春季学期</button>
-        <button type="button" id="termSummerBtn" data-term="summer" role="tab" aria-selected="false" onclick="setTerm('summer')">2026暑期学期</button>
-        <button type="button" id="termFallBtn" class="active" data-term="fall" role="tab" aria-selected="true" onclick="setTerm('fall')">2026秋季学期</button>
+        <button type="button" id="termSpringBtn" data-term="spring" role="tab" aria-selected="false" onclick="setTerm('spring')"><span class="term-label">2026春季学期</span></button>
+        <button type="button" id="termSummerBtn" data-term="summer" role="tab" aria-selected="false" onclick="setTerm('summer')"><span class="term-label">2026暑期学期</span></button>
+        <button type="button" id="termFallBtn" class="active" data-term="fall" role="tab" aria-selected="true" onclick="setTerm('fall')"><span class="term-label">2026秋季学期</span></button>
       </div>
       <a class="review-hub-link" id="reviewHubLink" href="/reviews">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
@@ -3337,9 +3375,9 @@ function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
   document.getElementById('brandName').textContent = lang.title;
-  document.getElementById('termFallBtn').textContent = lang.termFall;
-  document.getElementById('termSpringBtn').textContent = lang.termSpring;
-  document.getElementById('termSummerBtn').textContent = lang.termSummer;
+  document.querySelector('#termFallBtn .term-label').textContent = lang.termFall;
+  document.querySelector('#termSpringBtn .term-label').textContent = lang.termSpring;
+  document.querySelector('#termSummerBtn .term-label').textContent = lang.termSummer;
   document.querySelector('#reviewHubLink span').textContent = lang.reviewHub;
   document.getElementById('langLabel').textContent = lang.name;
   document.getElementById('searchInput').placeholder = lang.searchPlaceholder;
@@ -3419,6 +3457,7 @@ async function init() {
   refreshTermToggleUI();
   refreshLangSelectorUI();
   applyI18n();
+  initTermIndicator();
   document.getElementById('searchClear').classList.toggle(
     'hidden', !document.getElementById('searchInput').value);
   renderSkeletons();
@@ -3457,12 +3496,79 @@ async function init() {
   return true;
 }
 
+let termIndicatorController = null;
+
+function initTermIndicator() {
+  if (termIndicatorController) return;
+  const host = document.getElementById('termSwitcher');
+  const indicator = document.getElementById('termIndicator');
+  if (!host || !indicator) return;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let animation = null;
+  let target = null;
+  let resizeFrame = 0;
+
+  function sync(animate = false) {
+    const button = host.querySelector('.term-toggle button.active');
+    if (!button) return;
+    const bounds = host.getBoundingClientRect();
+    const selected = button.getBoundingClientRect();
+    if (!selected.width || !selected.height) return;
+    const next = {
+      x: selected.left - bounds.left,
+      y: selected.top - bounds.top,
+      width: selected.width,
+      height: selected.height,
+      radius: getComputedStyle(button).borderTopLeftRadius,
+    };
+    if (reducedMotion.matches) animation?.cancel();
+    // ResizeObserver also fires after selecting a heavier label. Do not cancel
+    // the slide if the measured destination has already been applied.
+    if (target && Object.keys(next).every(key => next[key] === target[key])) return;
+    // Read the current presentation before cancelling, so rapid taps continue
+    // from the in-flight position instead of jumping back to an earlier button.
+    const previous = target ? indicator.getBoundingClientRect() : null;
+    animation?.cancel();
+    const destination = `translate(${next.x}px, ${next.y}px)`;
+    indicator.style.width = next.width + 'px';
+    indicator.style.height = next.height + 'px';
+    indicator.style.borderRadius = next.radius;
+    indicator.style.transform = destination;
+    target = next;
+    if (animate && previous && !reducedMotion.matches && typeof indicator.animate === 'function') {
+      animation = indicator.animate([
+        { transform: `translate(${previous.left - bounds.left}px, ${previous.top - bounds.top}px) scale(${previous.width / next.width}, ${previous.height / next.height})` },
+        { transform: destination },
+      ], { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+    }
+  }
+
+  termIndicatorController = { sync };
+  host.classList.add('term-indicator-ready');
+  sync();
+  const realign = () => {
+    if (resizeFrame) return;
+    resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; sync(); });
+  };
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(realign);
+    observer.observe(host);
+    host.querySelectorAll('.term-toggle button').forEach(button => observer.observe(button));
+  } else {
+    window.addEventListener('resize', realign, { passive: true });
+  }
+  document.fonts?.ready.then(realign);
+  if (reducedMotion.addEventListener) reducedMotion.addEventListener('change', realign);
+  else reducedMotion.addListener(realign);
+}
+
 function refreshTermToggleUI() {
   document.querySelectorAll('.term-toggle button').forEach(btn => {
     const active = btn.dataset.term === currentTerm;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', active ? 'true' : 'false');
   });
+  termIndicatorController?.sync(true);
 }
 
 async function setTerm(term) {

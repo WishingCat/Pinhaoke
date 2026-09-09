@@ -1263,6 +1263,7 @@ class FrontendContractTests(unittest.TestCase):
             const window = {{ addEventListener() {{}} }};
             function readURLState() {{ return 'a1'; }}
             function initFavorites() {{}}
+            function initTermIndicator() {{}}
             function refreshTermToggleUI() {{}}
             function refreshLangSelectorUI() {{}}
             function applyI18n() {{ counts.i18n += 1; }}
