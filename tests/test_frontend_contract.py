@@ -284,17 +284,17 @@ class FrontendContractTests(unittest.TestCase):
                 r'<div[^>]+id="sponsorOverlay".*?</ul>\s*</div>\s*</div>', page, flags=re.S
             ).group(0)
             outside_panel = page.replace(panel, "", 1)
-            # 面板依次展示两个赞助码、微信联系二维码和鸣谢名单，图片来自 /Images/
+            # 仅保留微信赞助方式，开发者联系二维码与完整鸣谢名单仍在面板中。
             for asset in (
                 'src="/Images/wechat_sponsor.jpg?v=2" alt="微信赞助码"',
-                'src="/Images/alipay_sponsor.jpg?v=2" alt="支付宝赞助码"',
                 'src="/Images/MyWeChat.jpg" alt="微信联系方式"',
             ):
                 self.assertIn(asset, panel)
             for asset in ("wechat_sponsor.jpg", "alipay_sponsor.jpg"):
                 self.assertNotIn(asset, outside_panel)
-            self.assertLess(page.index('alt="微信赞助码"'), page.index('alt="支付宝赞助码"'))
-            self.assertLess(page.index('alt="支付宝赞助码"'), page.index('alt="微信联系方式"'))
+            self.assertNotIn("alipay_sponsor", page)
+            self.assertNotIn("支付宝赞助码", page)
+            self.assertLess(page.index('alt="微信赞助码"'), page.index('alt="微信联系方式"'))
             self.assertLess(page.index('alt="微信联系方式"'), page.index(">鸣谢赞助<"))
             # 两个网页的名单、金额与日期保持一致，且只在赞助面板内展示。
             self.assertIn(sponsor_list, panel)

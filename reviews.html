@@ -409,21 +409,35 @@ html[data-theme="dark"] .site-footer::after { background: radial-gradient(60% 10
 .stats-note { margin: 6px 18px 16px; font-size: 0.7rem; line-height: 1.7; color: var(--ink-3); }
 
 /* ===== Sponsor panel ===== */
-.sponsor-notice { margin: 0 14px 14px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--ink); font-size: 0.88rem; line-height: 1.8; }
-.sponsor-panel { display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(760px, 92vh); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-xl); }
-.sponsor-sec { margin: 0 18px 8px; font-size: 0.72rem; font-weight: 700; color: var(--ink-3); }
-.sponsor-qr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 18px 14px; }
+.sponsor-panel { --sponsor-gutter: 24px; display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: min(820px, 92vh); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-xl); }
+.sponsor-panel > * { flex-shrink: 0; }
+.sponsor-panel .modal-title { font-size: 1.2rem; line-height: 1.4; }
+.sponsor-panel .msg-head { position: sticky; top: 0; z-index: 1; padding: 18px var(--sponsor-gutter) 14px; background: var(--surface); }
+.sponsor-notice { margin: 0 var(--sponsor-gutter) 16px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--ink); font-size: 0.82rem; line-height: 1.75; }
+.sponsor-intro { margin: 0 var(--sponsor-gutter) 16px; font-size: 0.8rem; line-height: 1.7; color: var(--ink-2); text-align: center; }
+.sponsor-sec { margin: 0 var(--sponsor-gutter) 4px; font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+.sponsor-qr-grid { display: grid; justify-items: center; padding: 0 var(--sponsor-gutter) 22px; }
+.sponsor-qr-grid .sponsor-figure { width: min(100%, 220px); }
 .sponsor-figure { margin: 0; text-align: center; }
-.sponsor-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 10px; }
-.sponsor-figure figcaption { margin-top: 6px; font-size: 0.74rem; font-weight: 500; color: var(--ink-2); }
-.sponsor-contact { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 14px; align-items: center; margin: 0 18px 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.sponsor-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+.sponsor-figure figcaption { margin-top: 8px; font-size: 0.78rem; font-weight: 600; color: var(--ink-2); }
+.sponsor-contact { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 18px; align-items: center; margin: 0 var(--sponsor-gutter) 22px; padding: 18px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .sponsor-contact-text { font-size: 0.8rem; line-height: 1.7; color: var(--ink-2); }
-.sponsor-contact-text strong { display: block; margin-bottom: 2px; font-size: 0.86rem; color: var(--ink); }
-.sponsor-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0 18px 18px; list-style: none; }
-.sponsor-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 0.78rem; font-weight: 500; color: var(--ink); }
-.sponsor-amount { font-family: var(--mono); font-weight: 600; color: #E11D48; }
-.sponsor-date { font-size: 0.72rem; color: var(--ink-3); white-space: nowrap; }
+.sponsor-contact-text strong { display: block; margin-bottom: 6px; font-size: 0.88rem; color: var(--ink); }
+.sponsor-list { margin: 0; padding: 0 var(--sponsor-gutter) 20px; list-style: none; }
+.sponsor-chip { display: grid; grid-template-columns: minmax(0, 1fr) 64px 84px; align-items: baseline; gap: 4px 12px; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; font-weight: 500; color: var(--ink); }
+.sponsor-chip:last-child { border-bottom: 0; }
+.sponsor-name { overflow-wrap: anywhere; }
+.sponsor-amount { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: #E11D48; text-align: right; white-space: nowrap; }
+.sponsor-date { font-size: 0.72rem; color: var(--ink-3); white-space: nowrap; text-align: right; }
 html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
+@media (max-width: 640px) {
+  #sponsorOverlay { padding: 12px; }
+  .sponsor-panel { --sponsor-gutter: 18px; }
+  .sponsor-chip { grid-template-columns: minmax(0, 1fr) auto; }
+  .sponsor-amount { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .sponsor-date { grid-column: 1; text-align: left; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; scroll-behavior: auto !important; }
@@ -445,10 +459,6 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   .stat-value { font-size: 1.3rem; }
   .stats-trend, .stats-status, .stats-note { padding-left: 14px; padding-right: 14px; }
   .stats-note { margin-left: 14px; margin-right: 14px; }
-  .sponsor-sec { margin-left: 14px; margin-right: 14px; }
-  .sponsor-qr-grid { gap: 10px; padding: 0 14px 12px; }
-  .sponsor-contact { margin-left: 14px; margin-right: 14px; }
-  .sponsor-list { padding-left: 14px; padding-right: 14px; }
   .page { padding: 0 16px 60px; }
   .page-head { padding: 36px 8px 4px; }
   h1 { font-size: 2.1rem; }
@@ -490,8 +500,6 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
 }
 
 @media (max-width: 320px) {
-  .sponsor-contact { grid-template-columns: 1fr; justify-items: center; text-align: center; }
-  .sponsor-contact .sponsor-figure { width: min(100%, 150px); }
   .top-actions { gap: 4px; }
   .brand-name { font-size: 0.9rem; }
   .brand img { width: 27px; height: 27px; }
@@ -717,29 +725,23 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
       <button class="modal-close" onclick="closeSponsor()" aria-label="关闭赞助面板">&times;</button>
     </div>
     <p class="sponsor-notice"><strong>如果你赞助了可以加我的微信告诉我，或者转账备注上你希望留下的名字，我会给你加入到赞助列表。真的非常感谢您的支持！</strong></p>
-    <p class="msg-hint">拼好课是纯公益项目，承诺永久免费服务。如果有能力的话，欢迎扫码赞助，支持网站运行。</p>
-    <div class="sponsor-sec">赞助二维码</div>
+    <p class="sponsor-intro">纯公益项目，永久免费。欢迎通过微信赞助，支持网站运行。</p>
     <div class="sponsor-qr-grid">
       <figure class="sponsor-figure">
         <img src="/Images/wechat_sponsor.jpg?v=2" alt="微信赞助码" width="643" height="643" loading="lazy" decoding="async">
         <figcaption>微信赞助码</figcaption>
       </figure>
-      <figure class="sponsor-figure">
-        <img src="/Images/alipay_sponsor.jpg?v=2" alt="支付宝赞助码" width="835" height="835" loading="lazy" decoding="async">
-        <figcaption>支付宝赞助码</figcaption>
-      </figure>
     </div>
     <div class="sponsor-contact">
       <figure class="sponsor-figure">
         <img src="/Images/MyWeChat.jpg" alt="微信联系方式" width="1158" height="1579" loading="lazy" decoding="async">
-        <figcaption>微信联系方式</figcaption>
       </figure>
       <div class="sponsor-contact-text">
         <strong>联系开发者</strong>
-        扫码添加微信，问题反馈与功能需求都欢迎，也可以在留言板公开留言。
+        扫码添加开发者微信。赞助留名、问题反馈或功能建议，都欢迎联系。
       </div>
     </div>
-    <div class="sponsor-sec">鸣谢赞助</div>
+    <h2 class="sponsor-sec">鸣谢赞助</h2>
     <ul class="sponsor-list">
       <li class="sponsor-chip"><span class="sponsor-name">噬铁侠</span><span class="sponsor-amount">¥300</span></li>
       <li class="sponsor-chip"><span class="sponsor-name">罗淦-PKU</span><span class="sponsor-amount">¥100</span></li>
