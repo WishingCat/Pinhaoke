@@ -818,7 +818,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('.term-nav, .review-nav-shell { display: contents; }', REVIEWS_HTML)
 
     def test_review_page_matches_index_visual_language(self):
-        # 首页使用独立手写字标；共享学期控件尺寸、暗色底色、
+        # 首页使用独立圆体字标；共享学期控件尺寸、暗色底色、
         # 激活态渐变、卡片/弹窗圆角、页脚与回到顶部
         for token in (
             "#0E1013",
