@@ -1162,6 +1162,11 @@ html[data-theme="dark"] .course-card:hover::after { opacity: 0.12; }
 .course-card:hover .card-arrow,
 .course-card:focus-visible .card-arrow { opacity: 1; transform: translateX(0); }
 
+.card-correction { display: inline-flex; align-items: center; align-self: flex-end; gap: 5px; margin-top: auto; color: #B45309; font-size: 0.75rem; font-weight: 700; line-height: 1.5; }
+.card-correction-icon { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border: 1.5px solid currentColor; border-radius: 50%; font-size: 0.75rem; line-height: 1; }
+.course-card.has-corrections .card-arrow { display: none; }
+html[data-theme="dark"] .card-correction { color: #FBBF24; }
+
 @media (hover: none) { .card-arrow { opacity: 0.8; transform: none; } }
 
 /* ============================================================
@@ -1651,7 +1656,8 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   letter-spacing: 0;
 }
 
-.course-message-summary { margin: 0 0 14px; padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: 6px; background: var(--accent-mist); }
+.course-message-summary { margin: 0 0 14px; padding: 8px 12px; border: 2px solid #18B89A; border-radius: 6px; background: var(--accent-mist); }
+html[data-theme="dark"] .course-message-summary { border-color: #43E4BE; }
 .course-message-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .course-message-label { font-size: 0.74rem; font-weight: 700; color: var(--ink-2); }
 .course-correction-button { padding: 4px 8px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); font-size: 0.74rem; font-weight: 600; white-space: nowrap; }
@@ -3657,7 +3663,7 @@ async function fetchCourses({ page = 1, append = false } = {}) {
   syncURL();
 
   try {
-    const resp = await fetch('/api/courses?' + params.toString(), { signal: ctrl.signal });
+    const resp = await fetch('/api/courses?' + params.toString(), { signal: ctrl.signal, cache: 'no-store' });
     if (!ownsRequest()) return false;
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
@@ -3846,6 +3852,7 @@ function createCard(course, onOpen = null) {
   const card = document.createElement('article');
   card.className = 'course-card';
   card.dataset.strip = stripKey(course.course_type);
+  card.dataset.courseId = course.id;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
 
@@ -3883,6 +3890,7 @@ function createCard(course, onOpen = null) {
     <span class="card-arrow" aria-hidden="true">${esc(lang.detailBtn)} &rarr;</span>`;
 
   card.innerHTML = html;
+  setCourseCorrectionIndicator(card, course.has_course_corrections === true);
   // 收藏星标：阻止冒泡，点击或按键只切换收藏，不打开详情
   const favBtn = card.querySelector('.fav-btn');
   favBtn.innerHTML = ICONS.star;
@@ -3908,6 +3916,31 @@ function createCard(course, onOpen = null) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onOpen) onOpen(); else showDetail(course.id); }
   });
   return card;
+}
+
+function setCourseCorrectionIndicator(card, hasCorrections) {
+  card.classList.toggle('has-corrections', hasCorrections);
+  const existing = card.querySelector('.card-correction');
+  if (!hasCorrections) { existing?.remove(); return; }
+  if (existing) return;
+  const indicator = document.createElement('span');
+  indicator.className = 'card-correction';
+  indicator.title = '这门课有同学补充或修正的信息，点击课程查看。';
+  const icon = document.createElement('span');
+  icon.className = 'card-correction-icon';
+  icon.textContent = '!';
+  icon.setAttribute('aria-hidden', 'true');
+  indicator.append(icon, document.createTextNode('内容有修正'));
+  card.append(indicator);
+}
+
+function syncCourseCorrectionIndicators(courseId, hasCorrections) {
+  currentCourses.forEach(course => {
+    if (course.id === courseId) course.has_course_corrections = hasCorrections;
+  });
+  document.querySelectorAll('.course-card').forEach(card => {
+    if (card.dataset.courseId === courseId) setCourseCorrectionIndicator(card, hasCorrections);
+  });
 }
 
 /* ===== Detail modal ===== */
@@ -4415,6 +4448,7 @@ function mountCourseMessages(host, course) {
       });
       if (data.messages.length) beforeId = data.messages[data.messages.length - 1].id;
       total = data.total;
+      syncCourseCorrectionIndicators(course.id, total > 0);
       title.textContent = total ? `课程补充（${total}）` : '课程补充';
       if (reset || beforeId === 0) preview.textContent = data.messages[0]?.content || '有课程变化？点击“修正信息”补充。';
       more.hidden = !data.has_more;
@@ -4446,6 +4480,7 @@ function mountCourseMessages(host, course) {
       input.value = ''; postStatus.textContent = '课程留言已发布';
       list.prepend(renderMessage(message));
       title.textContent = `课程补充（${++total}）`;
+      syncCourseCorrectionIndicators(course.id, true);
       preview.textContent = message.content;
       await load(true);
     } catch (error) {

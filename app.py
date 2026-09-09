@@ -1285,6 +1285,7 @@ def list_courses(
     term: str = Query("fall", description="spring | summer | fall", pattern=r"^(?:spring|summer|fall)$"),
     page: int = Query(1, ge=1, le=10000),
     page_size: int = Query(50, ge=1, le=200),
+    response: Response = None,
 ):
     credits_value = _validate_list_params(term, lang, weekday, sort, credits, page, page_size)
     # Translation is disabled site-wide; accept old lang links but use source fields.
@@ -1344,6 +1345,9 @@ def list_courses(
             }
         )
 
+    _annotate_course_corrections(courses)
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store"
     return {"total": total, "page": page, "page_size": page_size, "courses": courses}
 
 
@@ -1976,11 +1980,41 @@ def create_message_reply(message_id: int, request: Request, payload: dict = Body
     return _insert_message(content, _client_ip_hash(request), _message_nickname(request), message_id)
 
 
+def _course_message_identity(term_label, level, course_code, class_no) -> str:
+    return json.dumps([str(value or "").strip() for value in (term_label, level, course_code, class_no)],
+                      ensure_ascii=False, separators=(",", ":"))
+
+
+def _annotate_course_corrections(courses: list[dict]) -> None:
+    # 一页最多 200 门课，复用列表已有的课程身份，一次索引查询即可获得补充状态。
+    if not courses:
+        return
+    keys = []
+    for course in courses:
+        term, prefix, _ = _parse_id(course["id"])
+        keys.append(_course_message_identity(_term_label(term), _level_of_prefix(prefix),
+                                             course["course_code"], course["class_no"]))
+    unique_keys = list(dict.fromkeys(keys))
+    placeholders = ",".join("?" for _ in unique_keys)
+    try:
+        with get_messages_db() as conn:
+            corrected = {row[0] for row in conn.execute(
+                f"SELECT DISTINCT course_key FROM messages WHERE parent_id IS NULL AND course_key IN ({placeholders})",
+                unique_keys,
+            )}
+    except (sqlite3.Error, OSError):
+        # 留言库暂不可用时仍提供课程搜索；未知状态不能当作已确认没有补充。
+        for course in courses:
+            course["has_course_corrections"] = None
+        return
+    for course, key in zip(courses, keys):
+        course["has_course_corrections"] = key in corrected
+
+
 def _course_message_key(course_id: str) -> str:
     # 绑定真实学期、培养层次、课程号和班号；换教师或重建本地 ID 不丢失讨论。
     snapshot = _favorite_snapshot(course_id)
-    return json.dumps([snapshot[field] for field in ("term_label", "level", "course_code", "class_no")],
-                      ensure_ascii=False, separators=(",", ":"))
+    return _course_message_identity(*(snapshot[field] for field in ("term_label", "level", "course_code", "class_no")))
 
 
 @app.get("/api/courses/{course_id}/messages")

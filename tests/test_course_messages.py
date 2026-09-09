@@ -7,6 +7,7 @@ from unittest.mock import patch
 import app
 import test_message_replies as message_tests
 from tests.test_app import _account_request
+import tests.test_app as app_tests
 
 
 class CourseMessageTests(unittest.TestCase):
@@ -22,6 +23,43 @@ class CourseMessageTests(unittest.TestCase):
         response = app.create_course_message(course_id, request or _account_request(), {'content':content, 'nickname':'spoof', 'course_key':'spoof'})
         self.assertEqual(response.status_code,201)
         return json.loads(response.body)
+
+    def test_search_reports_corrections_immediately_and_excludes_site_messages(self):
+        response = app.Response()
+        first = app_tests.CourseListTests.call(self, page_size=20, response=response)
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertTrue(all(c['has_course_corrections'] is False for c in first['courses']))
+        target = first['courses'][0]
+        app.create_message(_account_request(), {'content': target['course_name']})
+        self.assertTrue(all(c['has_course_corrections'] is False for c in app_tests.CourseListTests.call(self, page_size=20)['courses']))
+        self.post(target['id'])
+        updated = app_tests.CourseListTests.call(self, q=target['course_code'], page_size=20)
+        matching = next(c for c in updated['courses'] if c['id'] == target['id'])
+        self.assertIs(matching['has_course_corrections'], True)
+        self.assertNotIn('course_key', matching)
+
+    def test_search_status_uses_stable_identity_in_one_batch_without_detail_requests(self):
+        detail = {'course_code': 'TEST', 'class_no': '01', 'teacher': '甲', 'course_name': '测试课程'}
+        with patch.object(app, 'get_course_detail', return_value=detail):
+            self.post('a1')
+        courses = [dict(detail, id=cid) for cid in ('a999', 'u1', 'r1')]
+        courses.append(dict(detail, id='a2', class_no='02'))
+        with patch.object(app, 'get_course_detail', side_effect=AssertionError('N+1 detail lookup')), \
+             patch.object(app, 'get_messages_db', wraps=app.get_messages_db) as messages_db:
+            app._annotate_course_corrections(courses)
+            self.assertEqual(messages_db.call_count, 1)
+            self.assertEqual([c['has_course_corrections'] for c in courses], [True, False, False, False])
+            app._annotate_course_corrections([])
+            self.assertEqual(messages_db.call_count, 1)
+        with patch.object(app, '_term_label', return_value='2027秋季学期'):
+            app._annotate_course_corrections(courses)
+            self.assertFalse(any(c['has_course_corrections'] for c in courses))
+
+    def test_search_survives_unavailable_messages_database_with_unknown_status(self):
+        with patch.object(app, 'get_messages_db', side_effect=sqlite3.OperationalError('unavailable')):
+            result = app_tests.CourseListTests.call(self, page_size=1)
+        self.assertEqual(len(result['courses']), 1)
+        self.assertIsNone(result['courses'][0]['has_course_corrections'])
 
     def test_course_board_isolation_and_server_nickname_with_shared_replies(self):
         request=self.register()

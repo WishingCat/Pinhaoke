@@ -158,6 +158,42 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('-webkit-line-clamp: 2', HTML)
         self.assertIn('这里用于补充或修正课程信息', HTML)
         self.assertIn("history.pushState({ phk: 'coursecorrection' }", function_body('openCourseCorrection'))
+        summary_style = re.search(r'\.course-message-summary \{([^}]+)\}', HTML).group(1)
+        self.assertIn('border: 2px solid', summary_style)
+        self.assertNotIn('border-left', summary_style)
+
+    def test_course_correction_status_updates_matching_cards_without_duplicates(self):
+        self.assertIn('setCourseCorrectionIndicator(card, course.has_course_corrections === true)', function_body('createCard'))
+        self.assertIn('syncCourseCorrectionIndicators(course.id, true)', function_body('mountCourseMessages'))
+        self.assertIn('syncCourseCorrectionIndicators(course.id, total > 0)', function_body('mountCourseMessages'))
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            function element() {{
+              return {{ children: [], dataset: {{}}, classes: new Set(),
+                classList: {{ toggle(name, value) {{ value ? this.owner.classes.add(name) : this.owner.classes.delete(name); }} }},
+                setAttribute(name, value) {{ this[name] = value; }},
+                append(...children) {{ children.forEach(child => {{ child.parent = this; this.children.push(child); }}); }},
+                querySelector() {{ return this.children.find(child => child.className === 'card-correction'); }},
+                remove() {{ this.parent.children = this.parent.children.filter(child => child !== this); }} }};
+            }}
+            const cards = [element(), element()];
+            cards.forEach((card, index) => {{ card.dataset.courseId = 'a' + (index + 1); card.classList.owner = card; }});
+            const currentCourses = [{{id:'a1'}}, {{id:'a2'}}];
+            const document = {{ createElement: element, createTextNode: text => ({{textContent:text}}), querySelectorAll: () => cards }};
+            {function_source('setCourseCorrectionIndicator')}
+            {function_source('syncCourseCorrectionIndicators')}
+            syncCourseCorrectionIndicators('a1', true);
+            syncCourseCorrectionIndicators('a1', true);
+            assert.equal(cards[0].children.length, 1);
+            assert.equal(cards[0].children[0].children[1].textContent, '内容有修正');
+            assert.equal(cards[0].children[0].children[0]['aria-hidden'], 'true');
+            assert.equal(cards[1].children.length, 0);
+            assert.equal(currentCourses[0].has_course_corrections, true);
+            syncCourseCorrectionIndicators('a1', false);
+            assert.equal(cards[0].children.length, 0);
+            assert.equal(cards[0].classes.has('has-corrections'), false);
+            assert.equal(currentCourses[0].has_course_corrections, false);
+        """)
 
     def run_node(self, script):
         if not NODE:
