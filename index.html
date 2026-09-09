@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#F7F7F8">
 <link rel="icon" type="image/svg+xml" sizes="any" href="/Images/favicon-round.svg?v=1">
 <link rel="apple-touch-icon" href="/Images/apple-touch-icon.png?v=2">
+<link rel="preload" href="/Images/fonts/pinhaoke-hand.woff2?v=1" as="font" type="font/woff2" crossorigin>
 <script>try{var t=localStorage.getItem('pinhaoke_theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -426,6 +427,16 @@ html:not([data-theme="dark"]) .theme-icon-sun { display: none; }
    HERO
    ============================================================ */
 
+/* Three-glyph Yozai subset, renamed Pinhaoke Hand; license: /Images/fonts/OFL.txt. */
+@font-face {
+  font-family: 'Pinhaoke Hand';
+  src: url('/Images/fonts/pinhaoke-hand.woff2?v=1') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  unicode-range: U+597D, U+62FC, U+8BFE;
+}
+
 .hero {
   text-align: center;
   padding: 56px 16px 8px;
@@ -454,25 +465,44 @@ html[data-theme="dark"] .hero::before {
 
 .hero h1 {
   position: relative;
-  font-size: 3.3rem;
-  font-weight: 800;
+  display: inline-block;
+  font-family: 'Pinhaoke Hand', 'Kaiti SC', 'KaiTi', 'STKaiti', cursive;
+  font-size: 4.4rem;
+  font-weight: 500;
+  font-synthesis: none;
   letter-spacing: 0;
-  line-height: 1.15;
-  background-image: linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  line-height: 1.2;
+  padding: 0 0.08em;
+  color: #167B72;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8))
+          drop-shadow(0 4px 6px rgba(17, 105, 91, 0.12));
 }
 
 html[data-theme="dark"] .hero h1 {
-  background-image: linear-gradient(118deg, #5CE8C6 8%, #35C6A7 58%, #27A68E 94%);
+  color: #5CE8C6;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35))
+          drop-shadow(0 3px 9px rgba(53, 198, 167, 0.18));
 }
 
-.hero .subtitle {
-  position: relative;
-  font-size: 0.95rem;
-  color: var(--ink-3);
-  margin-top: 13px;
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 {
+    background-image: linear-gradient(155deg, #389F85 12%, #14776D 40%, #3BA98B 52%, #11675F 76%, #145D63 96%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  html[data-theme="dark"] .hero h1 {
+    background-image: linear-gradient(155deg, #AFF3D9 12%, #58DDB9 40%, #A2F0D5 52%, #3BC4A6 76%, #58C8C3 96%);
+    color: transparent;
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .hero h1, html[data-theme="dark"] .hero h1 {
+    background-image: none;
+    color: var(--ink);
+    filter: none;
+  }
 }
 
 /* Course data views */
@@ -2051,8 +2081,7 @@ html[data-theme="dark"] .site-footer::after {
   .top-btn { padding: 6px 10px; font-size: 0.74rem; }
   .icon-btn { width: 31px; height: 31px; }
   .hero { padding: 36px 8px 4px; }
-  .hero h1 { font-size: 2.1rem; }
-  .hero .subtitle { font-size: 0.86rem; margin-top: 10px; }
+  .hero h1 { font-size: 3.3rem; }
   .view-switcher { display: grid; align-items: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin-top: 14px; }
   .term-toggle { display: contents; }
   .term-toggle button, .review-hub-link { min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 0.82rem; white-space: normal; overflow-wrap: anywhere; }
@@ -2120,10 +2149,9 @@ html[data-theme="dark"] .site-footer::after {
   .modal-body { padding: 12px 12px 20px; }
 }
 
-/* 超窄屏（老款/小屏手机）：语言按钮只留地球图标，副标题缩小到单行 */
+/* 超窄屏（老款/小屏手机）：语言按钮只留地球图标 */
 @media (max-width: 400px) {
   #langLabel { display: none; }
-  .hero .subtitle { font-size: 0.78rem; }
 }
 
 
@@ -2419,7 +2447,6 @@ window._hmt.push(['_trackPageview', location.pathname]);
   <!-- Hero -->
   <div class="hero">
     <h1 id="title">拼好课</h1>
-    <p class="subtitle" id="subtitle">北京大学2026秋季学期课程搜索(每学期更新)</p>
     <div class="view-switcher">
       <div class="term-toggle" role="tablist" aria-label="学期切换">
         <button type="button" id="termSpringBtn" data-term="spring" role="tab" aria-selected="false" onclick="setTerm('spring')">2026春季学期</button>
@@ -2674,9 +2701,6 @@ const i18n = {
   zh: {
     name: '中文',
     title: '拼好课',
-    subtitleFall: '北京大学2026秋季学期课程搜索(每学期更新)',
-    subtitleSpring: '北京大学2026春季学期课程搜索(每学期更新)',
-    subtitleSummer: '北京大学2026暑期学期课程搜索(每学期更新)',
     termFall: '2026秋季学期', termSpring: '2026春季学期', termSummer: '2026暑期学期', reviewHub: '树洞课程评测',
     searchPlaceholder: '输入课程名、教师姓名或教室...',
     labelCourseType: '课程类型', labelCategory: '课程类别',
@@ -2715,9 +2739,6 @@ const i18n = {
   en: {
     name: 'English',
     title: 'Pinhaoke',
-    subtitleFall: 'PKU Fall 2026 Course Search (Updated Every Semester)',
-    subtitleSpring: 'PKU Spring 2026 Course Search (Updated Every Semester)',
-    subtitleSummer: 'PKU Summer 2026 Course Search (Updated Every Semester)',
     termFall: '2026 Fall', termSpring: '2026 Spring', termSummer: '2026 Summer', reviewHub: 'Treehole Course Reviews',
     searchPlaceholder: 'Search course name, teacher or classroom...',
     labelCourseType: 'Course Type', labelCategory: 'Category',
@@ -2756,9 +2777,6 @@ const i18n = {
   ja: {
     name: '日本語',
     title: '拼好課',
-    subtitleFall: '北京大学2026年秋学期 授業検索（毎学期更新）',
-    subtitleSpring: '北京大学2026年春学期 授業検索（毎学期更新）',
-    subtitleSummer: '北京大学2026年夏学期 授業検索（毎学期更新）',
     termFall: '2026 秋学期', termSpring: '2026 春学期', termSummer: '2026 夏学期', reviewHub: 'Treehole 授業評価',
     searchPlaceholder: '授業名、教員名または教室を入力...',
     labelCourseType: '科目種別', labelCategory: 'カテゴリー',
@@ -2797,9 +2815,6 @@ const i18n = {
   ko: {
     name: '한국어',
     title: '핀하오커',
-    subtitleFall: '베이징대학교 2026 가을학기 강좌 검색 (매 학기 업데이트)',
-    subtitleSpring: '베이징대학교 2026 봄학기 강좌 검색 (매 학기 업데이트)',
-    subtitleSummer: '베이징대학교 2026 여름학기 강좌 검색 (매 학기 업데이트)',
     termFall: '2026 가을학기', termSpring: '2026 봄학기', termSummer: '2026 여름학기', reviewHub: 'Treehole 강의 평가',
     searchPlaceholder: '강좌명, 교수명 또는 강의실 입력...',
     labelCourseType: '강좌 유형', labelCategory: '카테고리',
@@ -2838,9 +2853,6 @@ const i18n = {
   fr: {
     name: 'Fran\u00e7ais',
     title: 'Pinhaoke',
-    subtitleFall: 'Recherche de cours PKU - Automne 2026 (Mise \u00e0 jour chaque semestre)',
-    subtitleSpring: 'Recherche de cours PKU - Printemps 2026 (Mise \u00e0 jour chaque semestre)',
-    subtitleSummer: 'Recherche de cours PKU - \u00c9t\u00e9 2026 (Mise \u00e0 jour chaque semestre)',
     termFall: 'Automne 2026', termSpring: 'Printemps 2026', termSummer: '\u00c9t\u00e9 2026', reviewHub: 'Avis de cours Treehole',
     searchPlaceholder: 'Nom du cours, enseignant ou salle...',
     labelCourseType: 'Type de cours', labelCategory: 'Cat\u00e9gorie',
@@ -2879,9 +2891,6 @@ const i18n = {
   de: {
     name: 'Deutsch',
     title: 'Pinhaoke',
-    subtitleFall: 'PKU Kurssuche - Herbst 2026 (Jedes Semester aktualisiert)',
-    subtitleSpring: 'PKU Kurssuche - Fr\u00fchling 2026 (Jedes Semester aktualisiert)',
-    subtitleSummer: 'PKU Kurssuche - Sommer 2026 (Jedes Semester aktualisiert)',
     termFall: 'Herbst 2026', termSpring: 'Fr\u00fchling 2026', termSummer: 'Sommer 2026', reviewHub: 'Treehole-Kursbewertungen',
     searchPlaceholder: 'Kursname, Dozent oder Raum...',
     labelCourseType: 'Kurstyp', labelCategory: 'Kategorie',
@@ -2920,9 +2929,6 @@ const i18n = {
   es: {
     name: 'Espa\u00f1ol',
     title: 'Pinhaoke',
-    subtitleFall: 'B\u00fasqueda de cursos PKU - Oto\u00f1o 2026 (Actualizado cada semestre)',
-    subtitleSpring: 'B\u00fasqueda de cursos PKU - Primavera 2026 (Actualizado cada semestre)',
-    subtitleSummer: 'B\u00fasqueda de cursos PKU - Verano 2026 (Actualizado cada semestre)',
     termFall: 'Oto\u00f1o 2026', termSpring: 'Primavera 2026', termSummer: 'Verano 2026', reviewHub: 'Rese\u00f1as de cursos Treehole',
     searchPlaceholder: 'Nombre del curso, profesor o aula...',
     labelCourseType: 'Tipo de curso', labelCategory: 'Categor\u00eda',
@@ -2961,9 +2967,6 @@ const i18n = {
   ru: {
     name: 'Русский',
     title: 'Pinhaoke',
-    subtitleFall: 'Поиск курсов ПКУ - Осень 2026 (Обновляется каждый семестр)',
-    subtitleSpring: 'Поиск курсов ПКУ - Весна 2026 (Обновляется каждый семестр)',
-    subtitleSummer: 'Поиск курсов ПКУ - Лето 2026 (Обновляется каждый семестр)',
     termFall: 'Осень 2026', termSpring: 'Весна 2026', termSummer: 'Лето 2026', reviewHub: 'Отзывы о курсах Treehole',
     searchPlaceholder: 'Название курса, преподаватель или аудитория...',
     labelCourseType: 'Тип курса', labelCategory: 'Категория',
@@ -3334,10 +3337,6 @@ function applyI18n() {
   const lang = i18n[currentLang];
   document.getElementById('title').textContent = lang.title;
   document.getElementById('brandName').textContent = lang.title;
-  const subtitleKey = currentTerm === 'summer'
-    ? 'subtitleSummer'
-    : (currentTerm === 'spring' ? 'subtitleSpring' : 'subtitleFall');
-  document.getElementById('subtitle').textContent = lang[subtitleKey];
   document.getElementById('termFallBtn').textContent = lang.termFall;
   document.getElementById('termSpringBtn').textContent = lang.termSpring;
   document.getElementById('termSummerBtn').textContent = lang.termSummer;

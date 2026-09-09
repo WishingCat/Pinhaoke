@@ -818,14 +818,12 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('.term-nav, .review-nav-shell { display: contents; }', REVIEWS_HTML)
 
     def test_review_page_matches_index_visual_language(self):
-        # 与课程页共享的视觉记号：标题字号、学期控件尺寸、暗色底色、
+        # 首页使用独立手写字标；共享学期控件尺寸、暗色底色、
         # 激活态渐变、卡片/弹窗圆角、页脚与回到顶部
         for token in (
-            "font-size: 3.3rem",
             "#0E1013",
             "linear-gradient(135deg, #08766B, #075F57)",
             "rgba(22, 123, 114, 0.35)",
-            "linear-gradient(118deg, #2FBE9E 8%, #167B72 58%, #14606A 94%)",
         ):
             self.assertIn(token, REVIEWS_HTML)
             self.assertIn(token, HTML)
