@@ -512,6 +512,179 @@ html[data-theme="dark"] .sponsor-amount { color: #FB7185; }
   .popular-button svg { display: none; }
   .search-input { font-size: 0.9rem; }
 }
+/* ===== Material and motion — shared by both pages ===== */
+:root {
+  --glass-fill: rgba(255, 255, 255, 0.82);
+  --glass-solid: #F8FBFB;
+  --glass-light: rgba(255, 255, 255, 0.88);
+  --glass-edge: rgba(167, 188, 187, 0.40);
+  --glass-shadow: 0 6px 22px rgba(20, 57, 55, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --panel-shadow: 0 24px 72px rgba(8, 24, 27, 0.22), 0 4px 14px rgba(8, 24, 27, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --motion-quick: 150ms;
+  --motion-panel: 300ms;
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+html[data-theme="dark"] {
+  --glass-fill: rgba(28, 34, 40, 0.88);
+  --glass-solid: #1C2228;
+  --glass-light: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(168, 192, 196, 0.22);
+  --glass-shadow: 0 6px 22px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --panel-shadow: 0 24px 72px rgba(0, 0, 0, 0.48), 0 4px 14px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* One sampled navigation surface. Static highlights elsewhere keep scrolling cheap. */
+.topbar {
+  background: linear-gradient(110deg, var(--glass-light), transparent 65%), var(--glass-fill);
+  border-bottom-color: var(--glass-edge);
+  box-shadow: 0 3px 18px rgba(16, 45, 43, 0.035), inset 0 1px 0 var(--glass-light);
+  -webkit-backdrop-filter: saturate(135%) blur(16px);
+  backdrop-filter: saturate(135%) blur(16px);
+}
+body::before { animation: none; filter: none; }
+:is(.icon-btn, .icon-button, .top-link) {
+  border-radius: 11px;
+  background-image: linear-gradient(145deg, var(--glass-light), transparent 65%);
+  box-shadow: var(--glass-shadow);
+}
+:is(.term-toggle, .term-nav, .review-nav-shell, .review-hub-link) {
+  background: linear-gradient(145deg, var(--glass-light), transparent 65%), var(--glass-fill);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+:is(.search-box, .search-form) {
+  border-radius: 18px;
+  background: linear-gradient(120deg, var(--glass-light), transparent 72%), var(--surface);
+  box-shadow: var(--glass-shadow);
+}
+:is(.search-box, .search-form):focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), var(--glass-shadow);
+}
+:is(.custom-select-dropdown, .popular-courses, .tip-card, .lang-menu) {
+  border-radius: 16px;
+  border-color: var(--glass-edge);
+  background: linear-gradient(140deg, var(--glass-light), transparent 65%), var(--glass-solid);
+  box-shadow: var(--panel-shadow);
+  transform-origin: top center;
+  animation: material-menu 230ms var(--ease-settle);
+}
+:is(.tip-card, .popular-courses) { transform-origin: top right; }
+:is(.custom-select-dropdown, .popular-courses) {
+  background-color: var(--glass-fill);
+  -webkit-backdrop-filter: saturate(125%) blur(14px);
+  backdrop-filter: saturate(125%) blur(14px);
+}
+
+/* Dense content stays opaque. Only the frame carries the material highlight. */
+:is(.modal-content, .thread-modal, .msg-panel, .stats-panel, .fav-panel, .sponsor-panel) {
+  border-radius: 22px;
+  border-color: var(--glass-edge);
+  background: var(--surface);
+  box-shadow: var(--panel-shadow);
+  animation: material-panel var(--motion-panel) var(--ease-settle);
+}
+:is(.modal-head, .thread-modal-head, .account-header) {
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 65%), var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-light);
+}
+:is(.modal-overlay, .thread-modal-overlay) { animation: material-dim 180ms ease-out; }
+.account-view.open { animation: material-page 240ms var(--ease-settle); }
+.fav-toast { border-radius: 14px; transition: opacity 180ms ease-out; }
+
+/* Immediate tactile feedback; no timers, layout animation or waiting for completion. */
+:is(.icon-btn, .icon-button, .top-link, .about-link-btn, .term-toggle button, .term-nav a,
+    .review-hub-link, .review-nav-link, .popular-button, .filters-toggle, .modal-action,
+    .modal-close, .thread-modal-close, .thread-modal-source, .msg-submit, .msg-nav,
+    .msg-action, .msg-more, .fav-submit, .fav-ghost, .account-back, .collection-chip,
+    .collection-card, .load-more-btn, .load-more) {
+  transition: transform var(--motion-quick) var(--ease-settle),
+    background-color var(--motion-quick) ease, border-color var(--motion-quick) ease,
+    color var(--motion-quick) ease;
+}
+:is(.icon-btn, .icon-button, .top-link, .about-link-btn, .term-toggle button, .term-nav a,
+    .review-hub-link, .review-nav-link, .popular-button, .filters-toggle, .modal-action,
+    .modal-close, .thread-modal-close, .thread-modal-source, .msg-submit, .msg-nav,
+    .msg-action, .msg-more, .fav-submit, .fav-ghost, .account-back, .collection-chip,
+    .collection-card, .load-more-btn, .load-more):not(:disabled):active {
+  transform: scale(0.965);
+  transition-duration: 70ms;
+}
+.term-toggle button.active { animation: material-select 220ms var(--ease-settle); }
+:is(.course-card, .thread) { animation: none; transition: transform 180ms var(--ease-settle), border-color 150ms ease; }
+.course-card::after { display: none; }
+:is(.hero, .page-head) { animation: material-page 300ms var(--ease-settle); }
+:is(.search-section, .search-area) { animation: material-page 300ms 40ms var(--ease-settle) backwards; }
+.result-toolbar { animation: none; }
+
+@keyframes material-menu {
+  from { opacity: 0; transform: translateY(-5px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes material-panel {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes material-page {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes material-select {
+  from { transform: scale(0.97); }
+  to { transform: none; }
+}
+@keyframes material-dim { from { opacity: 0; } to { opacity: 1; } }
+
+/* Touch devices retain one small blur surface; menus use an opaque material. */
+@media (max-width: 720px), (pointer: coarse) {
+  .topbar { -webkit-backdrop-filter: saturate(120%) blur(10px); backdrop-filter: saturate(120%) blur(10px); }
+  :is(.custom-select-dropdown, .popular-courses) {
+    background-color: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :is(.hero, .page-head, .search-section, .search-area) { animation: none; }
+  :is(.modal-content, .thread-modal, .msg-panel, .stats-panel, .fav-panel, .sponsor-panel) {
+    --motion-panel: 240ms;
+    box-shadow: 0 12px 36px rgba(8, 24, 27, 0.20), inset 0 1px 0 var(--glass-light);
+  }
+}
+@media (max-width: 640px) {
+  .term-toggle button:not(.active), .term-nav a, .review-hub-link {
+    background: linear-gradient(145deg, var(--glass-light), transparent 65%), var(--glass-fill);
+    border-color: var(--glass-edge);
+    box-shadow: var(--glass-shadow);
+  }
+  :is(.term-toggle button, .term-nav a, .review-hub-link, .review-nav-link) { border-radius: 13px; }
+  :is(.modal-content, .thread-modal, .msg-panel, .stats-panel, .fav-panel, .sponsor-panel) { border-radius: 20px; }
+}
+@media (hover: none) {
+  :is(.course-card, .thread):hover, html[data-theme="dark"] :is(.course-card, .thread):hover { transform: none; box-shadow: var(--shadow-xs); }
+  :is(.course-card, .thread):active { transform: scale(0.995); }
+}
+
+/* Native accessibility preferences also apply to this web implementation. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar, .custom-select-dropdown, .popular-courses { background: var(--glass-solid); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :is(.topbar, .term-toggle, .term-nav, .review-nav-shell, .review-hub-link,
+      .custom-select-dropdown, .popular-courses, .tip-card, .lang-menu) {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: var(--ink-3);
+  }
+  .term-toggle button:not(.active), .term-nav a { background: var(--surface); }
+  :is(.modal-content, .thread-modal, .msg-panel, .stats-panel, .fav-panel, .sponsor-panel) { border-color: var(--ink-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+  :is(button, a, .collection-chip, .collection-card, .course-card, .thread):active { transform: none !important; }
+  :is(.course-card, .thread):hover { transform: none !important; }
+}
+/* ===== End material and motion ===== */
 </style>
 </head>
 <body>

@@ -43,8 +43,10 @@ tests/                          标准库 unittest 回归测试
 
 - 内容容器最大宽度为 `1120px`。正文使用 `'PingFang SC'`、`'Hiragino Sans GB'` 和系统无衬线回退；课程号、树洞号、楼层与统计数字使用 JetBrains Mono 或系统等宽字体。
 - 浅色背景为接近 `#F7F7F8` 的中性灰，深色背景为接近 `#0E1013` 的近黑色；品牌主色来自 Logo 的青绿色。页面不能退化成单一色相，课程类型、评测实体与树洞边框分别使用靛蓝、绿色、琥珀、玫红、蓝色等辅助色。
-- 两页都有低对比度环境柔光。课程页使用青绿与靛蓝，评测页使用粉色与雾蓝；柔光固定在内容后方、不可拦截事件，并在 `prefers-reduced-motion` 下停止动画。
-- 标题允许使用品牌渐变；普通命令按钮、筛选按钮、搜索框和卡片保持实体表面与清晰边界。圆角以 `7px`、`8px`、`10px`、`14px` 为主，不新增大面积胶囊卡片或嵌套卡片。
+- 两页都有低对比度环境柔光。课程页使用青绿与靛蓝，评测页使用粉色与雾蓝；柔光固定在内容后方、不可拦截事件，保持静态且取消额外模糊滤镜。
+- 标题允许使用品牌渐变；普通命令按钮、筛选按钮、搜索框和卡片保持实体表面与清晰边界。基础圆角为 `7px` 到 `14px`，玻璃菜单、搜索框和浮层用 `16px` 到 `22px` 表达层级，不新增大面积胶囊卡片或嵌套卡片。
+- 两页 CSS 末尾的 `Material and motion` 块必须同步，借鉴 [Apple Motion](https://developer.apple.com/design/human-interface-guidelines/motion) 与 [Meet Liquid Glass](https://developer.apple.com/videos/play/wwdc2025/219/) 的导航/内容分层：实际 backdrop-filter 仅用于顶栏与桌面筛选、热门菜单；关于卡位于顶栏内，只使用静态高光，正文、课表和全屏遮罩均不增加模糊。`720px` 以下或粗指针设备只保留顶栏 `10px` 模糊，菜单改为不透明底色。
+- 视觉反馈只使用短促的 transform、opacity 动画，不添加运行时库、滚动监听、常驻 will-change 或模糊强度动画。按钮按压 `70ms`、回弹 `150ms`，菜单 `230ms`，浮层桌面 `300ms`、手机 `240ms`；高频课程与评测列表不做批量入场。`prefers-reduced-motion` 直接关闭动画、过渡和按压位移；`prefers-reduced-transparency`、`prefers-contrast` 与不支持 backdrop-filter 的浏览器使用实底降级。保留原有显示/隐藏、焦点、inert、URL 和业务状态逻辑。
 - 字号不能随 viewport 宽度连续缩放，`letter-spacing` 保持 `0`。长课程名、院系、标签和按钮文本必须换行或压缩布局，不得遮挡相邻内容或造成横向滚动。
 
 ### 页面结构与交互

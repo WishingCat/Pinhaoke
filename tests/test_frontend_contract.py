@@ -69,7 +69,124 @@ def function_source(name, page=HTML):
     return match.group(0) + function_body(name, page) + "}"
 
 
+def material_styles(page):
+    begin = "/* ===== Material and motion — shared by both pages ===== */"
+    end = "/* ===== End material and motion ===== */"
+    if page.count(begin) != 1 or page.count(end) != 1:
+        raise AssertionError("The shared visual layer must appear exactly once")
+    start, finish = page.index(begin), page.index(end)
+    if not page.index("<style>") < start < finish < page.index("</style>"):
+        raise AssertionError("The visual layer must remain entirely inside the stylesheet")
+    return page[start + len(begin):finish]
+
+
+def css_rule_blocks(source, parents=()):
+    """Read this layer's nested media/keyframe rules without a CSS dependency."""
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    offset = 0
+    while (opening := source.find("{", offset)) != -1:
+        selector = source[offset:opening].strip()
+        depth, closing = 1, opening + 1
+        while depth and closing < len(source):
+            depth += (source[closing] == "{") - (source[closing] == "}")
+            closing += 1
+        if depth:
+            raise AssertionError("Unclosed shared CSS rule")
+        body = source[opening + 1:closing - 1]
+        if selector.startswith("@"):
+            yield from css_rule_blocks(body, (*parents, selector))
+        else:
+            declarations = dict(
+                (name.strip(), value.strip())
+                for entry in body.split(";") if ":" in entry
+                for name, value in [entry.split(":", 1)]
+            )
+            yield parents, selector, declarations
+        offset = closing
+
+
 class FrontendContractTests(unittest.TestCase):
+    def test_shared_visual_layer_preserves_interaction_structure(self):
+        block = material_styles(HTML)
+        self.assertEqual(block, material_styles(REVIEWS_HTML))
+        # State, focusability and the existing stacked-dialog geometry belong to
+        # the original UI rules and handlers, not to this optional visual layer.
+        forbidden = {"position", "z-index", "pointer-events", "visibility", "overflow", "overflow-x", "overflow-y"}
+        for _, selector, declarations in css_rule_blocks(block):
+            self.assertFalse(forbidden & declarations.keys(), selector)
+            self.assertNotRegex(selector, r"\[(?:hidden|inert)\]")
+            if "display" in declarations:
+                self.assertEqual(selector, ".course-card::after")
+                self.assertEqual(declarations["display"], "none")
+
+    def test_material_effects_stay_within_scroll_and_motion_budgets(self):
+        rules = list(css_rule_blocks(material_styles(HTML)))
+        sampled_surfaces = {".topbar", ".custom-select-dropdown", ".popular-courses"}
+        touch_rules = []
+        cards_static = ambient_static = False
+        for parents, selector, declarations in rules:
+            classes = set(re.findall(r"\.[\w-]+", selector))
+            touch = any("pointer: coarse" in parent or "max-width:" in parent for parent in parents)
+            if touch:
+                touch_rules.append((classes, declarations))
+            for prop, value in declarations.items():
+                if prop.endswith("backdrop-filter") and value != "none":
+                    self.assertTrue(classes and classes <= sampled_surfaces, selector)
+                    radius = re.search(r"blur\(([\d.]+)px\)", value)
+                    self.assertIsNotNone(radius, selector)
+                    self.assertLessEqual(float(radius.group(1)), 10 if touch else 16)
+                if prop in {"transition", "transition-property"}:
+                    self.assertNotRegex(value, r"\ball\b", selector)
+                if prop == "filter":
+                    self.assertEqual(value, "none", selector)
+                if prop == "will-change":
+                    self.assertEqual(value, "auto", selector)
+                if prop.startswith("animation"):
+                    self.assertNotIn("infinite", value, selector)
+            if any(parent.startswith("@keyframes") for parent in parents):
+                self.assertTrue(declarations.keys() <= {"opacity", "transform"}, selector)
+            if not parents and {".course-card", ".thread"} <= classes:
+                cards_static |= declarations.get("animation") == "none"
+            if not parents and selector == "body::before":
+                ambient_static |= declarations.get("animation") == declarations.get("filter") == "none"
+        self.assertTrue(cards_static, "Growing result lists must not animate every appended card")
+        self.assertTrue(ambient_static, "The viewport-wide ambient layer must not keep animating or blurring")
+        self.assertTrue(any(
+            {".custom-select-dropdown", ".popular-courses"} <= classes
+            and declarations.get("backdrop-filter") == declarations.get("-webkit-backdrop-filter") == "none"
+            and declarations.get("background-color") in {"var(--surface)", "var(--glass-solid)"}
+            for classes, declarations in touch_rules
+        ), "Touch menus must use opaque surfaces without sampled blur")
+
+    def test_material_layer_respects_system_preferences_and_blur_fallback(self):
+        rules = list(css_rule_blocks(material_styles(HTML)))
+        reduced_motion = [
+            (selector, declarations) for parents, selector, declarations in rules
+            if any("prefers-reduced-motion: reduce" in parent for parent in parents)
+        ]
+        self.assertTrue(any(
+            {"*", "*::before", "*::after"} <= {part.strip() for part in selector.split(",")}
+            and declarations.get("animation") == declarations.get("transition") == "none !important"
+            for selector, declarations in reduced_motion
+        ), "Reduced motion must stop repeated skeleton/spinner animations, not only shorten them")
+        self.assertTrue(any(selector == "html" and declarations.get("scroll-behavior") == "auto"
+                            for selector, declarations in reduced_motion))
+        required_surfaces = {".topbar", ".custom-select-dropdown", ".popular-courses"}
+        for preference in ("prefers-reduced-transparency: reduce", "prefers-contrast: more"):
+            self.assertTrue(any(
+                any(preference in parent for parent in parents)
+                and required_surfaces <= set(re.findall(r"\.[\w-]+", selector))
+                and declarations.get("background") == "var(--surface)"
+                and declarations.get("backdrop-filter") == declarations.get("-webkit-backdrop-filter") == "none"
+                for parents, selector, declarations in rules
+            ), preference)
+        self.assertTrue(any(
+            any(parent.startswith("@supports not") and "backdrop-filter" in parent for parent in parents)
+            and required_surfaces <= set(re.findall(r"\.[\w-]+", selector))
+            and declarations.get("background") in {"var(--surface)", "var(--glass-solid)"}
+            for parents, selector, declarations in rules
+        ), "Browsers without blur support must receive an opaque fallback")
+
     def test_translation_is_disabled_for_all_terms_and_course_fields(self):
         self.run_node(f"""
             const assert = require('node:assert/strict');
