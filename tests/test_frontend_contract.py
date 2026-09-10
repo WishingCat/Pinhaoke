@@ -280,6 +280,45 @@ class FrontendContractTests(unittest.TestCase):
             }}
         """)
 
+    def test_personal_timetable_week_input_preserves_zero_and_rejects_invalid_ranges(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            {function_source('parseTimetableWeeks')}
+            assert.equal(parseTimetableWeeks('  '), null);
+            assert.deepEqual(parseTimetableWeeks('0-3, 5，3、8~9'), [0,1,2,3,5,8,9]);
+            for (const text of ['16-1','-1','31','1.5','1,','a','1-2-3']) assert.throws(()=>parseTimetableWeeks(text));
+        """)
+        for name in ['openTimetableEditor', 'timetableTimeRow', 'renderTimetable']:
+            self.assertNotIn('innerHTML', function_body(name))
+        self.assertIn('textContent', function_body('openTimetableEditor'))
+        self.assertIn('timetableEditor', function_body('closeAccountView'))
+
+    def test_personal_timetable_save_keeps_state_on_failure_and_cancels_old_account_response(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            let favUser={{username:'A'}}, favSessionVersion=1, timetableRequest=0, timetableLoading=false;
+            let timetableCourses=[{{course_key:'old'}}],timetableLoaded=true,timetableTerm='fall',accountViewOpen=false;
+            const updateTimetableButtons=()=>{{}};
+            let finish, calls=0;
+            const favApi=()=>{{calls++;return new Promise(resolve=>finish=resolve);}};
+            {function_source('saveTimetableChanges')}
+            (async()=>{{
+                const editor={{key:'custom:abc',sessionVersion:1}};
+                let saving=saveTimetableChanges('/api/timetable/update',{{}},editor);
+                finish({{ok:false,status:503}});await saving;
+                assert.deepEqual(timetableCourses,[{{course_key:'old'}}]);
+                saving=saveTimetableChanges('/api/timetable/custom',{{}},editor);
+                finish({{ok:true,data:{{courses:[{{course_key:'custom:abc',term:'summer'}}]}}}});await saving;
+                assert.equal(timetableTerm,'summer');
+                saving=saveTimetableChanges('/api/timetable/reset',{{}},editor);
+                favSessionVersion=2;favUser={{username:'B'}};timetableCourses=[];
+                finish({{ok:true,data:{{courses:[{{course_key:'private-A'}}]}}}});
+                assert.equal((await saving).stale,true);assert.deepEqual(timetableCourses,[]);
+                assert.equal((await saveTimetableChanges('/api/timetable/update',{{}},editor)).stale,true);
+                assert.equal(calls,3);
+            }})().catch(error=>{{console.error(error);process.exit(1);}});
+        """)
+
     def test_course_messages_are_first_and_rendered_safely(self):
         self.assertIn("mountCourseMessages(content.querySelector('.modal-body'), c)", function_body('showDetail'))
         body = function_body('mountCourseMessages')

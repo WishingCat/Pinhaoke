@@ -441,6 +441,14 @@ def _migrate_accounts_db(conn) -> None:
             )""")
             conn.execute("PRAGMA user_version = 5")
         conn.commit()
+        version = 5
+    if version < 6:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] < 6:
+            conn.execute("ALTER TABLE timetable_courses ADD COLUMN customization TEXT NOT NULL DEFAULT '{}'")
+            conn.execute("ALTER TABLE timetable_courses ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0")
+            conn.execute("PRAGMA user_version = 6")
+        conn.commit()
 
 
 @contextmanager
@@ -2735,14 +2743,153 @@ def _timetable_sessions(schedule: str) -> dict:
 
 def _timetable_payload(conn, user_id):
     items = []
-    for row in conn.execute("SELECT course_key, snapshot, added_at FROM timetable_courses WHERE user_id=? ORDER BY added_at, course_key", (user_id,)):
+    overrides = []
+    for row in conn.execute("SELECT course_key, snapshot, added_at, customization, is_custom FROM timetable_courses WHERE user_id=? ORDER BY added_at, course_key", (user_id,)):
         item = json.loads(row['snapshot'])
-        item.update(course_key=row['course_key'], added_at=row['added_at'])
+        item.update(course_key=row['course_key'], added_at=row['added_at'], is_custom=bool(row['is_custom']))
         items.append(item)
-    _enrich_saved_courses(items)
-    for item in items:
+        overrides.append(json.loads(row['customization']))
+    # Identity and source enrichment always use the untouched source snapshot.
+    _enrich_saved_courses([item for item in items if not item['is_custom']])
+    for item, changes in zip(items, overrides):
+        item['source_available'] = not item['is_custom'] and item.get('available', False)
+        item['is_edited'] = bool(changes)
+        item.update(changes)
+        if item['is_custom'] or 'schedule' in changes:
+            item['available'] = True
         item.update(_timetable_sessions(item.get('schedule', '')))
     return {"courses": items, "limit": TIMETABLE_LIMIT}
+
+
+def _timetable_course_key(payload):
+    key = _payload_dict(payload).get('course_key')
+    if not _valid_text(key) or not 1 <= len(key) <= 2000:
+        raise HTTPException(status_code=422, detail="Invalid course key")
+    return key
+
+
+def _timetable_schedule(sessions):
+    if not isinstance(sessions, list) or len(sessions) > 12:
+        raise HTTPException(status_code=422, detail='上课时间最多设置 12 段')
+    labels = []
+    for slot in sessions:
+        if not isinstance(slot, dict):
+            raise HTTPException(status_code=422, detail='请检查上课时间')
+        day, start, end = (slot.get(key) for key in ('day', 'start', 'end'))
+        weeks, parity = slot.get('weeks'), slot.get('parity', '每周')
+        if (any(type(value) is not int for value in (day, start, end))
+                or not 1 <= day <= 7 or not 1 <= start <= end <= 14
+                or parity not in ('每周', '单周', '双周')):
+            raise HTTPException(status_code=422, detail='星期须为周一至周日，节次须在 1–14 节内且结束不早于开始')
+        if weeks is not None:
+            if (not isinstance(weeks, list) or not 1 <= len(weeks) <= 31
+                    or any(type(week) is not int or not 0 <= week <= 30 for week in weeks)):
+                raise HTTPException(status_code=422, detail='周次须在 0–30 周内')
+            weeks = sorted(set(weeks))
+        active = list(range(31)) if weeks is None else weeks
+        if not any(parity == '每周' or week % 2 == (1 if parity == '单周' else 0) for week in active):
+            raise HTTPException(status_code=422, detail='所选周次与单双周设置不匹配')
+        prefix = ','.join(map(str, weeks)) + '周 ' if weeks is not None else ''
+        labels.append(f"{prefix}{parity}周{'一二三四五六日'[day - 1]}{start}~{end}节")
+    return '\n'.join(labels)
+
+
+def _timetable_changes(value, *, custom=False):
+    value = _payload_dict(value)
+    limits = {'course_name': 200, 'teacher': 100, 'classroom': 200, 'schedule': 4000, 'notes': 1000}
+    allowed = set(limits) | {'sessions'} | ({'term'} if custom else set())
+    if set(value) - allowed or ('sessions' in value and 'schedule' in value):
+        raise HTTPException(status_code=422, detail='包含不支持的课表字段')
+    result = {}
+    for field, limit in limits.items():
+        if field not in value:
+            continue
+        text = value[field]
+        if (not _valid_text(text) or len(text) > limit
+                or any(unicodedata.category(char) == 'Cc' and char not in '\n\r\t' for char in text)):
+            raise HTTPException(status_code=422, detail=f'请检查课程信息长度与格式（{field}）')
+        result[field] = text.strip()
+    if 'course_name' in result and not result['course_name']:
+        raise HTTPException(status_code=422, detail='请填写课程名称')
+    if 'term' in value:
+        if not isinstance(value['term'], str) or value['term'] not in TERM_DBS:
+            raise HTTPException(status_code=422, detail='请选择有效学期')
+        result['term'] = value['term']
+        result['term_label'] = _term_label(value['term'])
+    if 'sessions' in value:
+        result['schedule'] = _timetable_schedule(value['sessions'])
+    return result
+
+
+@contextmanager
+def _timetable_write(request):
+    _require_trusted_origin(request)
+    with get_accounts_db() as conn:
+        # Recheck ownership/session under the same lock as every personal edit.
+        conn.execute('BEGIN IMMEDIATE')
+        now = int(time.time())
+        session = _require_user(conn, request, now)
+        subject = _client_ip_hash(request)
+        _enforce_rate_limit(conn, 'favorite_write_ip', subject, now)
+        _record_event(conn, 'favorite_write_ip', subject, now)
+        yield conn, session['user_id'], now
+
+
+@app.post('/api/timetable/custom')
+def create_custom_timetable_course(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    payload = _payload_dict(payload)
+    nonce = payload.get('request_id')
+    if not isinstance(nonce, str) or not re.fullmatch(r'[a-f0-9]{32}', nonce):
+        raise HTTPException(status_code=422, detail='Invalid request id')
+    fields = _timetable_changes(payload.get('course'), custom=True)
+    if not fields.get('course_name') or 'term' not in fields:
+        raise HTTPException(status_code=422, detail='请填写课程名称并选择学期')
+    key = 'custom:' + nonce
+    snapshot = {'id': key, 'teacher': '', 'classroom': '', 'schedule': '', 'notes': '', **fields}
+    with _timetable_write(request) as (conn, user_id, now):
+        exists = conn.execute('SELECT 1 FROM timetable_courses WHERE user_id=? AND course_key=?', (user_id, key)).fetchone()
+        if not exists and conn.execute('SELECT COUNT(*) FROM timetable_courses WHERE user_id=?', (user_id,)).fetchone()[0] >= TIMETABLE_LIMIT:
+            raise HTTPException(status_code=409, detail='课表课程已达上限（100 门）')
+        # Retrying after a lost response cannot create a second custom course.
+        conn.execute('INSERT INTO timetable_courses(user_id,course_key,snapshot,added_at,is_custom) VALUES(?,?,?,?,1) '
+                     'ON CONFLICT(user_id,course_key) DO NOTHING',
+                     (user_id, key, json.dumps(snapshot, ensure_ascii=False), now))
+        conn.commit()
+        return _no_store(_timetable_payload(conn, user_id))
+
+
+@app.post('/api/timetable/update')
+def update_timetable_course(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    key = _timetable_course_key(payload)
+    with _timetable_write(request) as (conn, user_id, _):
+        row = conn.execute('SELECT snapshot, customization, is_custom FROM timetable_courses WHERE user_id=? AND course_key=?', (user_id, key)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail='课程已从你的课表移除，请重新加载')
+        changes = _timetable_changes(payload.get('changes'), custom=bool(row['is_custom']))
+        column = 'snapshot' if row['is_custom'] else 'customization'
+        stored = json.loads(row[column])
+        stored.update(changes)
+        conn.execute(f'UPDATE timetable_courses SET {column}=? WHERE user_id=? AND course_key=?',
+                     (json.dumps(stored, ensure_ascii=False), user_id, key))
+        conn.commit()
+        return _no_store(_timetable_payload(conn, user_id))
+
+
+@app.post('/api/timetable/reset')
+def reset_timetable_course(request: Request, payload: dict = Body(...)):
+    _require_trusted_origin(request)
+    key = _timetable_course_key(payload)
+    with _timetable_write(request) as (conn, user_id, _):
+        row = conn.execute('SELECT is_custom FROM timetable_courses WHERE user_id=? AND course_key=?', (user_id, key)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail='课程已从你的课表移除，请重新加载')
+        if row['is_custom']:
+            raise HTTPException(status_code=409, detail='自定义课程没有选课网原始信息')
+        conn.execute("UPDATE timetable_courses SET customization='{}' WHERE user_id=? AND course_key=?", (user_id, key))
+        conn.commit()
+        return _no_store(_timetable_payload(conn, user_id))
 
 
 @app.get("/api/timetable")

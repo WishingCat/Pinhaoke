@@ -68,6 +68,7 @@ tests/                          标准库 unittest 回归测试
 
 ### 状态、安全与无障碍
 
+- 课表支持账号私有编辑与自定义课程。编辑浮层 `#timetableEditorOverlay` 用 DOM API 构建名称、教师、地点、时间与备注表单，支持星期、1–14 节、0–30 周、单双周和最多 12 段时间；原始时间文本模式保留无法识别的源文本，仅修改其他字段时不重写时间。自定义课可改学期；源课程身份不变，可两次点击恢复原始信息。浮层使用 `phk: timetableeditor` 的历史状态、背景 inert、焦点循环及关闭后焦点恢复，系统返回只关闭最上层。保存失败保留草稿，重复提交互斥，账号变化关闭旧表单，迟到响应不得影响新账号或新打开的编辑器。
 - 课表导出按钮位于学期、周次控件旁，空学期禁用。点击时从当前课表 DOM 固定数据快照，复用已显示的周次筛选、去重与冲突判断；原生 Canvas 输出浅色 PNG，保留七天、14 节及待确认课程备注，不截取滚动视口，不上传账号或课表数据。绘制只用系统字体，无外部图片；长文字换行，输出限制在 4096 像素边长、800 万像素以内。导出互斥并在结束后释放画布与 Blob URL，账号变化时取消迟到的下载，失败后按钮可以重试。
 - `pinhaoke_theme` 保存共享主题；界面固定中文，不读取历史 `pinhaoke_lang`。课程页 URL 保存学期、搜索、筛选、排序和课程详情，忽略旧语言参数；评测页 URL 保存 `q`。使用 `history.replaceState`，不要让每次输入污染浏览历史。
 - 收藏、收藏夹与账号状态都不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏、收藏夹或账号参数；个人中心全屏视图 `#accountView` 用 `history.pushState` 支持系统返回键关闭并监听 `popstate`，不写查询参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
@@ -235,6 +236,14 @@ git diff --check
 - 收藏夹数据模型的不变式：一条 `favorites` 行存在当且仅当该课程至少属于一个收藏夹。收藏一门课即建快照行并映射进默认收藏夹；取消收藏删 `favorites` 行并由复合外键级联清所有成员映射；`set-collections` 整集替换成员，勾选清空即删 `favorites` 行取消收藏；删自定义收藏夹级联清该夹映射后清理不再属于任何夹的孤儿收藏行。默认收藏夹每账号恰一个，`is_default = 1`，不可删除，可改名。
 - 收藏夹名 `strip()` 后为 1 到 `COLLECTION_NAME_MAX = 30` 字，按 `UNIQUE(user_id, name)` 判重，撞名 409；每账号自定义收藏夹上限 `COLLECTIONS_MAX = 50`（不含默认夹），超限 409；`collection_ids` 只接受该用户拥有的收藏夹 id，含他人夹 id 返回 404。收藏夹写入与收藏写入共用 `favorite_write_ip` 限流窗口。
 - `GET /api/account` 与四个 favorites、三个 collections 端点都经唯一装配出口返回全量 `{favorites, limit, collections, collections_limit}`，`collections` 每项为 `{id, name, is_default, position, count}` 且默认夹在前，`favorites` 每项带 `collection_ids`；成员映射以稳定 `fav_key` 为锚，课程库 ID 漂移不影响夹归属。
+
+课表账户库与 API：
+
+- 账户库版本 5 建立 `timetable_courses(user_id, course_key, snapshot, added_at)`；版本 6 在显式事务内锁后复查版本，增加 `customization`（默认 `{}`）与 `is_custom`（默认 `0`）。原有课程保留，删除账号级联删除全部个人课表记录；迁移仅加列，旧代码仍可读取原有列。
+- 源课程的 `snapshot` 保持公共课程身份，先按源身份批量补齐最新课程，再应用 `customization` 中的个人字段，不把个人教师、名称或时间用于公共身份匹配。未改字段继续跟随源信息，个人修改不会被刷新或重复加入覆盖；自定义课程不进入公共课程补齐查询。返回 `is_custom`、`is_edited`、`source_available`，源课程缺失但个人设置了时间时仍可排课；恢复后重新遵循源记录的可用状态。
+- `POST /api/timetable/custom` 接受 `{request_id, course}`，`request_id` 是编辑器生成并在重试时复用的 32 位小写十六进制串；服务端构建 `custom:` 稳定键，重复请求不新增、不覆盖后续编辑。自定义与选课网课程合计最多 100 门。
+- `POST /api/timetable/update` 接受 `{course_key, changes}`，仅允许名称（1–200 字）、教师（0–100）、地点（0–200）、时间原文（0–4000）、个人备注（0–1000），自定义课另允许学期。结构化 `sessions` 与时间原文互斥，最多 12 段，星期 1–7、节次 1–14 且起止有序，周次为 null 或 0–30 的非空整数列表，可选每周/单周/双周；服务端校验后生成现有解析器可读的时间文本。拒绝身份字段、控制字符、孤立代理字符和无效时间范围。
+- `POST /api/timetable/reset` 接受 `{course_key}`，仅清除源课程的个人字段与备注；自定义课返回 409。三种新写入均在 `BEGIN IMMEDIATE` 锁内校验会话和记录归属，使用现有收藏写入限流，返回带 `no-store` 的全量课表。被移除记录返回 404，不重新创建；所有更改只落在当前用户的账户库记录，不写公共课程库或收藏。
 
 ## 课程 ID
 

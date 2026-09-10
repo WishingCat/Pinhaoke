@@ -115,7 +115,7 @@ export function createTimetableCanvas(snapshot) {
     y += 34;
   }
   if (notes.length) {
-    text('时间待确认或未排入课表的课程', margin, y, 17, colors.ink, 600);
+    text('课程备注与待确认信息', margin, y, 17, colors.ink, 600);
     y += 30;
     notes.forEach(line => { text(line, margin + 12, y, 15, colors.muted); y += 24; });
   }
