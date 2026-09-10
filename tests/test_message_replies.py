@@ -157,6 +157,8 @@ class MessageRepliesAndNicknameTests(unittest.TestCase):
         request = self.register()
         with closing(sqlite3.connect(app.ACCOUNTS_DB_PATH)) as conn:
             conn.execute("ALTER TABLE users DROP COLUMN nickname")
+            # A real v3 database predates the timetable table and its v6 columns.
+            conn.execute("DROP TABLE timetable_courses")
             conn.execute("PRAGMA user_version=3")
             conn.commit()
         barrier = threading.Barrier(2)
@@ -179,11 +181,14 @@ class MessageRepliesAndNicknameTests(unittest.TestCase):
             with app.get_accounts_db() as conn:
                 return conn.execute("PRAGMA user_version").fetchone()[0]
         with ThreadPoolExecutor(max_workers=2) as pool:
-            self.assertEqual(list(pool.map(migrate, range(2))), [5, 5])
+            self.assertEqual(list(pool.map(migrate, range(2))), [6, 6])
         with app.get_accounts_db() as conn:
             columns = [row[1] for row in conn.execute("PRAGMA table_info(users)")]
             self.assertEqual(columns.count("nickname"), 1)
             self.assertEqual(columns.count("last_collection_id"), 1)
+            timetable_columns = [row[1] for row in conn.execute("PRAGMA table_info(timetable_courses)")]
+            self.assertEqual(timetable_columns.count("customization"), 1)
+            self.assertEqual(timetable_columns.count("is_custom"), 1)
 
     def test_content_validation_and_origin_guard_for_new_writes(self):
         root = self.root()
