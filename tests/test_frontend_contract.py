@@ -8,6 +8,7 @@ from pathlib import Path
 
 HTML = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")
 REVIEWS_HTML = (Path(__file__).resolve().parents[1] / "reviews.html").read_text(encoding="utf-8")
+TIMETABLE_EXPORT_JS = (Path(__file__).resolve().parents[1] / "Images/timetable-export.js").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 
 
@@ -258,6 +259,25 @@ class FrontendContractTests(unittest.TestCase):
                 failRemove=false; await callback(); assert.equal(timetableCourses.length,0);
                 await callback(); assert.equal(added,2); assert.equal(button.disabled,false);
             }})().catch(error => {{ console.error(error); process.exit(1); }});
+        """)
+
+    def test_timetable_export_preserves_wrapped_text_and_bounds_canvas_memory(self):
+        self.run_node(f"""
+            const assert = require('node:assert/strict');
+            {function_source('wrapCanvasText', TIMETABLE_EXPORT_JS)}
+            {function_source('timetableImageScale', TIMETABLE_EXPORT_JS)}
+            const context = {{measureText: text => ({{width: [...text].length * 10}})}};
+            const title = '一门非常长的课程名 Mathematics 🧪 与实验';
+            const lines = wrapCanvasText(context, title, 70);
+            assert.equal(lines.join(''), title);
+            assert.ok(lines.every(line => context.measureText(line).width <= 70));
+            assert.deepEqual(wrapCanvasText(context, '理教101\\n二教201', 200), ['理教101','二教201']);
+            for (const [width, height] of [[1460,1000],[1460,4000],[1460,20000]]) {{
+                const scale = timetableImageScale(width, height);
+                assert.ok(scale > 0 && scale <= 2);
+                assert.ok(width * scale <= 4096 && height * scale <= 4096);
+                assert.ok(width * height * scale * scale <= 8000001);
+            }}
         """)
 
     def test_course_messages_are_first_and_rendered_safely(self):

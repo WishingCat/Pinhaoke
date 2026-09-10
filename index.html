@@ -2171,6 +2171,8 @@ html[data-theme="dark"] .site-footer::after {
 .timetable-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
 .timetable-controls label { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
 .timetable-controls select { max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.timetable-export { margin-left: auto; min-height: 38px; white-space: nowrap; color: var(--accent); font-weight: 600; }
+.timetable-export:disabled { opacity: 0.55; cursor: default; }
 .timetable-scroll { overflow: auto; max-height: 65vh; border: 1px solid var(--border); border-radius: 10px; }
 .timetable-grid { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: 900px; font-size: 0.78rem; }
 .timetable-grid th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); padding: 10px; font-weight: 600; }
@@ -6101,6 +6103,7 @@ let timetableLoading = false;
 let timetableRequest = 0;
 let timetableTerm = 'fall';
 let timetableWeek = -1;
+let timetableExporting = false;
 let pendingTimetableId = null;
 
 function timetableHas(course) {
@@ -6203,6 +6206,69 @@ function sessionsOverlap(a, b) {
   return Array.from({ length: 31 }, (_, i) => i).some(week => sessionInWeek(a, week) && sessionInWeek(b, week));
 }
 
+function timetableExportSnapshot(area, items) {
+  const table = area.querySelector('.timetable-grid');
+  if (!table) return null;
+  return {
+    caption: table.caption.textContent,
+    headings: [...table.tHead.rows[0].cells].map(cell => cell.textContent),
+    rows: [...table.tBodies[0].rows].map(row => ({
+      label: row.cells[0].textContent,
+      cells: [...row.cells].slice(1).map(cell => ({
+        conflict: cell.classList.contains('timetable-conflict'),
+        courses: [...cell.querySelectorAll('.timetable-course')].map(button => ({
+          name: button.firstChild.textContent,
+          room: button.querySelector('span').textContent,
+        })),
+      })),
+    })),
+    notes: items.filter(item => item.unparsed || item.available === false).map(item =>
+      `${item.course_name} · ${item.classroom || '地点待定'} · ${item.schedule || '上课时间待定'}（${item.available === false ? '课程已不在当前课程库中，未排入课表' : '部分时间待确认'}）`),
+  };
+}
+
+function setTimetableExportBusy(busy) {
+  timetableExporting = busy;
+  document.querySelectorAll('.timetable-export').forEach(button => {
+    button.disabled = busy || button.dataset.empty === 'true';
+    button.textContent = busy ? '正在导出…' : '导出课表';
+    button.setAttribute('aria-busy', String(busy));
+  });
+}
+
+async function exportTimetable(area, items) {
+  if (!favUser || timetableExporting) return;
+  const snapshot = timetableExportSnapshot(area, items);
+  if (!snapshot) return;
+  const sessionVersion = favSessionVersion;
+  const filename = `拼好课-${snapshot.caption.replace(/\s*·\s*/g, '-').replace(/\s+/g, '')}.png`;
+  let canvas;
+  setTimetableExportBusy(true);
+  try {
+    const { createTimetableCanvas } = await import('/Images/timetable-export.js?v=1');
+    if (!favUser || sessionVersion !== favSessionVersion) return;
+    canvas = createTimetableCanvas(snapshot);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(
+      value => value ? resolve(value) : reject(new Error('PNG encoding failed')), 'image/png'));
+    if (!favUser || sessionVersion !== favSessionVersion) return;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = filename; link.hidden = true;
+    document.body.appendChild(link);
+    try { link.click(); } finally {
+      link.remove();
+      // Safari may consume the blob after the click handler has returned.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+    favToast('课表图片已生成，正在下载');
+  } catch (error) {
+    if (favUser && sessionVersion === favSessionVersion) favToast('导出失败，请稍后重试');
+  } finally {
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
+    setTimetableExportBusy(false);
+  }
+}
+
 function renderTimetable(body) {
   const area = favEl('section', 'timetable');
   area.setAttribute('aria-label', '我的课表');
@@ -6224,8 +6290,13 @@ function renderTimetable(body) {
   }
   selectControl('学期', [['spring', '2026春季学期'], ['summer', '2026暑期学期'], ['fall', '2026秋季学期']], timetableTerm, value => timetableTerm = value);
   selectControl('周次', [[-1, '全部周次'], ...Array.from({length:31}, (_, i) => [i, `第 ${i} 周`])], timetableWeek, value => timetableWeek = Number(value));
-  area.appendChild(controls);
   const items = timetableCourses.filter(item => item.term === timetableTerm);
+  const exportButton = favButton('导出课表', 'fav-ghost timetable-export', () => exportTimetable(area, items));
+  exportButton.dataset.empty = String(!items.length);
+  exportButton.title = items.length ? '下载当前学期与周次的完整课表（PNG）' : '加入课程后即可导出课表';
+  controls.appendChild(exportButton);
+  area.appendChild(controls);
+  setTimetableExportBusy(timetableExporting);
   area.appendChild(favEl('p', 'timetable-note', '课表按选课网的周次、星期和节次展示。横向滑动可查看整周；点击课程查看详情。'));
   if (!items.length) { area.appendChild(favEl('p', 'fav-empty', '这个学期还没有课表课程。在课程详情中点击“加入课表”即可添加。')); return; }
   const scroll = favEl('div', 'timetable-scroll');

@@ -37,7 +37,7 @@ tests/                          标准库 unittest 回归测试
 
 ## 前端与网页设计契约
 
-`index.html` 和 `reviews.html` 都是可直接由 FastAPI 返回的单文件页面，CSS 与 JavaScript 内联，无 npm、打包器或运行时框架。两页没有共享样式文件，因此修改共同控件时必须人工同步视觉尺寸、字体、主题变量和响应式行为，并由前端契约测试防止漂移。
+`index.html` 和 `reviews.html` 都是可直接由 FastAPI 返回的单文件页面，主体 CSS 与 JavaScript 内联，无 npm、打包器或运行时框架。课表导出绘图模块 `Images/timetable-export.js` 仅在点击导出时动态加载，修改时递增 import URL 的版本参数。两页没有共享样式文件，因此修改共同控件时必须人工同步视觉尺寸、字体、主题变量和响应式行为，并由前端契约测试防止漂移。
 
 ### 视觉系统
 
@@ -68,6 +68,7 @@ tests/                          标准库 unittest 回归测试
 
 ### 状态、安全与无障碍
 
+- 课表导出按钮位于学期、周次控件旁，空学期禁用。点击时从当前课表 DOM 固定数据快照，复用已显示的周次筛选、去重与冲突判断；原生 Canvas 输出浅色 PNG，保留七天、14 节及待确认课程备注，不截取滚动视口，不上传账号或课表数据。绘制只用系统字体，无外部图片；长文字换行，输出限制在 4096 像素边长、800 万像素以内。导出互斥并在结束后释放画布与 Blob URL，账号变化时取消迟到的下载，失败后按钮可以重试。
 - `pinhaoke_theme` 保存共享主题；界面固定中文，不读取历史 `pinhaoke_lang`。课程页 URL 保存学期、搜索、筛选、排序和课程详情，忽略旧语言参数；评测页 URL 保存 `q`。使用 `history.replaceState`，不要让每次输入污染浏览历史。
 - 收藏、收藏夹与账号状态都不进入 URL，`syncURL()` 与 `readURLState()` 不得写入或读取任何收藏、收藏夹或账号参数；个人中心全屏视图 `#accountView` 用 `history.pushState` 支持系统返回键关闭并监听 `popstate`，不写查询参数。会话只存在于 HttpOnly cookie `pinhaoke_session` 中，脚本不可读；`localStorage.pinhaoke_fav_mode` 只是“上次已登录”的提示，用来决定页面加载时是否请求 `GET /api/account`，`authenticated: false` 时清除，它不能替代服务器判断。收藏请求使用 `credentials: 'same-origin'` 与 `cache: 'no-store'`，收到 401 时清空本地账号状态并回到未登录态。
 - 搜索、筛选、热门课程和详情请求使用 `AbortController` 或请求序号拒绝过时响应。修改时不得重新引入快速切换导致旧请求覆盖新状态的竞态。
