@@ -665,7 +665,7 @@ class FrontendContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def test_treehole_reviews_is_adjacent_to_ordered_term_controls(self):
+    def test_treehole_entry_is_temporarily_hidden_and_terms_stay_ordered(self):
         spring = HTML.index('id="termSpringBtn"')
         summer = HTML.index('id="termSummerBtn"')
         fall = HTML.index('id="termFallBtn"')
@@ -675,7 +675,8 @@ class FrontendContractTests(unittest.TestCase):
         self.assertLess(fall, reviews)
         anchor = HTML[reviews:reviews + 180]
         self.assertIn('href="/reviews"', anchor)
-        self.assertNotIn(" hidden>", anchor)
+        self.assertIn(" hidden>", anchor)
+        self.assertIn('<div class="review-nav-shell" hidden>', REVIEWS_HTML)
 
     def test_message_board_button_and_panel_contract(self):
         # 两页顶栏都有留言按钮：课程页位于语言切换旁，评测页位于主题切换前
@@ -815,7 +816,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('class="footer-contact"', HTML)
 
     def test_about_panel_stays_open_and_allows_text_selection(self):
-        self.assertIn('class="tip-wrap about-wrap"', HTML)
+        self.assertIn('class="tip-wrap about-wrap" hidden>', HTML)
         self.assertIn(".about-wrap:hover::after", HTML)
         self.assertIn("pointer-events: auto;", HTML)
         self.assertIn("-webkit-user-select: text;", HTML)
@@ -892,7 +893,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('id="backTop"', REVIEWS_HTML)
         self.assertIn("window.scrollY > 600", REVIEWS_HTML)
         # 顶栏右侧与课程页一致：主题、关于悬浮卡；GitHub 与赞助并列在关于卡头部下方
-        self.assertIn('class="tip-wrap about-wrap"', REVIEWS_HTML)
+        self.assertIn('class="tip-wrap about-wrap" hidden>', REVIEWS_HTML)
         self.assertIn('class="tip-card about-tip"', REVIEWS_HTML)
         self.assertIn(".about-wrap:hover::after", REVIEWS_HTML)
         self.assertIn("user-select: text;", REVIEWS_HTML)
